@@ -4,26 +4,26 @@ const RAZONES = [
   {
     title: "Experiencia & Calidad",
     description:
-      "Equipo multidisciplinario con años de experiencia en desarrollo web y ciberseguridad. Soluciones hechas a medida con altos estándares.",
+      "Contamos con un equipo multidisciplinario con años de experiencia en desarrollo web y ciberseguridad, ofreciendo soluciones a la medida con altos estándares de calidad.",
     path: "M9 11l3 3L22 4M21 12.3v5.7A2 2 0 0 1 19 20H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h11.3",
   },
   {
     title: "Seguridad Digital Real",
     description:
-      "Cuidamos tu información con protocolos avanzados, auditorías, monitoreo y prácticas de ciberseguridad de nivel empresarial.",
+      "Cuidamos tu información con protocolos avanzados, auditorías periódicas, monitoreo constante y prácticas de ciberseguridad de nivel empresarial.",
     path: "M12 22s8-4 8-10V7l-8-5-8 5v5c0 6 8 10 8 10z",
   },
   {
     title: "Atención Personalizada",
     description:
-      "Te escuchamos y te acompañamos desde la planeación hasta la entrega final. ¡Cuentas con nuestro respaldo real!",
+      "Te escuchamos y te acompañamos desde la planeación hasta la entrega final, con un respaldo real en cada etapa del proyecto.",
     path: "M18 8A6 6 0 0 0 6 8c0 6-3 7-3 7h18s-3-1-3-7",
     extraCircle: true,
   },
   {
     title: "Innovación Constante",
     description:
-      "Usamos herramientas actuales y probadas, combinando creatividad y minimalismo para que tu negocio destaque.",
+      "Trabajamos con herramientas actuales y probadas, combinando creatividad y minimalismo para que tu negocio destaque frente a la competencia.",
     path: "M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z",
     extraPolyline: true,
   },
@@ -57,7 +57,7 @@ export default function PorQueTechPlace() {
                   {razon.extraPolyline && <polyline points="13 2 13 9 20 9" />}
                 </svg>
                 <h3 className="text-xl font-bold text-white mb-2">{razon.title}</h3>
-                <p className="text-gray-300 text-base">{razon.description}</p>
+                <p className="text-gray-300 text-base text-justify">{razon.description}</p>
               </div>
             </Reveal>
           ))}

@@ -52,7 +52,7 @@ export default function ServiceCard({
         </motion.div>
       </div>
       <h3 className="text-2xl font-bold text-white mb-2 drop-shadow">{title}</h3>
-      <p className="text-gray-300 mb-3">{description}</p>
+      <p className="text-gray-300 mb-3 text-justify">{description}</p>
       <a
         href={linkHref}
         className="inline-block mt-2 text-brand-blue font-bold underline underline-offset-4 hover:text-brand-blue transition duration-200"

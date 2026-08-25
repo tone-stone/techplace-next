@@ -124,15 +124,26 @@ html {
   }
 }
 
-/* Continuously shifting purple -> blue (brand logo blue #90cddd) gradient for primary buttons. */
+/* Mostly-purple gradient for primary buttons; blue (brand logo blue #90cddd) appears briefly as an accent. */
 .tp-btn-animated {
-  background-image: linear-gradient(90deg, #7e22ce, #4338ca, #90cddd, #5e8590, #7e22ce);
-  background-size: 300% 100%;
-  animation: tp-gradient-shift 6s ease-in-out infinite;
+  background-image: linear-gradient(
+    90deg,
+    #7e22ce 0%,
+    #6b21a8 18%,
+    #7e22ce 34%,
+    #5b21b6 46%,
+    #4338ca 56%,
+    #90cddd 63%,
+    #4338ca 70%,
+    #6b21a8 84%,
+    #7e22ce 100%
+  );
+  background-size: 400% 100%;
+  animation: tp-gradient-shift 12s ease-in-out infinite;
 }
 
 .tp-btn-animated:hover {
-  animation-duration: 2.5s;
+  animation-duration: 6s;
 }
 
 @keyframes tp-gradient-shift {
@@ -347,11 +358,66 @@ html {
   opacity: 0.55;
 }
 
+/* Swiper's own CSS sets .swiper-slide { display: block }, which can win the cascade over
+   Tailwind's .flex utility and silently break items-center centering inside slides. */
+.tp-swiper .swiper-slide {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
 .tp-glass {
   background: rgba(255, 255, 255, 0.055);
   backdrop-filter: blur(18px);
   border: 1px solid rgba(255, 255, 255, 0.1);
   box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.25);
+}
+
+/* Darker glass variant for the blog cards, so they contrast against the Aurora background
+   instead of blending into it like the lighter .tp-glass tint. */
+.tp-blog-card {
+  background: rgba(8, 6, 20, 0.55);
+  backdrop-filter: blur(18px);
+  border: 1px solid rgba(99, 102, 241, 0.16);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
+  transition:
+    background-color 0.3s,
+    border-color 0.3s,
+    box-shadow 0.3s;
+}
+
+.tp-blog-card:hover {
+  background: rgba(14, 10, 30, 0.7);
+  border-color: rgba(99, 102, 241, 0.4);
+  box-shadow: 0 8px 32px 0 rgba(79, 70, 229, 0.15);
+}
+
+/* Static dark panel for blog article content/CTA blocks — same dark tint as .tp-blog-card
+   but without the hover/lift behavior, since these aren't clickable cards. */
+.tp-dark-card {
+  background: rgba(8, 6, 20, 0.55);
+  backdrop-filter: blur(18px);
+  border: 1px solid rgba(99, 102, 241, 0.16);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
+}
+
+/* Admin variant of .tp-dark-card — same dark panel, but tinted with the site's
+   brand purple instead of indigo, so the admin dashboard reads visually distinct
+   from the redactor dashboard. */
+.tp-dark-card-admin {
+  background: rgba(8, 6, 20, 0.55);
+  backdrop-filter: blur(18px);
+  border: 1px solid rgba(168, 85, 247, 0.2);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
+}
+
+/* Darker glass variant for dropdown/flyout menus, so they read as a distinct panel
+   over the page instead of the lighter .tp-glass tint used on inline cards. */
+.tp-dropdown-glass {
+  background: rgba(10, 8, 22, 0.92);
+  backdrop-filter: blur(18px);
+  border: 1px solid rgba(147, 51, 234, 0.2);
+  box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.5);
 }
 
 .tp-glass-hover {

@@ -5,7 +5,7 @@ const ESPECIALIDADES = [
   {
     title: "Cyberseguridad & Infraestructura",
     description:
-      "Especialistas en proteger datos, redes y sistemas ante amenazas digitales. Implementación de controles, hardening, monitoreo y respuesta.",
+      "Nos especializamos en proteger datos, redes y sistemas ante amenazas digitales, implementando controles de seguridad, hardening, monitoreo constante y respuesta ante incidentes.",
     icon: (
       <svg width="48" height="48" fill="none" viewBox="0 0 48 48">
         <path
@@ -22,7 +22,7 @@ const ESPECIALIDADES = [
   {
     title: "Desarrollo Web & UX/UI",
     description:
-      "Creamos sitios web premium, optimizados y seguros. Diseño minimalista, enfoque en la experiencia del usuario e integración de arte y tecnología.",
+      "Creamos sitios web premium, optimizados y seguros, con un diseño minimalista centrado en la experiencia del usuario que integra arte y tecnología.",
     icon: (
       <svg width="48" height="48" fill="none" viewBox="0 0 48 48">
         <rect x="6" y="10" width="36" height="22" rx="4" stroke="#a78bfa" strokeWidth="2.2" fill="none" />
@@ -37,9 +37,26 @@ const ESPECIALIDADES = [
     ),
   },
   {
+    title: "Desarrollo Móvil & Apps",
+    description:
+      "Desarrollamos apps multiplataforma con React Native a partir de una sola base de código para iOS, Android y Web, logrando rendimiento nativo y ciclos de entrega ágiles.",
+    icon: (
+      <svg width="48" height="48" fill="none" viewBox="0 0 48 48">
+        <rect x="15" y="5" width="18" height="38" rx="4" stroke="#a78bfa" strokeWidth="2.2" fill="none" />
+        <line x1="15" y1="12" x2="33" y2="12" stroke="#a78bfa" strokeWidth="2.2" />
+        <line x1="15" y1="34" x2="33" y2="34" stroke="#a78bfa" strokeWidth="2.2" />
+        <circle cx="24" cy="38.5" r="1.6" fill="#c4b5fd" />
+        <rect x="19" y="17" width="5" height="5" rx="1.2" stroke="#c4b5fd" strokeWidth="1.8" />
+        <rect x="25.5" y="17" width="5" height="5" rx="1.2" stroke="#c4b5fd" strokeWidth="1.8" />
+        <rect x="19" y="23.5" width="5" height="5" rx="1.2" stroke="#c4b5fd" strokeWidth="1.8" />
+        <rect x="25.5" y="23.5" width="5" height="5" rx="1.2" stroke="#c4b5fd" strokeWidth="1.8" />
+      </svg>
+    ),
+  },
+  {
     title: "Consultoría & Innovación Digital",
     description:
-      "Te asesoramos para impulsar tu transformación tecnológica: migraciones, optimización IT, adopción de nuevas herramientas y acompañamiento estratégico.",
+      "Te asesoramos para impulsar tu transformación tecnológica, acompañándote en migraciones, optimización de IT, adopción de nuevas herramientas y decisiones estratégicas.",
     icon: (
       <svg width="48" height="48" fill="none" viewBox="0 0 48 48">
         <circle cx="16" cy="24" r="4" stroke="#a78bfa" strokeWidth="2.2" />
@@ -73,15 +90,16 @@ export default function Nosotros() {
           </h2>
         </Reveal>
         <Reveal delay={0.1}>
-          <p className="mb-10 text-gray-300 text-lg md:text-xl font-light">
-            En TechPlace, reunimos <span className="text-purple-400 font-semibold">talento multidisciplinario</span>{" "}
-            apasionado por la tecnología, la seguridad y el diseño. Nuestra fortaleza radica en la{" "}
-            <span className="text-purple-400">innovación digital</span> y la creación de experiencias web seguras,
-            eficientes y visualmente impactantes.
+          <p className="mb-10 text-gray-300 text-lg md:text-xl font-light text-justify">
+            En TechPlace reunimos un{" "}
+            <span className="text-purple-400 font-semibold">equipo multidisciplinario</span>{" "}
+            apasionado por la tecnología, la seguridad y el diseño. Nuestra fortaleza está en la{" "}
+            <span className="text-purple-400">innovación digital</span> y en crear experiencias web y
+            móviles seguras, eficientes y visualmente impactantes.
           </p>
         </Reveal>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-10 mb-16">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-10 mb-16">
           {ESPECIALIDADES.map((item, i) => (
             <Reveal key={item.title} delay={i * 0.12}>
               <div className="tp-glass tp-glass-hover rounded-2xl p-8 flex flex-col items-center group transition-all duration-300 hover:-translate-y-1">
@@ -89,7 +107,7 @@ export default function Nosotros() {
                 <h3 className="text-xl font-bold text-white group-hover:text-purple-300 transition-colors duration-300">
                   {item.title}
                 </h3>
-                <p className="text-gray-300 text-sm mt-2">{item.description}</p>
+                <p className="text-gray-300 text-sm mt-2 text-justify">{item.description}</p>
               </div>
             </Reveal>
           ))}
@@ -98,7 +116,7 @@ export default function Nosotros() {
         <div className="flex flex-col md:flex-row items-center justify-center gap-10">
           <Reveal className="text-left max-w-lg" y={0}>
             <h4 className="text-2xl font-bold text-white mb-2">Nuestra Misión</h4>
-            <p className="text-gray-300 mb-4">
+            <p className="text-gray-300 mb-4 text-justify">
               Impulsar la transformación de negocios y personas a través de la{" "}
               <span className="text-purple-400 font-semibold">innovación tecnológica</span> y la{" "}
               <span className="text-purple-400 font-semibold">protección digital</span>, creando soluciones seguras,

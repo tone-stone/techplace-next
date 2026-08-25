@@ -16,7 +16,9 @@ export async function proxy(request: NextRequest) {
           cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
           response = NextResponse.next({ request })
           cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options)
+            // Session-only cookie: no maxAge/expires, so the browser drops the
+            // login when the browser (or tab session) actually closes.
+            response.cookies.set(name, value, { ...options, maxAge: undefined, expires: undefined })
           )
         },
       },
@@ -27,9 +29,18 @@ export async function proxy(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  if (!user && request.nextUrl.pathname.startsWith('/admin')) {
+  const isUnderPath = (base: string) =>
+    request.nextUrl.pathname === base || request.nextUrl.pathname.startsWith(`${base}/`)
+
+  if (!user && isUnderPath('/admin')) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
+    return NextResponse.redirect(url)
+  }
+
+  if (!user && isUnderPath('/blog/dashboard')) {
+    const url = request.nextUrl.clone()
+    url.pathname = '/blog/login'
     return NextResponse.redirect(url)
   }
 

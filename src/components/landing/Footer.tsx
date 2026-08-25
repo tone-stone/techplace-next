@@ -1,14 +1,16 @@
 import Image from "next/image";
+import Link from "next/link";
 import { Clock4, Mail, MapPin, Phone } from "lucide-react";
 import { FaFacebookF, FaGithub, FaLinkedinIn, FaWhatsapp } from "react-icons/fa6";
 import Reveal from "./Reveal";
 
 const NAV_LINKS = [
-  { href: "#home", label: "Inicio" },
-  { href: "#servicios", label: "Servicios" },
-  { href: "#nosotros", label: "Nosotros" },
-  { href: "#portafolio", label: "Portafolio" },
-  { href: "#contacto", label: "Contacto" },
+  { href: "/#home", label: "Inicio" },
+  { href: "/#servicios", label: "Servicios" },
+  { href: "/#nosotros", label: "Nosotros" },
+  { href: "/#portafolio", label: "Portafolio" },
+  { href: "/blog", label: "Blog" },
+  { href: "/#contacto", label: "Contacto" },
 ];
 
 const SOCIAL_LINKS = [
@@ -60,7 +62,7 @@ export default function Footer() {
                 className="h-16 w-auto mb-3 drop-shadow-[0_0_16px_rgba(144,205,221,0.35)]"
               />
               <p className="text-sm leading-relaxed">
-                Desarrollo Web &nbsp;|&nbsp; Cyberseguridad <br />
+                Desarrollo Web &nbsp;|&nbsp; Apps Móviles &nbsp;|&nbsp; Cyberseguridad <br />
                 Innovación que protege tu futuro digital.
               </p>
             </div>
@@ -72,9 +74,9 @@ export default function Footer() {
               <ul className="space-y-2 text-sm">
                 {NAV_LINKS.map((link) => (
                   <li key={link.href}>
-                    <a href={link.href} className="hover:text-brand-blue hover:pl-1 transition-all">
+                    <Link href={link.href} className="hover:text-brand-blue hover:pl-1 transition-all">
                       {link.label}
-                    </a>
+                    </Link>
                   </li>
                 ))}
               </ul>
