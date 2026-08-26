@@ -20,6 +20,10 @@ describe("StatusBadge", () => {
     ["enviada", "Enviada"],
     ["pagada", "Pagada"],
     ["vencida", "Vencida"],
+    ["aceptada", "Aceptada"],
+    ["rechazada", "Rechazada"],
+    ["por_hacer", "Por hacer"],
+    ["terminado", "Terminado"],
   ])("maps status %s to label %s", (status, label) => {
     render(<StatusBadge status={status} />);
     expect(screen.getByText(label)).toBeInTheDocument();

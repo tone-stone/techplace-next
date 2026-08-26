@@ -14,6 +14,12 @@ const STYLES: Record<string, string> = {
   enviada: "border-sky-400/30 bg-sky-500/10 text-sky-300",
   pagada: "border-emerald-400/30 bg-emerald-500/10 text-emerald-300",
   vencida: "border-red-400/30 bg-red-500/10 text-red-300",
+  // cotizaciones
+  aceptada: "border-emerald-400/30 bg-emerald-500/10 text-emerald-300",
+  rechazada: "border-red-400/30 bg-red-500/10 text-red-300",
+  // tareas
+  por_hacer: "border-gray-400/30 bg-gray-500/10 text-gray-400",
+  terminado: "border-emerald-400/30 bg-emerald-500/10 text-emerald-300",
 };
 
 const LABELS: Record<string, string> = {
@@ -29,6 +35,10 @@ const LABELS: Record<string, string> = {
   enviada: "Enviada",
   pagada: "Pagada",
   vencida: "Vencida",
+  aceptada: "Aceptada",
+  rechazada: "Rechazada",
+  por_hacer: "Por hacer",
+  terminado: "Terminado",
 };
 
 export default function StatusBadge({ status }: { status: string }) {

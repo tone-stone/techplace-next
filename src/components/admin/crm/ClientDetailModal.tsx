@@ -22,7 +22,7 @@ import {
   type ClientDetail,
   type CrmActionState,
 } from "@/lib/crm/clients";
-import { formatCurrencyMXN } from "@/lib/crm/mock-data";
+import { formatCurrencyMXN } from "@/lib/crm/format";
 import { getDueDateUrgency } from "@/lib/crm/plan-status";
 import StatusBadge from "./StatusBadge";
 

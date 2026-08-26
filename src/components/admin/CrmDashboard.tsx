@@ -4,6 +4,8 @@ import { useState } from "react";
 import Image from "next/image";
 import {
   Briefcase,
+  FileText,
+  Kanban,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -13,29 +15,44 @@ import {
 } from "lucide-react";
 import { logout } from "@/lib/auth/actions";
 import type { ClientPayment, CrmClient } from "@/lib/crm/clients";
-import { MOCK_INVOICES, MOCK_PROJECTS } from "@/lib/crm/mock-data";
+import type { CrmProject } from "@/lib/crm/projects";
+import type { CrmInvoice } from "@/lib/crm/invoices";
+import type { CrmQuote } from "@/lib/crm/quotes";
+import type { CrmTask } from "@/lib/crm/tasks";
 import OverviewSection from "./crm/OverviewSection";
 import ClientsSection from "./crm/ClientsSection";
 import ProjectsSection from "./crm/ProjectsSection";
 import InvoicesSection from "./crm/InvoicesSection";
+import QuotesSection from "./crm/QuotesSection";
+import TasksSection from "./crm/TasksSection";
 
-type Section = "resumen" | "clientes" | "proyectos" | "facturacion";
+type Section = "resumen" | "clientes" | "proyectos" | "facturacion" | "cotizaciones" | "tareas";
 
 const NAV_ITEMS: { id: Section; label: string; icon: typeof Users }[] = [
   { id: "resumen", label: "Resumen", icon: LayoutDashboard },
   { id: "clientes", label: "Clientes", icon: Users },
   { id: "proyectos", label: "Proyectos", icon: Briefcase },
   { id: "facturacion", label: "Facturación", icon: Receipt },
+  { id: "cotizaciones", label: "Cotizaciones", icon: FileText },
+  { id: "tareas", label: "Tareas", icon: Kanban },
 ];
 
 export default function CrmDashboard({
   email,
   clients,
   payments,
+  projects,
+  invoices,
+  quotes,
+  tasks,
 }: {
   email: string;
   clients: CrmClient[];
   payments: ClientPayment[];
+  projects: CrmProject[];
+  invoices: CrmInvoice[];
+  quotes: CrmQuote[];
+  tasks: CrmTask[];
 }) {
   const [section, setSection] = useState<Section>("resumen");
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -152,11 +169,15 @@ export default function CrmDashboard({
           </div>
 
           {section === "resumen" && (
-            <OverviewSection clients={clients} projects={MOCK_PROJECTS} payments={payments} />
+            <OverviewSection clients={clients} projects={projects} payments={payments} />
           )}
           {section === "clientes" && <ClientsSection clients={clients} />}
-          {section === "proyectos" && <ProjectsSection projects={MOCK_PROJECTS} />}
-          {section === "facturacion" && <InvoicesSection invoices={MOCK_INVOICES} />}
+          {section === "proyectos" && <ProjectsSection projects={projects} clients={clients} />}
+          {section === "facturacion" && (
+            <InvoicesSection invoices={invoices} clients={clients} projects={projects} />
+          )}
+          {section === "cotizaciones" && <QuotesSection quotes={quotes} clients={clients} />}
+          {section === "tareas" && <TasksSection tasks={tasks} projects={projects} />}
         </main>
       </div>
     </div>

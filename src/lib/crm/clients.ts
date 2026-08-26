@@ -2,17 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { requireAdmin } from "./auth";
+import { addHistory, mapHistory, type ClientHistoryEntry, type HistoryEntryType } from "./history";
+
+export type { HistoryEntryType, ClientHistoryEntry } from "./history";
 
 export type ClientStatus = "lead" | "negociacion" | "activo" | "inactivo";
-export type HistoryEntryType =
-  | "nota"
-  | "llamada"
-  | "reunion"
-  | "email"
-  | "pago"
-  | "plan"
-  | "cambio_estado"
-  | "otro";
 export type PlanStatus = "activo" | "pausado" | "cancelado";
 export type BillingCycle = "mensual" | "trimestral" | "anual";
 export type PaymentStatus = "pendiente" | "pagado" | "vencido";
@@ -26,14 +21,6 @@ export type CrmClient = {
   status: ClientStatus;
   service: string | null;
   notes: string | null;
-  createdAt: string;
-};
-
-export type ClientHistoryEntry = {
-  id: string;
-  clientId: string;
-  entryType: HistoryEntryType;
-  description: string;
   createdAt: string;
 };
 
@@ -70,20 +57,6 @@ export type ClientDetail = {
 
 export type CrmActionState = { error: string } | { success: true } | null;
 
-async function requireAdmin() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) return { ok: false as const, error: "No autenticado" };
-
-  const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
-  if (profile?.role !== "admin") return { ok: false as const, error: "No tienes permisos de administrador" };
-
-  return { ok: true as const, userId: user.id };
-}
-
 function mapClient(row: {
   id: string;
   name: string;
@@ -104,22 +77,6 @@ function mapClient(row: {
     status: row.status as ClientStatus,
     service: row.service,
     notes: row.notes,
-    createdAt: row.created_at,
-  };
-}
-
-function mapHistory(row: {
-  id: string;
-  client_id: string;
-  entry_type: string;
-  description: string;
-  created_at: string;
-}): ClientHistoryEntry {
-  return {
-    id: row.id,
-    clientId: row.client_id,
-    entryType: row.entry_type as HistoryEntryType,
-    description: row.description,
     createdAt: row.created_at,
   };
 }
@@ -170,18 +127,6 @@ function mapPayment(row: {
     notes: row.notes,
     createdAt: row.created_at,
   };
-}
-
-async function addHistory(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  clientId: string,
-  entryType: HistoryEntryType,
-  description: string,
-  userId: string
-) {
-  await supabase
-    .from("crm_client_history")
-    .insert({ client_id: clientId, entry_type: entryType, description, created_by: userId });
 }
 
 export async function getClients(): Promise<CrmClient[]> {

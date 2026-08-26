@@ -1,6 +1,7 @@
 import { Briefcase, HandCoins, TrendingUp, Users } from "lucide-react";
 import type { ClientPayment, CrmClient } from "@/lib/crm/clients";
-import { formatCurrencyMXN, type Project } from "@/lib/crm/mock-data";
+import { formatCurrencyMXN } from "@/lib/crm/format";
+import type { CrmProject } from "@/lib/crm/projects";
 import StatusBadge from "./StatusBadge";
 
 export default function OverviewSection({
@@ -9,7 +10,7 @@ export default function OverviewSection({
   payments,
 }: {
   clients: CrmClient[];
-  projects: Project[];
+  projects: CrmProject[];
   payments: ClientPayment[];
 }) {
   const now = new Date();
@@ -35,7 +36,9 @@ export default function OverviewSection({
     { label: "Por cobrar", value: formatCurrencyMXN(pendingRevenue), icon: HandCoins },
   ];
 
-  const recentProjects = [...projects].sort((a, b) => a.dueDate.localeCompare(b.dueDate)).slice(0, 5);
+  const recentProjects = [...projects]
+    .sort((a, b) => (a.dueDate ?? "9999-99-99").localeCompare(b.dueDate ?? "9999-99-99"))
+    .slice(0, 5);
 
   return (
     <>
@@ -63,7 +66,9 @@ export default function OverviewSection({
             >
               <div className="min-w-0">
                 <p className="truncate font-semibold text-white">{project.name}</p>
-                <p className="text-xs text-gray-400">{project.client}</p>
+                <p className="text-xs text-gray-400">
+                  {clients.find((c) => c.id === project.clientId)?.company ?? "—"}
+                </p>
               </div>
               <div className="flex items-center gap-3">
                 <div className="h-1.5 w-24 overflow-hidden rounded-full bg-white/10">
