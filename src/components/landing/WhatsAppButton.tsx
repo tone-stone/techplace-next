@@ -10,10 +10,6 @@ export default function WhatsAppButton() {
       rel="noopener noreferrer"
       aria-label="WhatsApp"
       title="¡Envíanos un WhatsApp!"
-      // Empty touch handler so iOS Safari actually applies :active styles on
-      // tap — without it, WebKit skips :active entirely on elements with no
-      // touch listener in their ancestry.
-      onTouchStart={() => {}}
       className="tp-whatsapp-in group fixed bottom-6 right-6 z-50 flex items-center justify-center w-16 h-16 bg-green-500/40 backdrop-blur-md border border-white/20 rounded-full shadow-lg transition duration-200 hover:scale-[1.08] hover:bg-green-500/80 active:scale-95 active:bg-green-500/90"
     >
       <span className="absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-60 animate-ping" />

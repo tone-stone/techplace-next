@@ -88,11 +88,15 @@ export default function Navbar() {
     // cross-browser way to lock background scroll while the menu is open.
     const scrollY = window.scrollY;
     const body = document.body;
+    const html = document.documentElement;
     body.style.position = "fixed";
     body.style.top = `-${scrollY}px`;
     body.style.left = "0";
     body.style.right = "0";
     body.style.overflow = "hidden";
+    // Some iOS versions still rubber-band the document behind a fixed body
+    // unless the root element is also contained.
+    html.style.overflow = "hidden";
 
     return () => {
       body.style.position = "";
@@ -100,6 +104,7 @@ export default function Navbar() {
       body.style.left = "";
       body.style.right = "";
       body.style.overflow = "";
+      html.style.overflow = "";
       window.scrollTo(0, scrollY);
     };
   }, [menuOpen]);
@@ -197,7 +202,7 @@ export default function Navbar() {
           onClick={toggleMenu}
           aria-label={menuOpen ? "Cerrar menú" : "Abrir menú"}
           aria-expanded={menuOpen}
-          className="md:hidden relative z-50 flex items-center justify-center w-12 h-12 rounded-full text-purple-200 hover:text-brand-blue hover:bg-brand-blue/10 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue"
+          className="touch-manipulation md:hidden relative z-50 flex items-center justify-center w-12 h-12 rounded-full text-purple-200 hover:text-brand-blue hover:bg-brand-blue/10 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue"
         >
           <span className="relative block h-6 w-6">
             <Menu
@@ -223,7 +228,7 @@ export default function Navbar() {
                 href={link.href}
                 onClick={toggleMenu}
                 style={{ animationDelay: `${0.05 * i}s` }}
-                className={`tp-menu-link-in tp-nav-link-underline tp-mobile-nav-link${
+                className={`touch-manipulation tp-menu-link-in tp-nav-link-underline tp-mobile-nav-link${
                   isActive(link.href) ? " active" : ""
                 }`}
               >
@@ -235,7 +240,7 @@ export default function Navbar() {
                   href={child.href}
                   onClick={toggleMenu}
                   style={{ animationDelay: `${0.05 * i}s` }}
-                  className="tp-menu-link-in flex items-center gap-1.5 rounded-lg px-3 py-2 text-base font-normal text-gray-400 hover:text-brand-blue transition-colors"
+                  className="touch-manipulation tp-menu-link-in flex items-center gap-1.5 rounded-lg px-3 py-2 text-base font-normal text-gray-400 hover:text-brand-blue transition-colors"
                 >
                   {child.href === "/blog/login" && <PenSquare className="h-3.5 w-3.5" />}
                   {child.label}

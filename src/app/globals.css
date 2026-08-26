@@ -442,6 +442,11 @@ html {
   z-index: -10;
   overflow: hidden;
   background: #0a0a18;
+  /* Purely decorative and full-viewport — never let it intercept taps. Some
+     WebKit versions have had stacking-context/hit-testing quirks with
+     negative z-index elements, so this is a defensive belt-and-suspenders,
+     not just relying on z-index ordering. */
+  pointer-events: none;
 }
 
 .tp-aurora::before {
