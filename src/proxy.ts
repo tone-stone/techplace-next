@@ -2,6 +2,16 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function proxy(request: NextRequest) {
+  const isUnderPath = (base: string) =>
+    request.nextUrl.pathname === base || request.nextUrl.pathname.startsWith(`${base}/`)
+
+  // Only /admin and /blog/dashboard gate on auth — skip the Supabase round trip
+  // (a network call) on every other route so normal pages aren't slowed down by it.
+  const needsAuthCheck = isUnderPath('/admin') || isUnderPath('/blog/dashboard')
+  if (!needsAuthCheck) {
+    return NextResponse.next({ request })
+  }
+
   let response = NextResponse.next({ request })
 
   const supabase = createServerClient(
@@ -28,9 +38,6 @@ export async function proxy(request: NextRequest) {
   const {
     data: { user },
   } = await supabase.auth.getUser()
-
-  const isUnderPath = (base: string) =>
-    request.nextUrl.pathname === base || request.nextUrl.pathname.startsWith(`${base}/`)
 
   if (!user && isUnderPath('/admin')) {
     const url = request.nextUrl.clone()

@@ -7,6 +7,8 @@ import { ChevronDown, LogIn, Menu, PenSquare, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 
+const MotionLink = motion.create(Link);
+
 const NAV_LINKS = [
   { href: "/#home", label: "Inicio" },
   { href: "/#servicios", label: "Servicios" },
@@ -226,7 +228,7 @@ export default function Navbar() {
           >
             {NAV_LINKS.map((link, i) => (
               <div key={link.href} className="flex flex-col items-center gap-4">
-                <motion.a
+                <MotionLink
                   href={link.href}
                   onClick={toggleMenu}
                   initial={{ opacity: 0, y: 16 }}
@@ -235,9 +237,9 @@ export default function Navbar() {
                   className={`tp-nav-link-underline tp-mobile-nav-link${isActive(link.href) ? " active" : ""}`}
                 >
                   {link.label}
-                </motion.a>
+                </MotionLink>
                 {link.children?.map((child) => (
-                  <motion.a
+                  <MotionLink
                     key={child.href}
                     href={child.href}
                     onClick={toggleMenu}
@@ -248,7 +250,7 @@ export default function Navbar() {
                   >
                     {child.href === "/blog/login" && <PenSquare className="h-3.5 w-3.5" />}
                     {child.label}
-                  </motion.a>
+                  </MotionLink>
                 ))}
               </div>
             ))}
