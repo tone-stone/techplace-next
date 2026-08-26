@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { ManagedUser } from "@/lib/auth/users";
 import { deleteArticleAction, listArticles, type ManagedArticle } from "@/lib/blog/articles";
 import AdminDashboard from "./AdminDashboard";
@@ -20,6 +20,18 @@ export default function DashboardClient({
   initialUsers: ManagedUser[];
   initialArticles: ManagedArticle[];
 }) {
+  useEffect(() => {
+    // pagehide fires when this tab/window actually closes or navigates away
+    // to a different site — not on in-app client-side navigation, and not on
+    // switching to another tab/app — so the session ends with the tab it was
+    // opened in instead of outliving it.
+    const endSession = () => {
+      navigator.sendBeacon("/api/auth/close-session");
+    };
+    window.addEventListener("pagehide", endSession);
+    return () => window.removeEventListener("pagehide", endSession);
+  }, []);
+
   const [role, setRole] = useState<DashboardRole>(initialRole);
   const isRealAdmin = initialRole === "admin";
   const handleRoleChange = (next: DashboardRole) => {

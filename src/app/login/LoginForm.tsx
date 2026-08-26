@@ -7,7 +7,7 @@ import { motion } from "motion/react";
 import { login, type LoginState } from "@/lib/auth/actions";
 
 const inputClasses =
-  "tp-glass-input w-full pl-12 pr-4 py-3 rounded-xl text-purple-100 placeholder-purple-400 focus:border-brand-blue focus:ring focus:ring-brand-blue/40 outline-none transition";
+  "tp-glass-input w-full pl-12 pr-4 py-2.5 sm:py-3 rounded-xl text-purple-100 placeholder-purple-400 focus:border-brand-blue focus:ring focus:ring-brand-blue/40 outline-none transition";
 
 function SubmitButton() {
   const { pending } = useFormStatus();
@@ -18,7 +18,7 @@ function SubmitButton() {
       disabled={pending}
       whileHover={{ scale: pending ? 1 : 1.02 }}
       whileTap={{ scale: pending ? 1 : 0.98 }}
-      className="tp-btn-animated w-full py-3 rounded-xl font-bold text-white relative shadow-lg transition-opacity duration-200 disabled:opacity-60"
+      className="tp-btn-animated w-full py-2.5 sm:py-3 rounded-xl font-bold text-white relative shadow-lg transition-opacity duration-200 disabled:opacity-60"
     >
       <span className="inline-flex items-center gap-2">
         <LogIn className="h-4 w-4" />
@@ -39,7 +39,7 @@ export default function LoginForm({ redirectTo = "/admin" }: { redirectTo?: stri
   }
 
   return (
-    <form action={formAction} className="space-y-5">
+    <form action={formAction} className="space-y-4 sm:space-y-5">
       <input type="hidden" name="redirectTo" value={redirectTo} />
       <div className="relative">
         <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-purple-400" />
