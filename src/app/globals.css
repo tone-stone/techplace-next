@@ -374,6 +374,16 @@ html {
   opacity: 0.55;
 }
 
+/* The infinite float animation forces continuous GPU recompositing of 5 large
+   blurred layers, which on mid/low-end mobile GPUs competes with the navbar's
+   and blog cards' own backdrop-filter blur for memory and can crash the tab.
+   Keep the blobs as a static blurred backdrop on small viewports instead. */
+@media (max-width: 767px) {
+  .tp-aurora-blob {
+    animation: none !important;
+  }
+}
+
 /* Swiper's own CSS sets .swiper-slide { display: block }, which can win the cascade over
    Tailwind's .flex utility and silently break items-center centering inside slides. */
 .tp-swiper .swiper-slide {
