@@ -58,9 +58,7 @@ export default async function BlogPage() {
             </p>
           </Reveal>
 
-          <Reveal delay={0.15}>
-            <BlogListClient items={items} categories={categories} />
-          </Reveal>
+          <BlogListClient items={items} categories={categories} />
         </div>
       </main>
 
