@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createPublicClient } from "@/lib/supabase/public";
 import cloudinary from "@/lib/cloudinary";
 import { MAX_IMAGE_BYTES, MAX_VIDEO_BYTES, formatBytes } from "@/lib/blog/media-limits";
 
@@ -85,7 +86,7 @@ export async function estimateReadTime(html: string): Promise<string> {
 }
 
 export async function getPublishedArticles(): Promise<ManagedArticle[]> {
-  const supabase = await createClient();
+  const supabase = createPublicClient();
   const { data } = await supabase
     .from("articles")
     .select("*")
@@ -101,7 +102,7 @@ export async function getOtherArticles(excludeSlug: string): Promise<ManagedArti
 }
 
 export async function getPublishedArticleBySlug(slug: string): Promise<ManagedArticle | null> {
-  const supabase = await createClient();
+  const supabase = createPublicClient();
   const { data } = await supabase
     .from("articles")
     .select("*")

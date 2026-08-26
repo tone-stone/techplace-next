@@ -90,8 +90,47 @@ html {
   animation-delay: 1.2s;
 }
 
-.tp-heroSwiper .swiper-slide-active h1 {
-  animation: tp-fadein 1s cubic-bezier(0.4, 0, 0.2, 1);
+/* Hero headline crossfade — was a single-slide Swiper (Autoplay + EffectFade)
+   just to cycle 3 strings, pulling Swiper's JS/CSS into the homepage for
+   that alone. Stacking all three in one grid cell and phase-shifting each
+   one's animation-delay gets the same crossfade with zero JS: each h1's
+   local animation clock is offset by its delay, then repeats every
+   `duration` (this works for infinite animations too — the delay isn't
+   re-applied per loop, only the starting phase is shifted). */
+.tp-hero-slides {
+  display: grid;
+}
+
+.tp-hero-slide {
+  grid-area: 1 / 1;
+  opacity: 0;
+  animation: tp-hero-crossfade 8.4s ease-in-out infinite;
+}
+
+@keyframes tp-hero-crossfade {
+  0%,
+  4% {
+    opacity: 0;
+  }
+  8%,
+  25% {
+    opacity: 1;
+  }
+  29%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tp-hero-slide {
+    animation: none;
+    opacity: 0;
+  }
+
+  .tp-hero-slide:first-child {
+    opacity: 1;
+  }
 }
 
 @keyframes tp-fadein {
@@ -167,6 +206,34 @@ html {
 
 .tp-menu-overlay-in {
   animation: tp-fade 0.25s ease-out both;
+}
+
+/* Contacto form status message — was a Framer Motion shake/fade keyed on
+   the message text so React remounts (and thus re-triggers) it each time. */
+.tp-fade-in {
+  animation: tp-fade 0.4s ease-out both;
+}
+
+@keyframes tp-shake {
+  0% {
+    transform: translateX(-6px);
+  }
+  25% {
+    transform: translateX(6px);
+  }
+  50% {
+    transform: translateX(-4px);
+  }
+  75% {
+    transform: translateX(4px);
+  }
+  100% {
+    transform: translateX(0);
+  }
+}
+
+.tp-shake {
+  animation: tp-shake 0.4s ease-out;
 }
 
 .tp-menu-link-in {
@@ -501,6 +568,17 @@ html {
     background-color 0.3s,
     border-color 0.3s,
     box-shadow 0.3s;
+  /* Skips layout/paint for off-screen cards entirely. Without this, every
+     card on the blog grid (each holding two blurred next/image layers) has
+     to be repainted whenever an ancestor reflows — which is exactly what
+     happens when the mobile menu opens (Navbar pins <body> to position:
+     fixed, reflowing the whole document behind it). On a real phone that
+     repaint of a dozen blurred cards is what reads as the menu "freezing";
+     a dev machine's GPU hides the cost entirely. contain-intrinsic-size
+     reserves roughly a card's real height so nothing jumps before it's
+     first measured. */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 420px;
 }
 
 .tp-blog-card:hover {

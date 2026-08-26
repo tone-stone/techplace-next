@@ -1,7 +1,6 @@
 "use client";
 
 import { useRef, type ReactNode } from "react";
-import { motion } from "motion/react";
 
 type ServiceCardProps = {
   icon: ReactNode;
@@ -43,13 +42,9 @@ export default function ServiceCard({
       className="tp-glass tp-glass-hover group relative rounded-2xl p-10 overflow-hidden transition-transform duration-300 will-change-transform"
     >
       <div className="mb-6 flex justify-center relative">
-        <motion.div
-          whileHover={{ scale: 1.15, rotate: -6 }}
-          transition={{ type: "spring", stiffness: 300, damping: 12 }}
-          className="tp-icon-glow text-purple-300 group-hover:text-purple-400 transition-colors duration-300"
-        >
+        <div className="tp-icon-glow text-purple-300 transition-[color,transform] duration-300 group-hover:text-purple-400 group-hover:scale-[1.15] group-hover:-rotate-6">
           {icon}
-        </motion.div>
+        </div>
       </div>
       <h3 className="text-2xl font-bold text-white mb-2 drop-shadow">{title}</h3>
       <p className="text-gray-300 mb-3 text-justify">{description}</p>

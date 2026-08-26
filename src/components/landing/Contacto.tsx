@@ -3,7 +3,6 @@
 import Image from "next/image";
 import { Globe, Mail, MapPin, MessageSquare, Send, User } from "lucide-react";
 import { FaFacebookF, FaWhatsapp } from "react-icons/fa6";
-import { motion } from "motion/react";
 import { useState } from "react";
 import Reveal from "./Reveal";
 
@@ -89,32 +88,23 @@ export default function Contacto() {
               <input type="text" name="_gotcha" className="hidden" tabIndex={-1} autoComplete="off" />
 
               {estado && (
-                <motion.p
+                <p
                   key={estado.message}
-                  initial={estado.error ? { x: -6 } : { opacity: 0 }}
-                  animate={
-                    estado.error
-                      ? { x: [-6, 6, -4, 4, 0] }
-                      : { opacity: 1 }
-                  }
-                  transition={{ duration: 0.4 }}
-                  className={`text-sm ${estado.error ? "text-red-400" : "text-purple-300"}`}
+                  className={`text-sm ${estado.error ? "tp-shake text-red-400" : "tp-fade-in text-purple-300"}`}
                 >
                   {estado.message}
-                </motion.p>
+                </p>
               )}
 
-              <motion.button
+              <button
                 type="submit"
                 disabled={enviando}
-                whileHover={{ scale: enviando ? 1 : 1.03 }}
-                whileTap={{ scale: enviando ? 1 : 0.97 }}
-                className="tp-btn-animated relative px-10 py-3 rounded-full font-bold shadow-lg transition-opacity duration-300 text-lg text-white outline-none focus-visible:ring-2 focus-visible:ring-brand-blue disabled:opacity-60"
+                className="tp-btn-animated relative px-10 py-3 rounded-full font-bold shadow-lg transition-[opacity,transform] duration-300 text-lg text-white outline-none focus-visible:ring-2 focus-visible:ring-brand-blue disabled:opacity-60 not-disabled:hover:scale-[1.03] not-disabled:active:scale-[0.97]"
               >
                 <span className="inline-flex items-center gap-2">
                   <Send className="h-4 w-4" /> Enviar mensaje
                 </span>
-              </motion.button>
+              </button>
             </form>
             <div className="mt-10 text-gray-400 text-left space-y-3">
               <a

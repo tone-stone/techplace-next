@@ -8,6 +8,11 @@ import BlogPostCard from "@/components/blog/BlogPostCard";
 import BlogListClient from "@/components/blog/BlogListClient";
 import { getPublishedArticles } from "@/lib/blog/articles";
 
+// Articles rarely change more than a few times a day; revalidating on a
+// timer instead of on every request avoids a live Supabase round-trip per
+// visit (this route was fully dynamic — ƒ in the build output).
+export const revalidate = 60;
+
 const TITLE = "Blog | TechPlace";
 const DESCRIPTION =
   "Noticias, tendencias y guías sobre desarrollo de software, ciberseguridad e inteligencia artificial, escritas por el equipo de TechPlace en Tijuana.";

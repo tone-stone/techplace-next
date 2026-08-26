@@ -2,16 +2,25 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
+import dynamic from "next/dynamic";
 import { ExternalLink, X } from "lucide-react";
 import { FaFacebookF, FaGithub, FaLinkedinIn, FaWhatsapp } from "react-icons/fa6";
-import { Swiper, SwiperSlide } from "swiper/react";
-import { Autoplay, EffectCoverflow, Navigation, Pagination } from "swiper/modules";
 import Reveal from "./Reveal";
+import type { Proyecto } from "./PortafolioCarousel";
 
-import "swiper/css";
-import "swiper/css/effect-coverflow";
-import "swiper/css/pagination";
-import "swiper/css/navigation";
+const PortafolioCarousel = dynamic(() => import("./PortafolioCarousel"), {
+  ssr: false,
+  loading: () => (
+    <div className="tp-swiper flex gap-6 overflow-hidden">
+      {Array.from({ length: 3 }).map((_, i) => (
+        <div
+          key={i}
+          className="tp-glass h-72 w-full max-w-xs shrink-0 animate-pulse rounded-2xl"
+        />
+      ))}
+    </div>
+  ),
+});
 
 const PROYECTOS = [
   {
@@ -86,8 +95,6 @@ const SOCIAL_LINKS = [
   { href: "https://github.com/tone-stone", icon: FaGithub, label: "GitHub" },
 ];
 
-type Proyecto = (typeof PROYECTOS)[number];
-
 export default function Portafolio() {
   const [proyectoActivo, setProyectoActivo] = useState<Proyecto | null>(null);
 
@@ -109,56 +116,7 @@ export default function Portafolio() {
           </h2>
         </Reveal>
         <Reveal delay={0.1}>
-          <Swiper
-            modules={[Autoplay, EffectCoverflow, Navigation, Pagination]}
-            slidesPerView={1.1}
-            centeredSlides
-            spaceBetween={24}
-            loop
-            autoplay={{ delay: 2000, pauseOnMouseEnter: true }}
-            effect="coverflow"
-            coverflowEffect={{ rotate: 20, depth: 150, slideShadows: true }}
-            pagination={{ el: ".portafolio-pagination", clickable: true }}
-            navigation={{ nextEl: ".portafolio-next", prevEl: ".portafolio-prev" }}
-            breakpoints={{
-              640: { slidesPerView: 1.4, centeredSlides: true },
-              768: { slidesPerView: 2, centeredSlides: false, spaceBetween: 30 },
-              1200: { slidesPerView: 3, centeredSlides: false },
-            }}
-            className="tp-swiper"
-          >
-            {PROYECTOS.map((proyecto) => (
-              <SwiperSlide
-                key={proyecto.title}
-                className="tp-glass rounded-2xl p-6 mx-4 flex flex-col items-center cursor-pointer transition-transform hover:scale-[1.02]"
-                onClick={() => setProyectoActivo(proyecto)}
-              >
-                <Image
-                  src={proyecto.image}
-                  alt={proyecto.title}
-                  width={200}
-                  height={128}
-                  loading="eager"
-                  className="rounded-lg mb-4 shadow-lg h-32 object-contain"
-                />
-                <h3 className="text-xl text-white font-bold mb-1">{proyecto.title}</h3>
-                <p className="text-gray-400 text-sm mb-2">{proyecto.description}</p>
-                <a
-                  href={proyecto.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={(e) => e.stopPropagation()}
-                  className="inline-flex items-center gap-1.5 text-brand-blue underline hover:text-brand-blue"
-                >
-                  Visitar sitio
-                  <ExternalLink className="h-3.5 w-3.5" />
-                </a>
-              </SwiperSlide>
-            ))}
-            <div className="swiper-pagination portafolio-pagination" />
-            <div className="swiper-button-next portafolio-next" />
-            <div className="swiper-button-prev portafolio-prev" />
-          </Swiper>
+          <PortafolioCarousel proyectos={PROYECTOS} onSelect={setProyectoActivo} />
         </Reveal>
         <div className="mt-8">
           <a href="#contacto" className="text-brand-blue font-bold underline hover:text-brand-blue">

@@ -11,7 +11,24 @@ import FitImage from "@/components/blog/FitImage";
 import PostGallery from "@/components/blog/PostGallery";
 import RelatedArticlesCarousel from "@/components/blog/RelatedArticlesCarousel";
 import { CATEGORY_ICONS, formatPostDate } from "@/lib/blog-posts";
-import { estimateReadTime, getOtherArticles, getPublishedArticleBySlug } from "@/lib/blog/articles";
+import {
+  estimateReadTime,
+  getOtherArticles,
+  getPublishedArticleBySlug,
+  getPublishedArticles,
+} from "@/lib/blog/articles";
+
+export const revalidate = 60;
+
+// Pre-renders every published post at build time so it's served from the
+// static ISR cache on first visit too, instead of doing a live render (and a
+// Supabase round-trip) the first time each slug is hit. New posts published
+// after a deploy still work — dynamicParams defaults to true, so an unknown
+// slug renders on demand and joins the cache from then on.
+export async function generateStaticParams() {
+  const articles = await getPublishedArticles();
+  return articles.map((post) => ({ slug: post.slug }));
+}
 
 export async function generateMetadata({
   params,
