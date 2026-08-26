@@ -12,7 +12,8 @@ import {
   X,
 } from "lucide-react";
 import { logout } from "@/lib/auth/actions";
-import { MOCK_CLIENTS, MOCK_INVOICES, MOCK_PROJECTS } from "@/lib/crm/mock-data";
+import type { ClientPayment, CrmClient } from "@/lib/crm/clients";
+import { MOCK_INVOICES, MOCK_PROJECTS } from "@/lib/crm/mock-data";
 import OverviewSection from "./crm/OverviewSection";
 import ClientsSection from "./crm/ClientsSection";
 import ProjectsSection from "./crm/ProjectsSection";
@@ -27,7 +28,15 @@ const NAV_ITEMS: { id: Section; label: string; icon: typeof Users }[] = [
   { id: "facturacion", label: "Facturación", icon: Receipt },
 ];
 
-export default function CrmDashboard({ email }: { email: string }) {
+export default function CrmDashboard({
+  email,
+  clients,
+  payments,
+}: {
+  email: string;
+  clients: CrmClient[];
+  payments: ClientPayment[];
+}) {
   const [section, setSection] = useState<Section>("resumen");
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -143,9 +152,9 @@ export default function CrmDashboard({ email }: { email: string }) {
           </div>
 
           {section === "resumen" && (
-            <OverviewSection clients={MOCK_CLIENTS} projects={MOCK_PROJECTS} invoices={MOCK_INVOICES} />
+            <OverviewSection clients={clients} projects={MOCK_PROJECTS} payments={payments} />
           )}
-          {section === "clientes" && <ClientsSection clients={MOCK_CLIENTS} />}
+          {section === "clientes" && <ClientsSection clients={clients} />}
           {section === "proyectos" && <ProjectsSection projects={MOCK_PROJECTS} />}
           {section === "facturacion" && <InvoicesSection invoices={MOCK_INVOICES} />}
         </main>

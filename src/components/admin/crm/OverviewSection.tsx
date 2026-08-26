@@ -1,24 +1,32 @@
 import { Briefcase, HandCoins, TrendingUp, Users } from "lucide-react";
-import { formatCurrencyMXN, type Client, type Invoice, type Project } from "@/lib/crm/mock-data";
+import type { ClientPayment, CrmClient } from "@/lib/crm/clients";
+import { formatCurrencyMXN, type Project } from "@/lib/crm/mock-data";
 import StatusBadge from "./StatusBadge";
 
 export default function OverviewSection({
   clients,
   projects,
-  invoices,
+  payments,
 }: {
-  clients: Client[];
+  clients: CrmClient[];
   projects: Project[];
-  invoices: Invoice[];
+  payments: ClientPayment[];
 }) {
+  const now = new Date();
   const activeClients = clients.filter((c) => c.status === "activo").length;
   const activeProjects = projects.filter((p) => p.status !== "completado").length;
-  const monthlyRevenue = invoices
-    .filter((i) => i.status === "pagada")
-    .reduce((sum, i) => sum + i.amount, 0);
-  const pendingRevenue = invoices
-    .filter((i) => i.status === "enviada" || i.status === "vencida")
-    .reduce((sum, i) => sum + i.amount, 0);
+
+  const monthlyRevenue = payments
+    .filter((p) => {
+      if (p.status !== "pagado" || !p.paidDate) return false;
+      const paid = new Date(`${p.paidDate}T00:00:00`);
+      return paid.getFullYear() === now.getFullYear() && paid.getMonth() === now.getMonth();
+    })
+    .reduce((sum, p) => sum + p.amount, 0);
+
+  const pendingRevenue = payments
+    .filter((p) => p.status === "pendiente" || p.status === "vencido")
+    .reduce((sum, p) => sum + p.amount, 0);
 
   const stats = [
     { label: "Clientes activos", value: activeClients, icon: Users },
@@ -27,9 +35,7 @@ export default function OverviewSection({
     { label: "Por cobrar", value: formatCurrencyMXN(pendingRevenue), icon: HandCoins },
   ];
 
-  const recentProjects = [...projects]
-    .sort((a, b) => a.dueDate.localeCompare(b.dueDate))
-    .slice(0, 5);
+  const recentProjects = [...projects].sort((a, b) => a.dueDate.localeCompare(b.dueDate)).slice(0, 5);
 
   return (
     <>
@@ -61,10 +67,7 @@ export default function OverviewSection({
               </div>
               <div className="flex items-center gap-3">
                 <div className="h-1.5 w-24 overflow-hidden rounded-full bg-white/10">
-                  <div
-                    className="h-full rounded-full bg-sky-400"
-                    style={{ width: `${project.progress}%` }}
-                  />
+                  <div className="h-full rounded-full bg-sky-400" style={{ width: `${project.progress}%` }} />
                 </div>
                 <StatusBadge status={project.status} />
               </div>

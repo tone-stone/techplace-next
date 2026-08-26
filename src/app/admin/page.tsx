@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
+import { getAllPayments, getClients } from "@/lib/crm/clients";
 import CrmDashboard from "@/components/admin/CrmDashboard";
 
 export const metadata: Metadata = {
@@ -12,5 +13,7 @@ export default async function AdminPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  return <CrmDashboard email={user?.email ?? ""} />;
+  const [clients, payments] = await Promise.all([getClients(), getAllPayments()]);
+
+  return <CrmDashboard email={user?.email ?? ""} clients={clients} payments={payments} />;
 }
