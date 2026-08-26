@@ -94,7 +94,7 @@ export default function Navbar() {
   return (
     <nav className="fixed z-50 top-0 inset-x-0 md:top-4 md:inset-x-6 lg:left-1/2 lg:right-auto lg:-translate-x-1/2 lg:w-full lg:max-w-6xl">
       <div
-        className={`relative z-50 shadow-lg backdrop-blur-md transition-all duration-300 md:rounded-full ${
+        className={`relative z-50 shadow-lg md:backdrop-blur-md transition-all duration-300 md:rounded-full ${
           scrolled ? "tp-navbar-bg-dark" : "tp-navbar-bg-light"
         }`}
       >
@@ -224,7 +224,7 @@ export default function Navbar() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.25 }}
-            className="fixed inset-0 z-40 md:hidden flex flex-col items-center justify-center gap-7 text-xl font-semibold bg-[#0a0a18]/90 backdrop-blur-md"
+            className="fixed inset-0 z-40 md:hidden flex flex-col items-center justify-center gap-7 text-xl font-semibold bg-[#0a0a18]/95"
           >
             {NAV_LINKS.map((link, i) => (
               <div key={link.href} className="flex flex-col items-center gap-4">

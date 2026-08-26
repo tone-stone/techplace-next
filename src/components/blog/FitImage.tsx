@@ -30,7 +30,7 @@ export default function FitImage({
         fill
         unoptimized={isLocalPreview}
         sizes={sizes}
-        className="scale-110 object-cover blur-2xl"
+        className="scale-110 object-cover blur-lg md:blur-2xl"
       />
       <Image
         src={src}
