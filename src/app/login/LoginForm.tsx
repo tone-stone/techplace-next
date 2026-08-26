@@ -28,13 +28,7 @@ function SubmitButton() {
   );
 }
 
-export default function LoginForm({
-  redirectTo = "/admin",
-  requiredRole,
-}: {
-  redirectTo?: string;
-  requiredRole?: "admin" | "redactor";
-}) {
+export default function LoginForm({ redirectTo = "/admin" }: { redirectTo?: string }) {
   const [state, formAction] = useActionState<LoginState, FormData>(login, null);
   const [prevState, setPrevState] = useState(state);
   const [shake, setShake] = useState(0);
@@ -47,7 +41,6 @@ export default function LoginForm({
   return (
     <form action={formAction} className="space-y-5">
       <input type="hidden" name="redirectTo" value={redirectTo} />
-      {requiredRole && <input type="hidden" name="requiredRole" value={requiredRole} />}
       <div className="relative">
         <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-purple-400" />
         <input

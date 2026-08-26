@@ -117,39 +117,33 @@ export default function Contacto() {
               </motion.button>
             </form>
             <div className="mt-10 text-gray-400 text-left space-y-3">
-              <p className="flex items-center gap-2">
-                <FaWhatsapp className="text-green-400 text-xl" />
-                <a
-                  href="https://wa.me/526643425615"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-green-400 hover:underline font-semibold"
-                >
-                  664 342 56 15
-                </a>
-              </p>
-              <p className="flex items-center gap-2">
-                <Globe className="text-brand-blue h-5 w-5" />
-                <a
-                  href="https://techplacetj.com"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-brand-blue hover:underline font-semibold"
-                >
-                  www.techplacetj.com
-                </a>
-              </p>
-              <p className="flex items-center gap-2">
-                <FaFacebookF className="text-blue-400 h-5 w-5" />
-                <a
-                  href="https://facebook.com/techplacetijuana"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-blue-400 hover:underline font-semibold"
-                >
-                  /techplacetj
-                </a>
-              </p>
+              <a
+                href="https://wa.me/526643425615"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="-my-2 flex items-center gap-2 py-2 text-green-400 hover:underline font-semibold"
+              >
+                <FaWhatsapp className="text-green-400 text-xl shrink-0" />
+                664 342 56 15
+              </a>
+              <a
+                href="https://techplacetj.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="-my-2 flex items-center gap-2 py-2 text-brand-blue hover:underline font-semibold"
+              >
+                <Globe className="text-brand-blue h-5 w-5 shrink-0" />
+                www.techplacetj.com
+              </a>
+              <a
+                href="https://facebook.com/techplacetijuana"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="-my-2 flex items-center gap-2 py-2 text-blue-400 hover:underline font-semibold"
+              >
+                <FaFacebookF className="text-blue-400 h-5 w-5 shrink-0" />
+                /techplacetj
+              </a>
               <p className="flex items-center gap-2 text-xs">
                 <MapPin className="h-4 w-4 text-purple-400" /> Tijuana, B.C. | Lun-Vie 10am-4pm
               </p>

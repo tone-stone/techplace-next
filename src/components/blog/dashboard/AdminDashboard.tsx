@@ -158,7 +158,7 @@ export default function AdminDashboard({
               type="button"
               onClick={() => setSidebarOpen(false)}
               aria-label="Cerrar menú"
-              className="absolute right-4 top-4 text-gray-400 hover:text-white"
+              className="absolute right-4 top-4 -m-2 p-2 text-gray-400 hover:text-white"
             >
               <X className="h-5 w-5" />
             </button>
@@ -173,7 +173,7 @@ export default function AdminDashboard({
             type="button"
             onClick={() => setSidebarOpen(true)}
             aria-label="Abrir menú"
-            className="rounded-lg p-1.5 text-gray-300 hover:bg-white/10 hover:text-white"
+            className="rounded-lg p-3 -m-1.5 text-gray-300 hover:bg-white/10 hover:text-white"
           >
             <Menu className="h-5 w-5" />
           </button>

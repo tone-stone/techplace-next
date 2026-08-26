@@ -28,7 +28,7 @@ export default function BlogListClient({
         <button
           type="button"
           onClick={() => setCategoria(null)}
-          className={`rounded-full border px-4 py-1.5 text-sm font-medium transition-colors duration-200 ${
+          className={`rounded-full border px-4 py-2.5 text-sm font-medium transition-colors duration-200 ${
             categoria === null
               ? "border-purple-400 bg-purple-500/20 text-white"
               : "border-white/10 bg-white/5 text-gray-300 hover:border-purple-400/40 hover:text-white"
@@ -41,7 +41,7 @@ export default function BlogListClient({
             key={cat}
             type="button"
             onClick={() => setCategoria(cat)}
-            className={`rounded-full border px-4 py-1.5 text-sm font-medium transition-colors duration-200 ${
+            className={`rounded-full border px-4 py-2.5 text-sm font-medium transition-colors duration-200 ${
               categoria === cat
                 ? "border-purple-400 bg-purple-500/20 text-white"
                 : "border-white/10 bg-white/5 text-gray-300 hover:border-purple-400/40 hover:text-white"

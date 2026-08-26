@@ -95,9 +95,9 @@ export async function getPublishedArticles(): Promise<ManagedArticle[]> {
   return (data ?? []).map(mapRow);
 }
 
-export async function getRelatedArticles(excludeSlug: string, count = 2): Promise<ManagedArticle[]> {
+export async function getOtherArticles(excludeSlug: string): Promise<ManagedArticle[]> {
   const articles = await getPublishedArticles();
-  return articles.filter((a) => a.slug !== excludeSlug).slice(0, count);
+  return articles.filter((a) => a.slug !== excludeSlug);
 }
 
 export async function getPublishedArticleBySlug(slug: string): Promise<ManagedArticle | null> {

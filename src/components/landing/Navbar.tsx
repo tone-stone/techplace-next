@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ChevronDown, LogIn, Menu, PenSquare, ShieldCheck, X } from "lucide-react";
+import { ChevronDown, LogIn, Menu, PenSquare, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 
@@ -18,7 +18,6 @@ const NAV_LINKS = [
     children: [
       { href: "/blog", label: "Ver blog" },
       { href: "/blog/login", label: "Portal de redacción" },
-      { href: "/blog/admin-login", label: "Acceso Administrador" },
     ],
   },
   { href: "/#contacto", label: "Contacto" },
@@ -93,7 +92,7 @@ export default function Navbar() {
   return (
     <nav className="fixed z-50 top-0 inset-x-0 md:top-4 md:inset-x-6 lg:left-1/2 lg:right-auto lg:-translate-x-1/2 lg:w-full lg:max-w-6xl">
       <div
-        className={`shadow-lg backdrop-blur-md transition-all duration-300 md:rounded-full ${
+        className={`relative z-50 shadow-lg backdrop-blur-md transition-all duration-300 md:rounded-full ${
           scrolled ? "tp-navbar-bg-dark" : "tp-navbar-bg-light"
         }`}
       >
@@ -154,8 +153,6 @@ export default function Navbar() {
                         >
                           {child.href === "/blog/login" ? (
                             <PenSquare className="h-4 w-4 text-purple-400" />
-                          ) : child.href === "/blog/admin-login" ? (
-                            <ShieldCheck className="h-4 w-4 text-purple-400" />
                           ) : (
                             <ChevronDown className="h-4 w-4 -rotate-90 text-purple-400" />
                           )}
@@ -189,7 +186,7 @@ export default function Navbar() {
           onClick={toggleMenu}
           aria-label={menuOpen ? "Cerrar menú" : "Abrir menú"}
           aria-expanded={menuOpen}
-          className="md:hidden relative z-50 flex items-center justify-center w-10 h-10 rounded-full text-purple-200 hover:text-brand-blue hover:bg-brand-blue/10 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue"
+          className="md:hidden relative z-50 flex items-center justify-center w-12 h-12 rounded-full text-purple-200 hover:text-brand-blue hover:bg-brand-blue/10 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue"
         >
           <AnimatePresence mode="wait" initial={false}>
             {menuOpen ? (
@@ -235,7 +232,7 @@ export default function Navbar() {
                   initial={{ opacity: 0, y: 16 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.3, delay: 0.05 * i }}
-                  className={`tp-nav-link-underline${isActive(link.href) ? " active" : ""}`}
+                  className={`tp-nav-link-underline tp-mobile-nav-link${isActive(link.href) ? " active" : ""}`}
                 >
                   {link.label}
                 </motion.a>
@@ -247,10 +244,9 @@ export default function Navbar() {
                     initial={{ opacity: 0, y: 16 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.3, delay: 0.05 * i }}
-                    className="flex items-center gap-1.5 text-base font-normal text-gray-400 hover:text-brand-blue transition-colors"
+                    className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-base font-normal text-gray-400 hover:text-brand-blue transition-colors"
                   >
                     {child.href === "/blog/login" && <PenSquare className="h-3.5 w-3.5" />}
-                    {child.href === "/blog/admin-login" && <ShieldCheck className="h-3.5 w-3.5" />}
                     {child.label}
                   </motion.a>
                 ))}
@@ -264,7 +260,7 @@ export default function Navbar() {
               <Link
                 href="/login"
                 onClick={toggleMenu}
-                className="tp-btn-animated inline-flex items-center gap-1.5 rounded-full px-6 py-2.5 text-lg font-bold text-white shadow-lg transition-transform active:scale-95"
+                className="tp-btn-animated inline-flex items-center gap-1.5 rounded-full px-6 py-3 text-lg font-bold text-white shadow-lg transition-transform active:scale-95"
               >
                 <LogIn className="h-5 w-5" />
                 Entrar

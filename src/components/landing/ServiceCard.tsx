@@ -55,7 +55,7 @@ export default function ServiceCard({
       <p className="text-gray-300 mb-3 text-justify">{description}</p>
       <a
         href={linkHref}
-        className="inline-block mt-2 text-brand-blue font-bold underline underline-offset-4 hover:text-brand-blue transition duration-200"
+        className="-mx-2 -mb-3 mt-2 inline-block px-2 pt-1 pb-3 text-brand-blue font-bold underline underline-offset-4 hover:text-brand-blue transition duration-200"
       >
         {linkLabel}
       </a>

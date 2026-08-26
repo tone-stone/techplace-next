@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowRight, Calendar, Clock } from "lucide-react";
 import { CATEGORY_ICONS, formatPostDate } from "@/lib/blog-posts";
 import { estimateReadTime, type ManagedArticle } from "@/lib/blog/articles";
+import FitImage from "./FitImage";
 
 export default async function BlogPostCard({ post }: { post: ManagedArticle }) {
   const Icon = CATEGORY_ICONS[post.category];
@@ -10,13 +11,12 @@ export default async function BlogPostCard({ post }: { post: ManagedArticle }) {
   return (
     <Link
       href={`/blog/${post.slug}`}
-      className="tp-blog-card group flex flex-col overflow-hidden rounded-2xl transition-transform duration-300 hover:-translate-y-1"
+      className="tp-blog-card group flex h-full w-full flex-col overflow-hidden rounded-2xl transition-transform duration-300 hover:-translate-y-1"
     >
       <div className="relative flex h-40 items-center justify-center overflow-hidden bg-linear-to-br from-indigo-950/70 via-slate-900/60 to-black/50">
         <span className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(79,70,229,0.22)_0,transparent_60%)]" />
         {post.coverImageUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={post.coverImageUrl} alt="" className="h-full w-full object-cover" />
+          <FitImage src={post.coverImageUrl} />
         ) : (
           Icon && (
             <Icon

@@ -74,7 +74,10 @@ export default function Footer() {
               <ul className="space-y-2 text-sm">
                 {NAV_LINKS.map((link) => (
                   <li key={link.href}>
-                    <Link href={link.href} className="hover:text-brand-blue hover:pl-1 transition-all">
+                    <Link
+                      href={link.href}
+                      className="-my-1.5 block py-1.5 hover:text-brand-blue hover:pl-1 transition-all"
+                    >
                       {link.label}
                     </Link>
                   </li>
@@ -87,15 +90,21 @@ export default function Footer() {
                 Contacto
               </h4>
               <ul className="space-y-3 text-sm">
-                <li className="flex items-center gap-2">
-                  <Phone className="h-4 w-4 text-brand-blue" />
-                  <a href="tel:6643425615" className="hover:text-brand-blue transition">
+                <li>
+                  <a
+                    href="tel:6643425615"
+                    className="-my-1.5 flex items-center gap-2 py-1.5 hover:text-brand-blue transition"
+                  >
+                    <Phone className="h-4 w-4 shrink-0 text-brand-blue" />
                     664 342 56 15
                   </a>
                 </li>
-                <li className="flex items-center gap-2">
-                  <Mail className="h-4 w-4 text-brand-blue" />
-                  <a href="mailto:info@techplacetj.com" className="hover:text-brand-blue transition">
+                <li>
+                  <a
+                    href="mailto:info@techplacetj.com"
+                    className="-my-1.5 flex items-center gap-2 py-1.5 hover:text-brand-blue transition"
+                  >
+                    <Mail className="h-4 w-4 shrink-0 text-brand-blue" />
                     info@techplacetj.com
                   </a>
                 </li>

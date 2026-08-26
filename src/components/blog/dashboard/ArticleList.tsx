@@ -59,7 +59,7 @@ export default function ArticleList({
                 >
                   {article.coverImageUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={article.coverImageUrl} alt="" className="h-full w-full object-cover" />
+                    <img src={article.coverImageUrl} alt="" className="h-full w-full object-contain" />
                   ) : (
                     Icon && <Icon className={`h-6 w-6 ${accentText}`} strokeWidth={1.5} />
                   )}

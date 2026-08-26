@@ -75,7 +75,7 @@ export default async function BlogLoginPage() {
       <div className="relative flex w-full lg:w-1/2 flex-col items-center justify-center p-6 sm:p-12">
         <Link
           href="/blog"
-          className="lg:hidden absolute top-6 left-6 inline-flex items-center gap-1.5 text-sm text-gray-400 hover:text-indigo-300 transition-colors"
+          className="lg:hidden absolute top-6 left-6 -m-3 inline-flex items-center gap-1.5 p-3 text-sm text-gray-400 hover:text-indigo-300 transition-colors"
         >
           <ArrowLeft className="h-4 w-4" /> Volver al blog
         </Link>
@@ -97,17 +97,14 @@ export default async function BlogLoginPage() {
           </div>
 
           <h2 className="text-2xl font-bold text-white mb-2">Inicia sesión</h2>
-          <p className="text-gray-400 text-sm mb-8">Ingresa tus credenciales de redactor para continuar.</p>
+          <p className="text-gray-400 text-sm mb-8">Ingresa tus credenciales del equipo para continuar.</p>
 
           <LoginForm redirectTo="/blog/dashboard" />
 
-          <div className="flex justify-between items-center mt-6 text-sm">
-            <a href="#" className="text-gray-400 hover:text-indigo-300 hover:underline transition">
+          <div className="mt-6 text-sm">
+            <a href="#" className="-my-3 py-3 text-gray-400 hover:text-indigo-300 hover:underline transition">
               ¿Olvidaste tu contraseña?
             </a>
-            <Link href="/blog/admin-login" className="text-gray-500 hover:text-gray-300 hover:underline transition">
-              Acceso admin
-            </Link>
           </div>
         </div>
       </div>

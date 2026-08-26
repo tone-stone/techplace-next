@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ImagePlus, X } from "lucide-react";
 import { formatBytes, MAX_GALLERY_IMAGES, MAX_IMAGE_BYTES } from "@/lib/blog/media-limits";
+import FitImage from "../FitImage";
 
 type GalleryDropzoneProps = {
   files: File[];
@@ -107,8 +108,7 @@ export default function GalleryDropzone({
         <div className="mt-3 grid grid-cols-4 gap-2 sm:grid-cols-6">
           {existingUrls.map((url) => (
             <div key={url} className="group relative aspect-square overflow-hidden rounded-lg border border-white/10">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={url} alt="" className="h-full w-full object-cover" />
+              <FitImage src={url} />
               <button
                 type="button"
                 onClick={() => onRemoveExisting(url)}
@@ -121,8 +121,7 @@ export default function GalleryDropzone({
           ))}
           {previews.map((url, i) => (
             <div key={url} className="group relative aspect-square overflow-hidden rounded-lg border border-indigo-400/30">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={url} alt="" className="h-full w-full object-cover" />
+              <FitImage src={url} />
               <button
                 type="button"
                 onClick={() => removeNewFile(i)}

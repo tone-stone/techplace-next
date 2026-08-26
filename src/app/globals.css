@@ -218,6 +218,16 @@ html {
   opacity: 1;
 }
 
+/* Related-articles carousel: nav buttons live outside the Swiper's own
+   overflow-hidden box (see RelatedArticlesCarousel.tsx), so they sit in the
+   side gutter next to the cards instead of overlapping them. Swiper still
+   toggles this disabled class on them at the first/last slide. */
+.related-prev.swiper-button-disabled,
+.related-next.swiper-button-disabled {
+  opacity: 0.3;
+  pointer-events: none;
+}
+
 .tp-navbar-bg-light {
   background: rgba(20, 14, 40, 0.25);
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -283,9 +293,15 @@ html {
   color: #fff;
 }
 
+/* Bigger tap target for the mobile menu links without touching the desktop pill nav. */
+.tp-nav-link-underline.tp-mobile-nav-link {
+  display: block;
+  padding: 0.625rem 1.5rem;
+}
+
 .tp-social-btn {
-  width: 2.5rem;
-  height: 2.5rem;
+  width: 2.75rem;
+  height: 2.75rem;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -408,6 +424,15 @@ html {
   background: rgba(8, 6, 20, 0.55);
   backdrop-filter: blur(18px);
   border: 1px solid rgba(168, 85, 247, 0.2);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
+}
+
+/* CRM variant — tinted with the brand blue instead of purple/indigo, so the
+   company CRM reads as its own system distinct from the blog dashboards. */
+.tp-dark-card-crm {
+  background: rgba(8, 6, 20, 0.55);
+  backdrop-filter: blur(18px);
+  border: 1px solid rgba(144, 205, 221, 0.2);
   box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
 }
 
