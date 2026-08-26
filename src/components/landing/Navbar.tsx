@@ -4,10 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ChevronDown, LogIn, Menu, PenSquare, X } from "lucide-react";
-import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
-
-const MotionLink = motion.create(Link);
 
 const NAV_LINKS = [
   { href: "/#home", label: "Inicio" },
@@ -155,33 +152,27 @@ export default function Navbar() {
                   </span>
                 </button>
 
-                <AnimatePresence>
-                  {blogMenuOpen && (
-                    <motion.div
-                      initial={{ opacity: 0, y: -8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -8 }}
-                      transition={{ duration: 0.18 }}
-                      className="tp-dropdown-glass absolute left-1/2 top-full mt-3 w-56 -translate-x-1/2 rounded-2xl p-2 text-base"
-                    >
-                      {link.children.map((child) => (
-                        <Link
-                          key={child.href}
-                          href={child.href}
-                          onClick={() => setBlogMenuOpen(false)}
-                          className="flex items-center gap-2 rounded-xl px-3 py-2.5 font-medium text-gray-200 hover:bg-white/10 hover:text-brand-blue transition-colors"
-                        >
-                          {child.href === "/blog/login" ? (
-                            <PenSquare className="h-4 w-4 text-purple-400" />
-                          ) : (
-                            <ChevronDown className="h-4 w-4 -rotate-90 text-purple-400" />
-                          )}
-                          {child.label}
-                        </Link>
-                      ))}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+                {blogMenuOpen && (
+                  <div
+                    className="tp-dropdown-glass tp-dropdown-in absolute left-1/2 top-full mt-3 w-56 -translate-x-1/2 rounded-2xl p-2 text-base"
+                  >
+                    {link.children.map((child) => (
+                      <Link
+                        key={child.href}
+                        href={child.href}
+                        onClick={() => setBlogMenuOpen(false)}
+                        className="flex items-center gap-2 rounded-xl px-3 py-2.5 font-medium text-gray-200 hover:bg-white/10 hover:text-brand-blue transition-colors"
+                      >
+                        {child.href === "/blog/login" ? (
+                          <PenSquare className="h-4 w-4 text-purple-400" />
+                        ) : (
+                          <ChevronDown className="h-4 w-4 -rotate-90 text-purple-400" />
+                        )}
+                        {child.label}
+                      </Link>
+                    ))}
+                  </div>
+                )}
               </div>
             ) : (
               <Link
@@ -208,87 +199,65 @@ export default function Navbar() {
           aria-expanded={menuOpen}
           className="md:hidden relative z-50 flex items-center justify-center w-12 h-12 rounded-full text-purple-200 hover:text-brand-blue hover:bg-brand-blue/10 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue"
         >
-          <AnimatePresence mode="wait" initial={false}>
-            {menuOpen ? (
-              <motion.span
-                key="close"
-                initial={{ rotate: -90, opacity: 0 }}
-                animate={{ rotate: 0, opacity: 1 }}
-                exit={{ rotate: 90, opacity: 0 }}
-                transition={{ duration: 0.2 }}
-              >
-                <X className="h-6 w-6" />
-              </motion.span>
-            ) : (
-              <motion.span
-                key="open"
-                initial={{ rotate: 90, opacity: 0 }}
-                animate={{ rotate: 0, opacity: 1 }}
-                exit={{ rotate: -90, opacity: 0 }}
-                transition={{ duration: 0.2 }}
-              >
-                <Menu className="h-6 w-6" />
-              </motion.span>
-            )}
-          </AnimatePresence>
+          <span className="relative block h-6 w-6">
+            <Menu
+              className={`tp-menu-icon absolute inset-0 h-6 w-6 ${
+                menuOpen ? "rotate-90 opacity-0" : "rotate-0 opacity-100"
+              }`}
+            />
+            <X
+              className={`tp-menu-icon absolute inset-0 h-6 w-6 ${
+                menuOpen ? "rotate-0 opacity-100" : "-rotate-90 opacity-0"
+              }`}
+            />
+          </span>
         </button>
       </div>
       </div>
 
-      <AnimatePresence>
-        {menuOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.25 }}
-            className="fixed inset-0 z-40 md:hidden flex flex-col items-center justify-center gap-7 text-xl font-semibold bg-[#0a0a18]/95"
-          >
-            {NAV_LINKS.map((link, i) => (
-              <div key={link.href} className="flex flex-col items-center gap-4">
-                <MotionLink
-                  href={link.href}
-                  onClick={toggleMenu}
-                  initial={{ opacity: 0, y: 16 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3, delay: 0.05 * i }}
-                  className={`tp-nav-link-underline tp-mobile-nav-link${isActive(link.href) ? " active" : ""}`}
-                >
-                  {link.label}
-                </MotionLink>
-                {link.children?.map((child) => (
-                  <MotionLink
-                    key={child.href}
-                    href={child.href}
-                    onClick={toggleMenu}
-                    initial={{ opacity: 0, y: 16 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.3, delay: 0.05 * i }}
-                    className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-base font-normal text-gray-400 hover:text-brand-blue transition-colors"
-                  >
-                    {child.href === "/blog/login" && <PenSquare className="h-3.5 w-3.5" />}
-                    {child.label}
-                  </MotionLink>
-                ))}
-              </div>
-            ))}
-            <motion.div
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3, delay: 0.05 * NAV_LINKS.length }}
-            >
+      {menuOpen && (
+        <div className="tp-menu-overlay-in fixed inset-0 z-40 md:hidden flex flex-col items-center justify-center gap-7 text-xl font-semibold bg-[#0a0a18]/95">
+          {NAV_LINKS.map((link, i) => (
+            <div key={link.href} className="flex flex-col items-center gap-4">
               <Link
-                href="/login"
+                href={link.href}
                 onClick={toggleMenu}
-                className="tp-btn-animated inline-flex items-center gap-1.5 rounded-full px-6 py-3 text-lg font-bold text-white shadow-lg transition-transform active:scale-95"
+                style={{ animationDelay: `${0.05 * i}s` }}
+                className={`tp-menu-link-in tp-nav-link-underline tp-mobile-nav-link${
+                  isActive(link.href) ? " active" : ""
+                }`}
               >
-                <LogIn className="h-5 w-5" />
-                Entrar
+                {link.label}
               </Link>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+              {link.children?.map((child) => (
+                <Link
+                  key={child.href}
+                  href={child.href}
+                  onClick={toggleMenu}
+                  style={{ animationDelay: `${0.05 * i}s` }}
+                  className="tp-menu-link-in flex items-center gap-1.5 rounded-lg px-3 py-2 text-base font-normal text-gray-400 hover:text-brand-blue transition-colors"
+                >
+                  {child.href === "/blog/login" && <PenSquare className="h-3.5 w-3.5" />}
+                  {child.label}
+                </Link>
+              ))}
+            </div>
+          ))}
+          <div
+            style={{ animationDelay: `${0.05 * NAV_LINKS.length}s` }}
+            className="tp-menu-link-in"
+          >
+            <Link
+              href="/login"
+              onClick={toggleMenu}
+              className="tp-btn-animated inline-flex items-center gap-1.5 rounded-full px-6 py-3 text-lg font-bold text-white shadow-lg transition-transform active:scale-95"
+            >
+              <LogIn className="h-5 w-5" />
+              Entrar
+            </Link>
+          </div>
+        </div>
+      )}
     </nav>
   );
 }
