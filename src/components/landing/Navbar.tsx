@@ -83,9 +83,27 @@ export default function Navbar() {
   }, [blogMenuOpen]);
 
   useEffect(() => {
-    document.body.style.overflow = menuOpen ? "hidden" : "";
+    if (!menuOpen) return;
+
+    // `overflow: hidden` on body doesn't stop touch-scrolling on iOS Safari —
+    // a long-standing WebKit quirk. Pinning the body to a fixed position
+    // instead (and restoring the scroll offset on close) is the reliable
+    // cross-browser way to lock background scroll while the menu is open.
+    const scrollY = window.scrollY;
+    const body = document.body;
+    body.style.position = "fixed";
+    body.style.top = `-${scrollY}px`;
+    body.style.left = "0";
+    body.style.right = "0";
+    body.style.overflow = "hidden";
+
     return () => {
-      document.body.style.overflow = "";
+      body.style.position = "";
+      body.style.top = "";
+      body.style.left = "";
+      body.style.right = "";
+      body.style.overflow = "";
+      window.scrollTo(0, scrollY);
     };
   }, [menuOpen]);
 
