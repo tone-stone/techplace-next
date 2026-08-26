@@ -130,7 +130,7 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
           <div className="relative mb-10 flex aspect-video w-full items-center justify-center overflow-hidden rounded-2xl bg-linear-to-br from-indigo-950/70 via-slate-900/60 to-black/50">
             <span className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(79,70,229,0.22)_0,transparent_60%)]" />
             {post.coverImageUrl ? (
-              <FitImage src={post.coverImageUrl} />
+              <FitImage src={post.coverImageUrl} sizes="(min-width: 768px) 768px, 100vw" />
             ) : (
               Icon && (
                 <Icon

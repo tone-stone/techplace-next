@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { ExternalLink, Pencil, Trash2, Video as VideoIcon } from "lucide-react";
 import { CATEGORY_ICONS, formatPostDate } from "@/lib/blog-posts";
@@ -58,8 +59,13 @@ export default function ArticleList({
                   className={`flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl border ${accentIconWrap}`}
                 >
                   {article.coverImageUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={article.coverImageUrl} alt="" className="h-full w-full object-contain" />
+                    <Image
+                      src={article.coverImageUrl}
+                      alt=""
+                      width={56}
+                      height={56}
+                      className="h-full w-full object-contain"
+                    />
                   ) : (
                     Icon && <Icon className={`h-6 w-6 ${accentText}`} strokeWidth={1.5} />
                   )}

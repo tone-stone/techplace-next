@@ -16,7 +16,10 @@ export default async function BlogPostCard({ post }: { post: ManagedArticle }) {
       <div className="relative flex h-40 items-center justify-center overflow-hidden bg-linear-to-br from-indigo-950/70 via-slate-900/60 to-black/50">
         <span className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(79,70,229,0.22)_0,transparent_60%)]" />
         {post.coverImageUrl ? (
-          <FitImage src={post.coverImageUrl} />
+          <FitImage
+            src={post.coverImageUrl}
+            sizes="(min-width: 1024px) 360px, (min-width: 640px) 45vw, 100vw"
+          />
         ) : (
           Icon && (
             <Icon

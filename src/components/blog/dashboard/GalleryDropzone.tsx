@@ -108,7 +108,7 @@ export default function GalleryDropzone({
         <div className="mt-3 grid grid-cols-4 gap-2 sm:grid-cols-6">
           {existingUrls.map((url) => (
             <div key={url} className="group relative aspect-square overflow-hidden rounded-lg border border-white/10">
-              <FitImage src={url} />
+              <FitImage src={url} sizes="120px" />
               <button
                 type="button"
                 onClick={() => onRemoveExisting(url)}
@@ -121,7 +121,7 @@ export default function GalleryDropzone({
           ))}
           {previews.map((url, i) => (
             <div key={url} className="group relative aspect-square overflow-hidden rounded-lg border border-indigo-400/30">
-              <FitImage src={url} />
+              <FitImage src={url} sizes="120px" />
               <button
                 type="button"
                 onClick={() => removeNewFile(i)}

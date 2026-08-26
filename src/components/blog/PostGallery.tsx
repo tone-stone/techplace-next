@@ -29,7 +29,7 @@ export default function PostGallery({ urls }: { urls: string[] }) {
             aria-label="Ver foto en grande"
             className="group relative aspect-square w-full cursor-pointer overflow-hidden rounded-2xl border border-white/10 transition-transform duration-300 hover:-translate-y-1"
           >
-            <FitImage src={url} />
+            <FitImage src={url} sizes="(min-width: 640px) 240px, 45vw" />
             <span className="pointer-events-none absolute inset-0 bg-black/0 transition-colors duration-300 group-hover:bg-black/15" />
           </button>
         ))}
