@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { TouchEvent } from "react";
 import Image from "next/image";
 import dynamic from "next/dynamic";
-import { ExternalLink, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, ExternalLink, X } from "lucide-react";
 import { FaFacebookF, FaGithub, FaLinkedinIn, FaWhatsapp } from "react-icons/fa6";
 import Reveal from "./Reveal";
-import type { Proyecto } from "./PortafolioCarousel";
 
 const PortafolioCarousel = dynamic(() => import("./PortafolioCarousel"), {
   ssr: false,
@@ -96,31 +96,70 @@ const SOCIAL_LINKS = [
 ];
 
 export default function Portafolio() {
-  const [proyectoActivo, setProyectoActivo] = useState<Proyecto | null>(null);
+  const [activeIndex, setActiveIndex] = useState<number | null>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const touchStartX = useRef<number | null>(null);
+
+  const total = PROYECTOS.length;
+  const proyectoActivo = activeIndex !== null ? PROYECTOS[activeIndex] : null;
+
+  const close = useCallback(() => setActiveIndex(null), []);
+  const goPrev = useCallback(
+    () => setActiveIndex((i) => (i === null ? i : (i - 1 + total) % total)),
+    [total]
+  );
+  const goNext = useCallback(
+    () => setActiveIndex((i) => (i === null ? i : (i + 1) % total)),
+    [total]
+  );
 
   useEffect(() => {
-    if (!proyectoActivo) return;
+    if (activeIndex === null) return;
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setProyectoActivo(null);
+      if (e.key === "Escape") close();
+      else if (e.key === "ArrowLeft") goPrev();
+      else if (e.key === "ArrowRight") goNext();
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [proyectoActivo]);
+  }, [activeIndex, close, goPrev, goNext]);
+
+  // Jump back to the top of the panel when switching to another project.
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: 0 });
+  }, [activeIndex]);
+
+  const onTouchStart = (e: TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+  };
+  const onTouchEnd = (e: TouchEvent) => {
+    if (touchStartX.current === null) return;
+    const delta = e.changedTouches[0].clientX - touchStartX.current;
+    if (delta > 50) goPrev();
+    else if (delta < -50) goNext();
+    touchStartX.current = null;
+  };
 
   return (
     <section id="portafolio" className="relative py-16">
       <div className="max-w-6xl mx-auto px-4 text-center">
         <Reveal>
-          <h2 className="tp-heading font-heading text-3xl md:text-4xl font-bold mb-8 tracking-tight">
-            Portafolio de Proyectos
+          <h2 className="tp-heading font-heading text-3xl md:text-4xl font-bold mb-4 tracking-tight">
+            Portafolio de proyectos
           </h2>
         </Reveal>
+        <Reveal delay={0.05}>
+          <p className="max-w-2xl mx-auto text-gray-300 text-lg font-light mb-10">
+            Plataformas y sistemas en producción. Despachos, restaurantes, medios
+            y startups que han confiado su presencia digital a TechPlace.
+          </p>
+        </Reveal>
         <Reveal delay={0.1}>
-          <PortafolioCarousel proyectos={PROYECTOS} onSelect={setProyectoActivo} />
+          <PortafolioCarousel proyectos={PROYECTOS} onSelect={setActiveIndex} />
         </Reveal>
         <div className="mt-8">
           <a href="#contacto" className="text-brand-blue font-bold underline hover:text-brand-blue">
-            ¿Quieres que tu negocio sea nuestro próximo caso de éxito?
+            ¿Quieres que tu empresa sea el próximo caso? Solicita tu cotización.
           </a>
         </div>
       </div>
@@ -128,17 +167,47 @@ export default function Portafolio() {
       {proyectoActivo && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 tp-animate-fadein"
-          onClick={() => setProyectoActivo(null)}
+          onClick={close}
         >
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              goPrev();
+            }}
+            aria-label="Proyecto anterior"
+            className="absolute left-2 sm:left-4 top-1/2 z-20 -translate-y-1/2 rounded-full bg-black/50 p-2.5 text-gray-200 shadow-lg ring-1 ring-white/10 backdrop-blur transition-colors hover:bg-black/70 hover:text-white"
+          >
+            <ChevronLeft className="h-5 w-5 sm:h-6 sm:w-6" />
+          </button>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              goNext();
+            }}
+            aria-label="Proyecto siguiente"
+            className="absolute right-2 sm:right-4 top-1/2 z-20 -translate-y-1/2 rounded-full bg-black/50 p-2.5 text-gray-200 shadow-lg ring-1 ring-white/10 backdrop-blur transition-colors hover:bg-black/70 hover:text-white"
+          >
+            <ChevronRight className="h-5 w-5 sm:h-6 sm:w-6" />
+          </button>
+
           <div
+            ref={scrollRef}
             className="tp-glass relative w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-3xl text-left shadow-[0_0_80px_rgba(126,34,206,0.35)] ring-1 ring-purple-400/20"
             onClick={(e) => e.stopPropagation()}
+            onTouchStart={onTouchStart}
+            onTouchEnd={onTouchEnd}
           >
             <span className="pointer-events-none absolute inset-0 rounded-3xl bg-[radial-gradient(circle_at_15%_0%,rgba(147,51,234,0.20)_0,transparent_45%),radial-gradient(circle_at_100%_100%,rgba(67,56,202,0.22)_0,transparent_45%)]" />
 
+            <div className="absolute top-5 left-5 z-10 rounded-full bg-black/40 px-3 py-1 text-xs font-semibold tabular-nums text-gray-300">
+              {(activeIndex ?? 0) + 1} / {total}
+            </div>
+
             <button
               type="button"
-              onClick={() => setProyectoActivo(null)}
+              onClick={close}
               aria-label="Cerrar"
               className="absolute top-5 right-5 z-10 rounded-full bg-black/40 p-2 text-gray-300 hover:text-white hover:bg-black/60 transition-colors"
             >

@@ -126,9 +126,9 @@ export default function Navbar() {
   };
 
   return (
-    <nav className="fixed z-50 top-0 inset-x-0 md:top-4 md:inset-x-6 lg:left-1/2 lg:right-auto lg:-translate-x-1/2 lg:w-full lg:max-w-6xl">
+    <nav className="fixed z-50 top-2 inset-x-2 sm:top-3 sm:inset-x-3 md:top-4 md:inset-x-6 lg:left-1/2 lg:right-auto lg:-translate-x-1/2 lg:w-full lg:max-w-6xl">
       <div
-        className={`relative z-50 shadow-lg md:backdrop-blur-md transition-all duration-300 md:rounded-full ${
+        className={`relative z-50 shadow-lg rounded-2xl md:rounded-full md:backdrop-blur-md transition-all duration-300 ${
           scrolled ? "tp-navbar-bg-dark" : "tp-navbar-bg-light"
         }`}
       >

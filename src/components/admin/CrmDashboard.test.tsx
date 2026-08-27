@@ -114,6 +114,25 @@ describe("CrmDashboard", () => {
     expect(screen.getByText(/crea un proyecto primero/i)).toBeInTheDocument();
   });
 
+  it("switches to Usuarios when that nav item is clicked", async () => {
+    const user = userEvent.setup();
+    render(
+      <CrmDashboard
+        email="ana@techplacetj.com"
+        clients={[]}
+        payments={[]}
+        projects={[]}
+        invoices={[]}
+        quotes={[]}
+        tasks={[]}
+      />
+    );
+
+    await user.click(screen.getAllByRole("button", { name: "Usuarios" })[0]);
+
+    expect(screen.getByText("Usuarios totales")).toBeInTheDocument();
+  });
+
   it("shows the signed-in user's email in the sidebar", () => {
     render(
       <CrmDashboard

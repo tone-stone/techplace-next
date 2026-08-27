@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { ACTIVITY_COOKIE, IDLE_TIMEOUT_MS } from '@/lib/auth/session'
 
 export async function proxy(request: NextRequest) {
   const isUnderPath = (base: string) =>
@@ -39,17 +40,39 @@ export async function proxy(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  if (!user && isUnderPath('/admin')) {
+  const loginPath = isUnderPath('/admin') ? '/login' : '/blog/login'
+
+  if (!user) {
     const url = request.nextUrl.clone()
-    url.pathname = '/login'
+    url.pathname = loginPath
     return NextResponse.redirect(url)
   }
 
-  if (!user && isUnderPath('/blog/dashboard')) {
+  // Inactivity timeout: if the rolling "last seen" stamp is older than the
+  // window, drop the session (wipe the Supabase auth cookies) and bounce to
+  // the login screen with ?expired=1. Otherwise slide the window forward.
+  const now = Date.now()
+  const seen = Number(request.cookies.get(ACTIVITY_COOKIE)?.value)
+  if (Number.isFinite(seen) && now - seen > IDLE_TIMEOUT_MS) {
     const url = request.nextUrl.clone()
-    url.pathname = '/blog/login'
-    return NextResponse.redirect(url)
+    url.pathname = loginPath
+    url.search = '?expired=1'
+    const expiredRes = NextResponse.redirect(url)
+    for (const c of request.cookies.getAll()) {
+      if (c.name.startsWith('sb-') && c.name.includes('-auth-token')) {
+        expiredRes.cookies.delete(c.name)
+      }
+    }
+    expiredRes.cookies.delete(ACTIVITY_COOKIE)
+    return expiredRes
   }
+
+  response.cookies.set(ACTIVITY_COOKIE, String(now), {
+    path: '/',
+    sameSite: 'lax',
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+  })
 
   return response
 }

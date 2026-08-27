@@ -173,7 +173,7 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
               href="/#contacto"
               className="tp-btn-animated inline-block text-white px-8 py-3 rounded-full text-lg font-bold shadow-lg hover:scale-105 transition-transform duration-200"
             >
-              Solicita tu consultoría gratis
+              Solicita tu cotización
             </Link>
           </div>
 

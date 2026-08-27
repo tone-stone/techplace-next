@@ -15,6 +15,7 @@ import {
   X,
 } from "lucide-react";
 import { logout } from "@/lib/auth/actions";
+import IdleTimeout from "@/components/auth/IdleTimeout";
 import { CATEGORIES } from "@/lib/blog-posts";
 import type { ManagedUser } from "@/lib/auth/users";
 import type { ManagedArticle } from "@/lib/blog/articles";
@@ -118,29 +119,19 @@ export default function AdminDashboard({
         <div className="px-1">
           <p className="truncate text-xs text-gray-400">{email}</p>
         </div>
-        <div className="flex items-center gap-2">
-          <Link
-            href="/blog"
-            className="flex-1 rounded-full border border-white/10 px-3 py-2 text-center text-xs text-gray-300 transition-colors hover:border-purple-400/40 hover:text-purple-300"
-          >
-            Ver blog
-          </Link>
-          <form action={logout} className="flex-1">
-            <input type="hidden" name="redirectTo" value="/blog/login" />
-            <button
-              type="submit"
-              className="flex w-full items-center justify-center gap-1.5 rounded-full border border-white/10 px-3 py-2 text-xs text-gray-300 transition-colors hover:border-red-400/40 hover:text-red-300"
-            >
-              <LogOut className="h-3.5 w-3.5" /> Salir
-            </button>
-          </form>
-        </div>
+        <Link
+          href="/blog"
+          className="block rounded-full border border-white/10 px-3 py-2 text-center text-xs text-gray-300 transition-colors hover:border-purple-400/40 hover:text-purple-300"
+        >
+          Ver blog
+        </Link>
       </div>
     </>
   );
 
   return (
     <div className="flex min-h-screen bg-linear-to-br from-[#160a1f] via-[#150c1e] to-[#05040c] text-white">
+      <IdleTimeout redirectTo="/blog/login" />
       <aside className="hidden lg:sticky lg:top-0 lg:flex lg:h-screen lg:w-64 lg:shrink-0 lg:flex-col lg:overflow-hidden lg:border-r lg:border-white/10 lg:bg-black/30 lg:p-5 lg:backdrop-blur-md">
         {sidebarContent}
       </aside>
@@ -168,12 +159,12 @@ export default function AdminDashboard({
       )}
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-white/10 bg-black/30 px-4 py-4 backdrop-blur-md sm:px-6 lg:hidden">
+        <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-white/10 bg-black/25 px-4 py-3.5 backdrop-blur-md sm:px-6">
           <button
             type="button"
             onClick={() => setSidebarOpen(true)}
             aria-label="Abrir menú"
-            className="rounded-lg p-3 -m-1.5 text-gray-300 hover:bg-white/10 hover:text-white"
+            className="rounded-lg p-3 -m-1.5 text-gray-300 hover:bg-white/10 hover:text-white lg:hidden"
           >
             <Menu className="h-5 w-5" />
           </button>
@@ -182,9 +173,23 @@ export default function AdminDashboard({
             alt="TechPlace"
             width={28}
             height={28}
-            className="h-7 w-7 rounded-full"
+            className="h-7 w-7 rounded-full lg:hidden"
           />
-          <p className="text-sm font-bold text-white">Panel de Administrador</p>
+          <p className="text-sm font-bold text-white lg:hidden">Panel de Administrador</p>
+
+          <div className="ml-auto flex items-center gap-3">
+            <form action={logout}>
+              <input type="hidden" name="redirectTo" value="/blog/login" />
+              <button
+                type="submit"
+                aria-label="Cerrar sesión"
+                title="Cerrar sesión"
+                className="inline-flex items-center justify-center rounded-full border border-white/10 p-2 text-gray-300 transition-colors hover:border-red-400/40 hover:text-red-300"
+              >
+                <LogOut className="h-4 w-4" />
+              </button>
+            </form>
+          </div>
         </header>
 
         <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6 sm:py-10">

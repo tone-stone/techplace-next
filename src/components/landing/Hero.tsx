@@ -1,9 +1,9 @@
 import { ShieldCheck } from "lucide-react";
 
 const SLIDES = [
-  "Tu futuro digital empieza aquí",
-  "Seguridad & Web a otro nivel",
-  "Innovación para negocios modernos",
+  "Ingeniería digital para empresas en crecimiento",
+  "Desarrollo potenciado por inteligencia artificial",
+  "Tecnología de vanguardia, resultados medibles",
 ];
 
 export default function Hero() {
@@ -34,21 +34,30 @@ export default function Hero() {
       />
 
       <div className="tp-hero-content relative z-20 text-center w-full max-w-full md:max-w-2xl mx-auto">
-        <div className="tp-hero-slides select-none mb-4 w-full max-w-full md:max-w-2xl mx-auto">
+        {/* Decorative crossfading tagline — not a heading. The single real
+            <h1> for SEO is the line below it. */}
+        <div
+          aria-hidden
+          className="tp-hero-slides select-none mb-4 w-full max-w-full md:max-w-2xl mx-auto"
+        >
           {SLIDES.map((text, i) => (
-            <h1
+            <span
               key={text}
               style={{ animationDelay: `${i * 2.8}s` }}
               className="tp-hero-slide font-heading text-3xl sm:text-4xl md:text-6xl font-extrabold drop-shadow-xl tracking-tight"
             >
               {text}
-            </h1>
+            </span>
           ))}
         </div>
-        <p className="text-base sm:text-lg md:text-2xl text-gray-200 mb-8 drop-shadow-lg font-light tp-animate-fadein">
-          Desarrollamos sitios web y blindamos tus datos.
-          <br />
-          Innovación y seguridad para negocios modernos.
+        <h1 className="font-heading text-lg sm:text-xl md:text-2xl font-bold text-white/95 mb-3 tracking-tight drop-shadow-lg">
+          Desarrollo web, apps y ciberseguridad en Tijuana
+        </h1>
+        <p className="text-base sm:text-lg md:text-xl text-gray-200 mb-8 drop-shadow-lg font-light tp-animate-fadein">
+          Diseñamos, desarrollamos y aseguramos productos digitales a la medida,
+          con inteligencia artificial integrada en cada etapa del proceso.
+          Operamos desde Tijuana y Baja California, con cobertura remota en todo
+          México.
         </p>
         {/* Wrapped so the entrance animation (from `.tp-hero-content > *`)
             lands on this div instead of the <a>. The <a> already runs its
@@ -56,13 +65,19 @@ export default function Hero() {
             collision as the headline slides above, avoided the same way:
             keep the two animated elements separate instead of letting two
             classes fight over one `animation` property. */}
-        <div>
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
           <a
             href="#contacto"
             className="tp-btn-animated inline-flex items-center text-white px-6 sm:px-8 md:px-10 py-3 md:py-4 rounded-full text-base sm:text-lg font-bold shadow-lg shadow-blue-900/40 transition-transform duration-300 hover:scale-105 active:scale-[0.97]"
           >
             <ShieldCheck className="mr-2 h-5 w-5" />
-            Solicita tu consultoría
+            Solicita tu cotización
+          </a>
+          <a
+            href="#portafolio"
+            className="inline-flex items-center rounded-full border border-white/25 px-6 sm:px-8 py-3 md:py-4 text-base sm:text-lg font-bold text-white/90 transition-colors duration-300 hover:bg-white/10 hover:text-white"
+          >
+            Ver proyectos
           </a>
         </div>
       </div>

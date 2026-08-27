@@ -4,16 +4,21 @@ import { useState } from "react";
 import Image from "next/image";
 import {
   Briefcase,
+  ChevronRight,
   FileText,
   Kanban,
   LayoutDashboard,
   LogOut,
   Menu,
   Receipt,
+  UserCog,
   Users,
   X,
 } from "lucide-react";
 import { logout } from "@/lib/auth/actions";
+import IdleTimeout from "@/components/auth/IdleTimeout";
+import UserManagement from "@/components/blog/dashboard/UserManagement";
+import type { ManagedUser } from "@/lib/auth/users";
 import type { ClientPayment, CrmClient } from "@/lib/crm/clients";
 import type { CrmProject } from "@/lib/crm/projects";
 import type { CrmInvoice } from "@/lib/crm/invoices";
@@ -26,7 +31,14 @@ import InvoicesSection from "./crm/InvoicesSection";
 import QuotesSection from "./crm/QuotesSection";
 import TasksSection from "./crm/TasksSection";
 
-type Section = "resumen" | "clientes" | "proyectos" | "facturacion" | "cotizaciones" | "tareas";
+type Section =
+  | "resumen"
+  | "clientes"
+  | "proyectos"
+  | "facturacion"
+  | "cotizaciones"
+  | "tareas"
+  | "usuarios";
 
 const NAV_ITEMS: { id: Section; label: string; icon: typeof Users }[] = [
   { id: "resumen", label: "Resumen", icon: LayoutDashboard },
@@ -35,10 +47,13 @@ const NAV_ITEMS: { id: Section; label: string; icon: typeof Users }[] = [
   { id: "facturacion", label: "Facturación", icon: Receipt },
   { id: "cotizaciones", label: "Cotizaciones", icon: FileText },
   { id: "tareas", label: "Tareas", icon: Kanban },
+  { id: "usuarios", label: "Usuarios", icon: UserCog },
 ];
 
 export default function CrmDashboard({
   email,
+  userId = "",
+  users = [],
   clients,
   payments,
   projects,
@@ -47,6 +62,8 @@ export default function CrmDashboard({
   tasks,
 }: {
   email: string;
+  userId?: string;
+  users?: ManagedUser[];
   clients: CrmClient[];
   payments: ClientPayment[];
   projects: CrmProject[];
@@ -57,9 +74,13 @@ export default function CrmDashboard({
   const [section, setSection] = useState<Section>("resumen");
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
+  const currentLabel = NAV_ITEMS.find((n) => n.id === section)?.label ?? "Resumen";
+
   const navButtonClass = (active: boolean) =>
     `flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${
-      active ? "bg-sky-500/20 text-white" : "text-gray-400 hover:bg-white/5 hover:text-gray-200"
+      active
+        ? "bg-linear-to-r from-sky-500/25 to-purple-500/15 text-white ring-1 ring-sky-400/20"
+        : "text-gray-400 hover:bg-white/5 hover:text-gray-200"
     }`;
 
   const sidebarContent = (
@@ -95,25 +116,15 @@ export default function CrmDashboard({
         ))}
       </nav>
 
-      <div className="mt-8 space-y-4 border-t border-white/10 pt-5">
-        <div className="px-1">
-          <p className="truncate text-xs text-gray-400">{email}</p>
-        </div>
-        <form action={logout}>
-          <input type="hidden" name="redirectTo" value="/login" />
-          <button
-            type="submit"
-            className="flex w-full items-center justify-center gap-1.5 rounded-full border border-white/10 px-3 py-2 text-xs text-gray-300 transition-colors hover:border-red-400/40 hover:text-red-300"
-          >
-            <LogOut className="h-3.5 w-3.5" /> Salir
-          </button>
-        </form>
+      <div className="mt-8 border-t border-white/10 pt-5">
+        <p className="truncate px-1 text-xs text-gray-400">{email}</p>
       </div>
     </>
   );
 
   return (
-    <div className="flex min-h-screen bg-linear-to-br from-[#0a1420] via-[#0c1522] to-[#05040c] text-white">
+    <div className="flex min-h-screen bg-[radial-gradient(circle_at_12%_-8%,rgba(147,51,234,0.16),transparent_42%),radial-gradient(circle_at_108%_6%,rgba(56,189,248,0.13),transparent_40%),linear-gradient(to_bottom_right,#0a1420,#0c1522,#05040c)] text-white">
+      <IdleTimeout redirectTo="/login" />
       <aside className="hidden lg:sticky lg:top-0 lg:flex lg:h-screen lg:w-64 lg:shrink-0 lg:flex-col lg:overflow-hidden lg:border-r lg:border-white/10 lg:bg-black/30 lg:p-5 lg:backdrop-blur-md">
         {sidebarContent}
       </aside>
@@ -141,30 +152,70 @@ export default function CrmDashboard({
       )}
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-white/10 bg-black/30 px-4 py-4 backdrop-blur-md sm:px-6 lg:hidden">
-          <button
-            type="button"
-            onClick={() => setSidebarOpen(true)}
-            aria-label="Abrir menú"
-            className="rounded-lg p-3 -m-1.5 text-gray-300 hover:bg-white/10 hover:text-white"
-          >
-            <Menu className="h-5 w-5" />
-          </button>
-          <Image
-            src="/img/logos/techplace-icon.webp"
-            alt="TechPlace"
-            width={28}
-            height={28}
-            className="h-7 w-7 rounded-full"
-          />
-          <p className="text-sm font-bold text-white">CRM TechPlace</p>
+        <header className="sticky top-0 z-30 border-b border-white/10 bg-black/25 backdrop-blur-md">
+          <div className="flex items-center gap-3 px-4 py-3.5 sm:px-6">
+            <button
+              type="button"
+              onClick={() => setSidebarOpen(true)}
+              aria-label="Abrir menú"
+              className="rounded-lg p-3 -m-1.5 text-gray-300 hover:bg-white/10 hover:text-white lg:hidden"
+            >
+              <Menu className="h-5 w-5" />
+            </button>
+            <Image
+              src="/img/logos/techplace-icon.webp"
+              alt="TechPlace"
+              width={28}
+              height={28}
+              className="h-7 w-7 rounded-full lg:hidden"
+            />
+            <nav aria-label="Ruta" className="flex min-w-0 items-center gap-1.5 text-sm lg:hidden">
+              <span className="shrink-0 text-gray-500">CRM</span>
+              <ChevronRight className="h-3.5 w-3.5 shrink-0 text-gray-600" />
+              <span className="truncate font-bold text-white">{currentLabel}</span>
+            </nav>
+
+            <div className="ml-auto flex items-center gap-3">
+              <form action={logout}>
+                <input type="hidden" name="redirectTo" value="/login" />
+                <button
+                  type="submit"
+                  aria-label="Cerrar sesión"
+                  title="Cerrar sesión"
+                  className="inline-flex items-center justify-center rounded-full border border-white/10 p-2 text-gray-300 transition-colors hover:border-red-400/40 hover:text-red-300"
+                >
+                  <LogOut className="h-4 w-4" />
+                </button>
+              </form>
+            </div>
+          </div>
+
+          {/* Mobile quick-nav: every section at a glance, horizontal scroll */}
+          <div className="flex gap-2 overflow-x-auto px-4 pb-2.5 sm:px-6 lg:hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {NAV_ITEMS.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setSection(item.id)}
+                aria-current={section === item.id ? "page" : undefined}
+                className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+                  section === item.id
+                    ? "border-sky-400/40 bg-sky-500/15 text-white"
+                    : "border-white/10 text-gray-400 hover:text-gray-200"
+                }`}
+              >
+                <item.icon className="h-3.5 w-3.5" />
+                {item.label}
+              </button>
+            ))}
+          </div>
         </header>
 
-        <main className="mx-auto w-full max-w-6xl flex-1 space-y-8 px-4 py-8 sm:px-6 sm:py-10">
-          <div className="hidden items-center gap-2 lg:flex">
-            <LayoutDashboard className="h-6 w-6 text-sky-300" />
-            <h1 className="font-heading text-2xl font-extrabold tracking-tight sm:text-3xl">
-              {NAV_ITEMS.find((n) => n.id === section)?.label}
+        <main className="mx-auto w-full max-w-6xl flex-1 space-y-6 px-4 py-6 sm:space-y-8 sm:px-6 sm:py-10">
+          <div className="flex items-center gap-2">
+            <LayoutDashboard className="h-5 w-5 shrink-0 text-sky-300 sm:h-6 sm:w-6" />
+            <h1 className="font-heading text-xl font-extrabold tracking-tight sm:text-3xl">
+              {currentLabel}
             </h1>
           </div>
 
@@ -178,6 +229,9 @@ export default function CrmDashboard({
           )}
           {section === "cotizaciones" && <QuotesSection quotes={quotes} clients={clients} />}
           {section === "tareas" && <TasksSection tasks={tasks} projects={projects} />}
+          {section === "usuarios" && (
+            <UserManagement currentUserId={userId} initialUsers={users} accent="sky" />
+          )}
         </main>
       </div>
     </div>

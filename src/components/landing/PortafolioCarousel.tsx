@@ -26,7 +26,7 @@ export default function PortafolioCarousel({
   onSelect,
 }: {
   proyectos: Proyecto[];
-  onSelect: (proyecto: Proyecto) => void;
+  onSelect: (index: number) => void;
 }) {
   return (
     <Swiper
@@ -45,13 +45,13 @@ export default function PortafolioCarousel({
         768: { slidesPerView: 2, centeredSlides: false, spaceBetween: 30 },
         1200: { slidesPerView: 3, centeredSlides: false },
       }}
-      className="tp-swiper"
+      className="tp-swiper pb-12!"
     >
-      {proyectos.map((proyecto) => (
+      {proyectos.map((proyecto, i) => (
         <SwiperSlide
           key={proyecto.title}
           className="tp-glass rounded-2xl p-6 mx-4 flex flex-col items-center cursor-pointer transition-transform hover:scale-[1.02]"
-          onClick={() => onSelect(proyecto)}
+          onClick={() => onSelect(i)}
         >
           <Image
             src={proyecto.image}

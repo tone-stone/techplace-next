@@ -4,6 +4,7 @@ const signInWithPassword = vi.fn();
 const signOut = vi.fn();
 const redirectMock = vi.fn();
 const revalidatePathMock = vi.fn();
+const cookieDelete = vi.fn();
 
 vi.mock("next/navigation", () => ({
   redirect: (...args: unknown[]) => redirectMock(...args),
@@ -11,6 +12,10 @@ vi.mock("next/navigation", () => ({
 
 vi.mock("next/cache", () => ({
   revalidatePath: (...args: unknown[]) => revalidatePathMock(...args),
+}));
+
+vi.mock("next/headers", () => ({
+  cookies: async () => ({ get: () => undefined, set: vi.fn(), delete: cookieDelete }),
 }));
 
 vi.mock("@/lib/supabase/server", () => ({
@@ -86,6 +91,7 @@ describe("logout", () => {
     await logout(formDataFrom({ redirectTo: "/blog/login" }));
 
     expect(signOut).toHaveBeenCalled();
+    expect(cookieDelete).toHaveBeenCalledWith("tp_seen");
     expect(redirectMock).toHaveBeenCalledWith("/blog/login");
   });
 

@@ -142,7 +142,7 @@ export default function Contacto() {
           <Reveal className="tp-glass hidden md:flex md:w-1/2 rounded-3xl p-6 items-center justify-center" delay={0.15}>
             <Image
               src="/img/logos/techplace-brand.webp"
-              alt="Ilustración contacto"
+              alt="TechPlace — desarrollo web, apps y ciberseguridad en Tijuana"
               width={480}
               height={480}
               loading="eager"

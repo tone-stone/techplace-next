@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { FileText, LayoutDashboard, LogOut, Newspaper, Tags } from "lucide-react";
 import { logout } from "@/lib/auth/actions";
+import IdleTimeout from "@/components/auth/IdleTimeout";
 import { CATEGORIES } from "@/lib/blog-posts";
 import type { ManagedArticle } from "@/lib/blog/articles";
 import ArticleForm from "./ArticleForm";
@@ -42,6 +43,7 @@ export default function RedactorDashboard({
 
   return (
     <div className="min-h-screen bg-linear-to-br from-[#0b0a1a] via-[#0d0c1c] to-[#05040c] text-white">
+      <IdleTimeout redirectTo="/blog/login" />
       <header className="sticky top-0 z-30 border-b border-white/10 bg-black/30 backdrop-blur-md">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-4 sm:px-6">
           <div className="flex items-center gap-3">

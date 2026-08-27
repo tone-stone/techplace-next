@@ -2,8 +2,9 @@ import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
-import { ArrowLeft, Newspaper, PenSquare, Sparkles, Users } from "lucide-react";
+import { ArrowLeft, Home, Newspaper, PenSquare, Sparkles, Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import LoginFooter from "@/components/auth/LoginFooter";
 import LoginForm from "../../login/LoginForm";
 
 export const metadata: Metadata = {
@@ -17,7 +18,12 @@ const FEATURES = [
   { icon: Users, text: "Acceso exclusivo para el equipo de contenido" },
 ];
 
-export default async function BlogLoginPage() {
+export default async function BlogLoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ expired?: string }>;
+}) {
+  const { expired } = await searchParams;
   const supabase = await createClient();
   const {
     data: { user },
@@ -28,14 +34,20 @@ export default async function BlogLoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex font-sans bg-[#050409] text-white">
-      <div className="relative hidden lg:flex lg:w-1/2 flex-col justify-between overflow-hidden bg-gradient-to-br from-[#0b0a1a] via-[#151233] to-[#05040c] p-12">
+    <div className="relative min-h-dvh flex font-sans text-white">
+      <video autoPlay muted loop playsInline className="tp-login-video-bg" poster="/img/backup-dark-bg.webp">
+        <source src="/video/bg.mp4" type="video/mp4" />
+        Tu navegador no soporta videos en HTML5.
+      </video>
+      <div className="tp-login-overlay" />
+
+      <div className="relative z-10 hidden lg:flex lg:w-1/2 flex-col justify-between overflow-hidden bg-gradient-to-br from-[#0b0a1a]/85 via-[#151233]/80 to-[#05040c]/85 p-12">
         <span className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_15%,rgba(79,70,229,0.28)_0,transparent_55%),radial-gradient(circle_at_85%_85%,rgba(99,102,241,0.18)_0,transparent_50%)]" />
         <span className="pointer-events-none absolute inset-0 bg-[radial-gradient(rgba(255,255,255,0.06)_1px,transparent_1px)] bg-[length:26px_26px] opacity-40" />
 
         <Link
           href="/blog"
-          className="relative z-10 inline-flex items-center gap-1.5 text-sm text-gray-400 hover:text-indigo-300 transition-colors w-fit"
+          className="relative z-10 inline-flex w-fit items-center gap-1.5 text-sm text-gray-400 hover:text-indigo-300 transition-colors"
         >
           <ArrowLeft className="h-4 w-4" /> Volver al blog
         </Link>
@@ -72,7 +84,8 @@ export default async function BlogLoginPage() {
         </div>
       </div>
 
-      <div className="relative flex w-full lg:w-1/2 flex-col items-center justify-center p-6 sm:p-12">
+      <div className="relative z-10 flex w-full lg:w-1/2 flex-col items-center justify-center p-6 sm:p-12">
+        {/* Back-to-blog: mobile only (desktop shows it in the brand panel) */}
         <Link
           href="/blog"
           className="lg:hidden absolute top-6 left-6 -m-3 inline-flex items-center gap-1.5 p-3 text-sm text-gray-400 hover:text-indigo-300 transition-colors"
@@ -80,7 +93,17 @@ export default async function BlogLoginPage() {
           <ArrowLeft className="h-4 w-4" /> Volver al blog
         </Link>
 
-        <div className="w-full max-w-sm">
+        {/* Home: top-right corner, every size */}
+        <Link
+          href="/"
+          aria-label="Ir al inicio"
+          title="Inicio"
+          className="absolute right-5 top-5 z-10 inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/5 text-gray-400 transition-colors hover:text-indigo-300 sm:right-8 sm:top-8"
+        >
+          <Home className="h-4 w-4" />
+        </Link>
+
+        <div className="tp-glass w-full max-w-sm rounded-3xl p-6 sm:p-8">
           <div className="flex items-center gap-3 mb-10">
             <Image
               src="/img/logos/techplace-icon.webp"
@@ -96,16 +119,26 @@ export default async function BlogLoginPage() {
             </div>
           </div>
 
-          <h2 className="text-2xl font-bold text-white mb-2">Inicia sesión</h2>
-          <p className="text-gray-400 text-sm mb-8">Ingresa tus credenciales del equipo para continuar.</p>
+          <span className="mb-4 inline-flex items-center gap-2 rounded-full border-2 border-indigo-400/60 bg-indigo-500/20 px-5 py-2 text-base sm:text-lg font-extrabold uppercase tracking-widest text-indigo-200 shadow-[0_0_24px_rgba(99,102,241,0.45)]">
+            <PenSquare className="h-5 w-5" />
+            Redacción
+          </span>
+          <h2 className="text-2xl font-bold text-white">Inicia sesión</h2>
+          <p className="text-gray-400 text-sm mb-8 mt-1">Ingresa tus credenciales del equipo de contenido para continuar.</p>
+
+          {expired && (
+            <p className="mb-4 rounded-lg border border-amber-400/30 bg-amber-500/10 px-3 py-2 text-center text-sm text-amber-200">
+              Tu sesión expiró por inactividad. Inicia sesión de nuevo.
+            </p>
+          )}
 
           <LoginForm redirectTo="/blog/dashboard" />
 
-          <div className="mt-6 text-sm">
-            <a href="#" className="-my-3 py-3 text-gray-400 hover:text-indigo-300 hover:underline transition">
-              ¿Olvidaste tu contraseña?
-            </a>
-          </div>
+          <LoginFooter
+            accent="indigo"
+            switchHref="/login"
+            switchLabel="Ir al panel de administración"
+          />
         </div>
       </div>
     </div>

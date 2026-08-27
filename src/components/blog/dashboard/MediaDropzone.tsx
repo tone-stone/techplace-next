@@ -53,7 +53,6 @@ export default function MediaDropzone({
       <label className="block text-sm text-gray-400 mb-1.5">
         {label} <span className="text-gray-500">(máx. {formatBytes(maxBytes)})</span>
       </label>
-      {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events */}
       <div
         onClick={() => inputRef.current?.click()}
         onDragOver={(e) => {

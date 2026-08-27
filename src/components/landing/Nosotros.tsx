@@ -1,9 +1,10 @@
 import Image from "next/image";
 import Reveal from "./Reveal";
+import MobileAccordion from "./MobileAccordion";
 
 const ESPECIALIDADES = [
   {
-    title: "Cyberseguridad & Infraestructura",
+    title: "Ciberseguridad e infraestructura",
     description:
       "Nos especializamos en proteger datos, redes y sistemas ante amenazas digitales, implementando controles de seguridad, hardening, monitoreo constante y respuesta ante incidentes.",
     icon: (
@@ -54,9 +55,9 @@ const ESPECIALIDADES = [
     ),
   },
   {
-    title: "Consultoría & Innovación Digital",
+    title: "Inteligencia Artificial & Automatización",
     description:
-      "Te asesoramos para impulsar tu transformación tecnológica, acompañándote en migraciones, optimización de IT, adopción de nuevas herramientas y decisiones estratégicas.",
+      "Integramos IA en tu operación y en nuestro propio proceso de desarrollo: asistentes, automatizaciones a la medida y adopción guiada de nuevas herramientas para acelerar resultados.",
     icon: (
       <svg width="48" height="48" fill="none" viewBox="0 0 48 48">
         <circle cx="16" cy="24" r="4" stroke="#a78bfa" strokeWidth="2.2" />
@@ -71,7 +72,7 @@ const ESPECIALIDADES = [
 const CULTURA = [
   "Minimalismo funcional",
   "Arte & Diseño UX/UI",
-  "Innovación constante",
+  "Desarrollo asistido por IA",
   "Ética profesional",
   "Transparencia total",
   "Seguridad desde el inicio",
@@ -91,15 +92,19 @@ export default function Nosotros() {
         </Reveal>
         <Reveal delay={0.1}>
           <p className="mb-10 text-gray-300 text-lg md:text-xl font-light text-justify">
-            En TechPlace reunimos un{" "}
-            <span className="text-purple-400 font-semibold">equipo multidisciplinario</span>{" "}
-            apasionado por la tecnología, la seguridad y el diseño. Nuestra fortaleza está en la{" "}
-            <span className="text-purple-400">innovación digital</span> y en crear experiencias web y
-            móviles seguras, eficientes y visualmente impactantes.
+            TechPlace es una{" "}
+            <span className="text-purple-400 font-semibold">firma de ingeniería digital</span>{" "}
+            con base en Tijuana, especializada en desarrollo de software, ciberseguridad e{" "}
+            <span className="text-purple-400 font-semibold">inteligencia artificial aplicada</span>.
+            Construimos soluciones{" "}
+            <span className="text-purple-400">escalables y seguras desde su concepción</span>, con
+            IA integrada en nuestro proceso de trabajo, para empresas, despachos profesionales y
+            startups de Baja California y todo México.
           </p>
         </Reveal>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-10 mb-16">
+        {/* Desktop: grid of cards. Mobile: one-open-at-a-time accordion. */}
+        <div className="hidden sm:grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-10 mb-16">
           {ESPECIALIDADES.map((item, i) => (
             <Reveal key={item.title} delay={i * 0.12}>
               <div className="tp-glass tp-glass-hover rounded-2xl p-8 flex flex-col items-center group transition-all duration-300 hover:-translate-y-1">
@@ -112,15 +117,25 @@ export default function Nosotros() {
             </Reveal>
           ))}
         </div>
+        <MobileAccordion
+          className="sm:hidden mb-16"
+          items={ESPECIALIDADES.map((item) => ({
+            id: item.title,
+            title: item.title,
+            icon: item.icon,
+            body: <p className="text-justify">{item.description}</p>,
+          }))}
+        />
 
         <div className="flex flex-col md:flex-row items-center justify-center gap-10">
           <Reveal className="text-left max-w-lg" y={0}>
             <h4 className="text-2xl font-bold text-white mb-2">Nuestra Misión</h4>
             <p className="text-gray-300 mb-4 text-justify">
-              Impulsar la transformación de negocios y personas a través de la{" "}
-              <span className="text-purple-400 font-semibold">innovación tecnológica</span> y la{" "}
-              <span className="text-purple-400 font-semibold">protección digital</span>, creando soluciones seguras,
-              eficientes y visualmente sobresalientes.
+              Impulsar el crecimiento de organizaciones y personas mediante{" "}
+              <span className="text-purple-400 font-semibold">inteligencia artificial</span>,{" "}
+              <span className="text-purple-400 font-semibold">tecnología de vanguardia</span> y{" "}
+              <span className="text-purple-400 font-semibold">protección digital</span>, entregando
+              soluciones seguras, eficientes y con estándares de calidad empresarial.
             </p>
             <h4 className="text-2xl font-bold text-white mt-6 mb-2">Cultura TechPlace</h4>
             <ul className="text-gray-400 space-y-1 text-base ml-4 list-disc">
@@ -137,7 +152,7 @@ export default function Nosotros() {
           <Reveal className="w-full md:w-72" delay={0.15} y={0}>
             <Image
               src="/img/logos/techplace-brand.webp"
-              alt="logo"
+              alt="TechPlace — desarrollo web, apps y ciberseguridad en Tijuana"
               width={288}
               height={288}
               className="tp-branding-img w-full h-auto"

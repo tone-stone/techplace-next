@@ -76,7 +76,6 @@ export default function GalleryDropzone({
         Galería de fotos ({totalCount}/{MAX_GALLERY_IMAGES})
       </label>
 
-      {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events */}
       <div
         onClick={() => inputRef.current?.click()}
         onDragOver={(e) => {

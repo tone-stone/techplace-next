@@ -1,6 +1,7 @@
 import Aurora from "@/components/landing/Aurora";
 import Navbar from "@/components/landing/Navbar";
 import Hero from "@/components/landing/Hero";
+import TechStack from "@/components/landing/TechStack";
 import Servicios from "@/components/landing/Servicios";
 import Nosotros from "@/components/landing/Nosotros";
 import PorQueTechPlace from "@/components/landing/PorQueTechPlace";
@@ -16,6 +17,7 @@ export default function Home() {
       <Aurora />
       <Navbar />
       <Hero />
+      <TechStack />
       <Servicios />
       <Nosotros />
       <PorQueTechPlace />

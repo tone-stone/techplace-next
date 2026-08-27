@@ -1,8 +1,10 @@
 "use server";
 
+import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { ACTIVITY_COOKIE } from "@/lib/auth/session";
 
 export type LoginState = { error: string } | null;
 
@@ -33,6 +35,7 @@ export async function logout(formData?: FormData) {
   const redirectTo = String(formData?.get("redirectTo") ?? "/login");
   const supabase = await createClient();
   await supabase.auth.signOut();
+  (await cookies()).delete(ACTIVITY_COOKIE);
   revalidatePath("/", "layout");
   redirect(redirectTo);
 }

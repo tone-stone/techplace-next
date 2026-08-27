@@ -62,21 +62,24 @@ export default function Footer() {
                 className="h-16 w-auto mb-3 drop-shadow-[0_0_16px_rgba(144,205,221,0.35)]"
               />
               <p className="text-sm leading-relaxed">
-                Desarrollo Web &nbsp;|&nbsp; Apps Móviles &nbsp;|&nbsp; Cyberseguridad <br />
+                Desarrollo web &nbsp;·&nbsp; Aplicaciones móviles &nbsp;·&nbsp; IA &nbsp;·&nbsp; Ciberseguridad <br />
                 Innovación que protege tu futuro digital.
               </p>
             </div>
 
             <div>
-              <h4 className="font-heading text-purple-400 font-bold mb-4 text-sm tracking-wide uppercase">
+              <h4 className="font-heading text-purple-400 font-bold mb-3 sm:mb-4 text-sm tracking-wide uppercase">
                 Navegación
               </h4>
-              <ul className="space-y-2 text-sm">
+              {/* Mobile: links wrap in a horizontal row to cut footer height.
+                  From sm up (footer becomes a multi-column grid) it's a
+                  normal vertical list again. */}
+              <ul className="flex flex-wrap gap-x-5 gap-y-1 text-sm sm:block sm:space-y-2">
                 {NAV_LINKS.map((link) => (
                   <li key={link.href}>
                     <Link
                       href={link.href}
-                      className="-my-1.5 block py-1.5 hover:text-brand-blue hover:pl-1 transition-all"
+                      className="block py-1 hover:text-brand-blue transition-all sm:-my-1.5 sm:py-1.5 sm:hover:pl-1"
                     >
                       {link.label}
                     </Link>
