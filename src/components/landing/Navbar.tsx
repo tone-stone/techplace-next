@@ -29,6 +29,10 @@ export default function Navbar() {
   const [active, setActive] = useState("home");
   const [blogMenuOpen, setBlogMenuOpen] = useState(false);
   const blogMenuRef = useRef<HTMLDivElement>(null);
+  // Set right before a menu link closes the menu, so the scroll-lock cleanup
+  // knows not to restore the old scroll offset (the link's own navigation /
+  // #anchor scroll should win instead).
+  const closingViaNavRef = useRef(false);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 30);
@@ -86,30 +90,40 @@ export default function Navbar() {
     // a long-standing WebKit quirk. Pinning the body to a fixed position
     // instead (and restoring the scroll offset on close) is the reliable
     // cross-browser way to lock background scroll while the menu is open.
+    // Do NOT also set `overflow: hidden` on <html>/<body> here: on iOS 18 that
+    // combination leaves the whole viewport unresponsive to taps until the
+    // next reflow, which is what made the toggle button feel dead.
     const scrollY = window.scrollY;
     const body = document.body;
-    const html = document.documentElement;
     body.style.position = "fixed";
     body.style.top = `-${scrollY}px`;
     body.style.left = "0";
     body.style.right = "0";
-    body.style.overflow = "hidden";
-    // Some iOS versions still rubber-band the document behind a fixed body
-    // unless the root element is also contained.
-    html.style.overflow = "hidden";
+    body.style.width = "100%";
 
     return () => {
       body.style.position = "";
       body.style.top = "";
       body.style.left = "";
       body.style.right = "";
-      body.style.overflow = "";
-      html.style.overflow = "";
-      window.scrollTo(0, scrollY);
+      body.style.width = "";
+      // When a menu link closed the menu, let its route change / #anchor scroll
+      // decide where the page lands. Restoring the old offset here fights that
+      // — and on iOS it won, dumping you back at the top instead of the section.
+      if (closingViaNavRef.current) {
+        closingViaNavRef.current = false;
+      } else {
+        window.scrollTo(0, scrollY);
+      }
     };
   }, [menuOpen]);
 
   const toggleMenu = () => setMenuOpen((open) => !open);
+  const closeMenu = () => setMenuOpen(false);
+  const closeMenuForNav = () => {
+    closingViaNavRef.current = true;
+    setMenuOpen(false);
+  };
 
   return (
     <nav className="fixed z-50 top-0 inset-x-0 md:top-4 md:inset-x-6 lg:left-1/2 lg:right-auto lg:-translate-x-1/2 lg:w-full lg:max-w-6xl">
@@ -199,6 +213,7 @@ export default function Navbar() {
         </div>
 
         <button
+          type="button"
           onClick={toggleMenu}
           aria-label={menuOpen ? "Cerrar menú" : "Abrir menú"}
           aria-expanded={menuOpen}
@@ -221,12 +236,17 @@ export default function Navbar() {
       </div>
 
       {menuOpen && (
-        <div className="tp-menu-overlay-in fixed inset-0 z-40 md:hidden flex flex-col items-center justify-center gap-7 text-xl font-semibold bg-[#0a0a18]/95">
+        <div
+          onClick={(e) => {
+            if (e.target === e.currentTarget) closeMenu();
+          }}
+          className="tp-menu-overlay-in fixed inset-0 z-40 md:hidden flex flex-col items-center justify-center gap-7 overflow-y-auto overscroll-contain text-xl font-semibold bg-[#0a0a18]/95"
+        >
           {NAV_LINKS.map((link, i) => (
             <div key={link.href} className="flex flex-col items-center gap-4">
               <Link
                 href={link.href}
-                onClick={toggleMenu}
+                onClick={closeMenuForNav}
                 style={{ animationDelay: `${0.05 * i}s` }}
                 className={`touch-manipulation tp-menu-link-in tp-nav-link-underline tp-mobile-nav-link${
                   isActive(link.href) ? " active" : ""
@@ -238,7 +258,7 @@ export default function Navbar() {
                 <Link
                   key={child.href}
                   href={child.href}
-                  onClick={toggleMenu}
+                  onClick={closeMenuForNav}
                   style={{ animationDelay: `${0.05 * i}s` }}
                   className="touch-manipulation tp-menu-link-in flex items-center gap-1.5 rounded-lg px-3 py-2 text-base font-normal text-gray-400 hover:text-brand-blue transition-colors"
                 >
@@ -254,7 +274,7 @@ export default function Navbar() {
           >
             <Link
               href="/login"
-              onClick={toggleMenu}
+              onClick={closeMenuForNav}
               className="tp-btn-animated inline-flex items-center gap-1.5 rounded-full px-6 py-3 text-lg font-bold text-white shadow-lg transition-transform active:scale-95"
             >
               <LogIn className="h-5 w-5" />
