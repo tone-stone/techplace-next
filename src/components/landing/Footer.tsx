@@ -148,7 +148,10 @@ export default function Footer() {
           </div>
 
           <div className="mt-10 border-t border-white/10 pt-6 text-center text-xs text-gray-500">
-            © {new Date().getFullYear()} TechPlace – Todos los derechos reservados.
+            © {new Date().getFullYear()} TechPlace – Todos los derechos reservados. ·{" "}
+            <Link href="/legal" className="hover:text-brand-blue transition-colors">
+              Legal
+            </Link>
           </div>
         </Reveal>
       </div>
