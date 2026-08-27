@@ -3,7 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { withTiming } from "@/lib/monitoring/timing";
-import { isCrmAdmin, type Role, type Team } from "@/lib/auth/roles";
+import { isBlogAdmin, isCrmAdmin, type ProfileRole, type Role, type Team } from "@/lib/auth/roles";
 
 export type ManagedUser = {
   id: string;
@@ -30,7 +30,10 @@ function parseTeamRole(formData: FormData): { team: Team; role: Role } | { error
   return { team, role };
 }
 
-async function requireAdmin() {
+// CRM admin manages every account (it's the app's general admin). Blog admin
+// manages only its own team's accounts — it can't reach into or promote
+// someone into the CRM.
+async function requireUserManager() {
   const supabase = await createClient();
   const {
     data: { user },
@@ -39,16 +42,17 @@ async function requireAdmin() {
   if (!user) return { ok: false as const, error: "No autenticado" };
 
   const { data: profile } = await supabase.from("profiles").select("team, role").eq("id", user.id).single();
+  if (!profile) return { ok: false as const, error: "No tienes permisos para hacer esto" };
 
-  if (!profile || !isCrmAdmin(profile as { team: Team; role: Role })) {
-    return { ok: false as const, error: "Solo un administrador del CRM puede hacer esto" };
-  }
+  const p = profile as ProfileRole;
+  if (isCrmAdmin(p)) return { ok: true as const, userId: user.id, scope: "all" as const };
+  if (isBlogAdmin(p)) return { ok: true as const, userId: user.id, scope: "blog" as const };
 
-  return { ok: true as const, userId: user.id };
+  return { ok: false as const, error: "No tienes permisos para hacer esto" };
 }
 
 export async function listUsers(): Promise<{ users: ManagedUser[] } | { error: string }> {
-  const check = await requireAdmin();
+  const check = await requireUserManager();
   if (!check.ok) return { error: check.error };
 
   const admin = createAdminClient();
@@ -63,7 +67,7 @@ export async function listUsers(): Promise<{ users: ManagedUser[] } | { error: s
 
   const profileById = new Map((profiles ?? []).map((p) => [p.id, p]));
 
-  const users: ManagedUser[] = authData.users.map((u) => {
+  let users: ManagedUser[] = authData.users.map((u) => {
     const profile = profileById.get(u.id);
     return {
       id: u.id,
@@ -74,13 +78,17 @@ export async function listUsers(): Promise<{ users: ManagedUser[] } | { error: s
     };
   });
 
+  if (check.scope === "blog") {
+    users = users.filter((u) => u.team === "blog");
+  }
+
   users.sort((a, b) => a.name.localeCompare(b.name));
 
   return { users };
 }
 
 export async function createUserAction(_prevState: UsersActionState, formData: FormData): Promise<UsersActionState> {
-  const check = await requireAdmin();
+  const check = await requireUserManager();
   if (!check.ok) return { error: check.error };
 
   const name = String(formData.get("name") ?? "").trim();
@@ -95,6 +103,9 @@ export async function createUserAction(_prevState: UsersActionState, formData: F
     return { error: "La contraseña debe tener al menos 8 caracteres" };
   }
   if ("error" in teamRole) return teamRole;
+  if (check.scope === "blog" && teamRole.team !== "blog") {
+    return { error: "Solo puedes crear cuentas del equipo de blog" };
+  }
 
   const admin = createAdminClient();
   const { data, error } = await admin.auth.admin.createUser({
@@ -118,7 +129,7 @@ export async function createUserAction(_prevState: UsersActionState, formData: F
 }
 
 export async function updateUserAction(_prevState: UsersActionState, formData: FormData): Promise<UsersActionState> {
-  const check = await requireAdmin();
+  const check = await requireUserManager();
   if (!check.ok) return { error: check.error };
 
   const id = String(formData.get("id") ?? "");
@@ -131,8 +142,18 @@ export async function updateUserAction(_prevState: UsersActionState, formData: F
     return { error: "Completa nombre y email" };
   }
   if ("error" in teamRole) return teamRole;
+  if (check.scope === "blog" && teamRole.team !== "blog") {
+    return { error: "Solo puedes asignar cuentas al equipo de blog" };
+  }
 
   const admin = createAdminClient();
+
+  if (check.scope === "blog") {
+    const { data: target } = await admin.from("profiles").select("team").eq("id", id).single();
+    if (target?.team !== "blog") {
+      return { error: "Solo puedes editar cuentas del equipo de blog" };
+    }
+  }
 
   const authUpdate: { email?: string; password?: string; user_metadata: { full_name: string } } = {
     email,
@@ -157,11 +178,19 @@ export async function updateUserAction(_prevState: UsersActionState, formData: F
 }
 
 export async function deleteUserAction(id: string): Promise<UsersActionState> {
-  const check = await requireAdmin();
+  const check = await requireUserManager();
   if (!check.ok) return { error: check.error };
   if (id === check.userId) return { error: "No puedes eliminar tu propia cuenta" };
 
   const admin = createAdminClient();
+
+  if (check.scope === "blog") {
+    const { data: target } = await admin.from("profiles").select("team").eq("id", id).single();
+    if (target?.team !== "blog") {
+      return { error: "Solo puedes eliminar cuentas del equipo de blog" };
+    }
+  }
+
   const { error } = await admin.auth.admin.deleteUser(id);
   if (error) return { error: error.message };
 

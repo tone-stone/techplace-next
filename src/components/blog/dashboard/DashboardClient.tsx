@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import type { ManagedUser } from "@/lib/auth/users";
 import { deleteArticleAction, listArticles, type ManagedArticle } from "@/lib/blog/articles";
 import AdminDashboard from "./AdminDashboard";
 import RedactorDashboard from "./RedactorDashboard";
@@ -8,12 +9,18 @@ import type { ActivityAction, ActivityEntry, DashboardRole } from "./types";
 
 export default function DashboardClient({
   email,
+  userId,
   initialRole,
   initialArticles,
+  initialUsers,
+  canManageAllUsers,
 }: {
   email: string;
+  userId: string;
   initialRole: DashboardRole;
   initialArticles: ManagedArticle[];
+  initialUsers: ManagedUser[];
+  canManageAllUsers: boolean;
 }) {
   useEffect(() => {
     // pagehide fires when this tab/window actually closes or navigates away
@@ -71,6 +78,9 @@ export default function DashboardClient({
     return (
       <AdminDashboard
         email={email}
+        userId={userId}
+        initialUsers={initialUsers}
+        canManageAllUsers={canManageAllUsers}
         role={role}
         canPreview={isRealAdmin}
         onRoleChange={handleRoleChange}

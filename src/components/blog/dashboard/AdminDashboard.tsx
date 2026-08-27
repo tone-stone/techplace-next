@@ -11,27 +11,34 @@ import {
   LogOut,
   Newspaper,
   Tags,
+  Users,
   X,
 } from "lucide-react";
 import { logout } from "@/lib/auth/actions";
 import IdleTimeout from "@/components/auth/IdleTimeout";
 import { CATEGORIES } from "@/lib/blog-posts";
 import type { ManagedArticle } from "@/lib/blog/articles";
+import type { ManagedUser } from "@/lib/auth/users";
 import ArticleForm from "./ArticleForm";
 import ArticleList from "./ArticleList";
 import ActivityLog from "./ActivityLog";
+import UserManagement from "./UserManagement";
 import RolePreviewSwitch from "./RolePreviewSwitch";
 import type { ActivityEntry, DashboardRole } from "./types";
 
-type Section = "articles" | "activity";
+type Section = "articles" | "users" | "activity";
 
 const NAV_ITEMS: { id: Section; label: string; icon: typeof Newspaper }[] = [
   { id: "articles", label: "Artículos", icon: Newspaper },
+  { id: "users", label: "Usuarios", icon: Users },
   { id: "activity", label: "Actividad", icon: History },
 ];
 
 export default function AdminDashboard({
   email,
+  userId,
+  initialUsers,
+  canManageAllUsers,
   role,
   canPreview,
   onRoleChange,
@@ -45,6 +52,9 @@ export default function AdminDashboard({
   onDelete,
 }: {
   email: string;
+  userId: string;
+  initialUsers: ManagedUser[];
+  canManageAllUsers: boolean;
   role: DashboardRole;
   canPreview: boolean;
   onRoleChange: (role: DashboardRole) => void;
@@ -231,6 +241,15 @@ export default function AdminDashboard({
                 </div>
               </div>
             </>
+          )}
+
+          {section === "users" && (
+            <UserManagement
+              currentUserId={userId}
+              initialUsers={initialUsers}
+              scope={canManageAllUsers ? "all" : "blog"}
+              accent="purple"
+            />
           )}
 
           {section === "activity" && <ActivityLog entries={activity} />}
