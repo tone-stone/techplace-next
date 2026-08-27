@@ -84,7 +84,7 @@ export default function UserManagement({
   const isSelf = editingId === currentUserId;
 
   const refresh = async () => {
-    const result = await listUsers();
+    const result = await listUsers({ blogOnly: scope === "blog" });
     if ("users" in result) setUsers(result.users);
   };
 
@@ -131,7 +131,7 @@ export default function UserManagement({
     setError(null);
     setDeletingId(id);
     startTransition(async () => {
-      const result = await deleteUserAction(id);
+      const result = await deleteUserAction(id, { blogOnly: scope === "blog" });
       if (result && "error" in result) {
         setError(result.error);
       } else {
@@ -217,7 +217,12 @@ export default function UserManagement({
             className={`mb-5 space-y-3 rounded-2xl border p-4 ${a.formBox}`}
           >
             {editingId && <input type="hidden" name="id" value={editingId} />}
-            {scope === "blog" && <input type="hidden" name="team" value="blog" />}
+            {scope === "blog" && (
+              <>
+                <input type="hidden" name="team" value="blog" />
+                <input type="hidden" name="panel" value="blog" />
+              </>
+            )}
 
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-semibold text-white">

@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { listArticles } from "@/lib/blog/articles";
 import { listUsers } from "@/lib/auth/users";
-import { isCrmAdmin, showsBlogAdminView, type ProfileRole } from "@/lib/auth/roles";
+import { showsBlogAdminView, type ProfileRole } from "@/lib/auth/roles";
 import DashboardClient from "@/components/blog/dashboard/DashboardClient";
 
 export const metadata: Metadata = {
@@ -25,13 +25,13 @@ export default async function BlogDashboardPage() {
   // general admin (who has full access to the blog too).
   const isAdminView = profile && showsBlogAdminView(profile as ProfileRole);
   const initialRole = isAdminView ? "admin" : "redactor";
-  // CRM admin manages every account; blog admin manages only its own team —
-  // listUsers() itself enforces this scoping server-side either way.
-  const canManageAllUsers = profile ? isCrmAdmin(profile as ProfileRole) : false;
 
+  // The blog dashboard's own Usuarios panel is blog-only, even for the CRM
+  // general admin browsing it from here — CRM account management stays in
+  // the CRM's own Usuarios tab.
   const [articlesResult, usersResult] = await Promise.all([
     listArticles(),
-    isAdminView ? listUsers() : Promise.resolve({ users: [] }),
+    isAdminView ? listUsers({ blogOnly: true }) : Promise.resolve({ users: [] }),
   ]);
   const initialArticles = "articles" in articlesResult ? articlesResult.articles : [];
   const initialUsers = "users" in usersResult ? usersResult.users : [];
@@ -43,7 +43,6 @@ export default async function BlogDashboardPage() {
       initialRole={initialRole}
       initialArticles={initialArticles}
       initialUsers={initialUsers}
-      canManageAllUsers={canManageAllUsers}
     />
   );
 }

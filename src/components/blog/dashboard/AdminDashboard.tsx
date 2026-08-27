@@ -38,7 +38,6 @@ export default function AdminDashboard({
   email,
   userId,
   initialUsers,
-  canManageAllUsers,
   role,
   canPreview,
   onRoleChange,
@@ -54,7 +53,6 @@ export default function AdminDashboard({
   email: string;
   userId: string;
   initialUsers: ManagedUser[];
-  canManageAllUsers: boolean;
   role: DashboardRole;
   canPreview: boolean;
   onRoleChange: (role: DashboardRole) => void;
@@ -247,7 +245,7 @@ export default function AdminDashboard({
             <UserManagement
               currentUserId={userId}
               initialUsers={initialUsers}
-              scope={canManageAllUsers ? "all" : "blog"}
+              scope="blog"
               accent="purple"
             />
           )}

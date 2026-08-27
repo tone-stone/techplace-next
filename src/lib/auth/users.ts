@@ -51,9 +51,19 @@ async function requireUserManager() {
   return { ok: false as const, error: "No tienes permisos para hacer esto" };
 }
 
-export async function listUsers(): Promise<{ users: ManagedUser[] } | { error: string }> {
+// The blog CMS's own Usuarios panel is blog-only no matter who's looking at
+// it — even the CRM general admin, browsing user management from inside the
+// blog dashboard, shouldn't be able to reach into the CRM from there. That
+// capability already exists in its own place: the CRM's Usuarios tab.
+function resolveScope(callerScope: "all" | "blog", blogOnly: boolean): "all" | "blog" {
+  return blogOnly ? "blog" : callerScope;
+}
+
+export async function listUsers(opts?: { blogOnly?: boolean }): Promise<{ users: ManagedUser[] } | { error: string }> {
   const check = await requireUserManager();
   if (!check.ok) return { error: check.error };
+
+  const scope = resolveScope(check.scope, opts?.blogOnly ?? false);
 
   const admin = createAdminClient();
   const [{ data: authData, error: authError }, { data: profiles, error: profilesError }] = await withTiming(
@@ -78,7 +88,7 @@ export async function listUsers(): Promise<{ users: ManagedUser[] } | { error: s
     };
   });
 
-  if (check.scope === "blog") {
+  if (scope === "blog") {
     users = users.filter((u) => u.team === "blog");
   }
 
@@ -90,6 +100,8 @@ export async function listUsers(): Promise<{ users: ManagedUser[] } | { error: s
 export async function createUserAction(_prevState: UsersActionState, formData: FormData): Promise<UsersActionState> {
   const check = await requireUserManager();
   if (!check.ok) return { error: check.error };
+
+  const scope = resolveScope(check.scope, formData.get("panel") === "blog");
 
   const name = String(formData.get("name") ?? "").trim();
   const email = String(formData.get("email") ?? "").trim();
@@ -103,7 +115,7 @@ export async function createUserAction(_prevState: UsersActionState, formData: F
     return { error: "La contraseña debe tener al menos 8 caracteres" };
   }
   if ("error" in teamRole) return teamRole;
-  if (check.scope === "blog" && teamRole.team !== "blog") {
+  if (scope === "blog" && teamRole.team !== "blog") {
     return { error: "Solo puedes crear cuentas del equipo de blog" };
   }
 
@@ -132,6 +144,8 @@ export async function updateUserAction(_prevState: UsersActionState, formData: F
   const check = await requireUserManager();
   if (!check.ok) return { error: check.error };
 
+  const scope = resolveScope(check.scope, formData.get("panel") === "blog");
+
   const id = String(formData.get("id") ?? "");
   const name = String(formData.get("name") ?? "").trim();
   const email = String(formData.get("email") ?? "").trim();
@@ -142,13 +156,13 @@ export async function updateUserAction(_prevState: UsersActionState, formData: F
     return { error: "Completa nombre y email" };
   }
   if ("error" in teamRole) return teamRole;
-  if (check.scope === "blog" && teamRole.team !== "blog") {
+  if (scope === "blog" && teamRole.team !== "blog") {
     return { error: "Solo puedes asignar cuentas al equipo de blog" };
   }
 
   const admin = createAdminClient();
 
-  if (check.scope === "blog") {
+  if (scope === "blog") {
     const { data: target } = await admin.from("profiles").select("team").eq("id", id).single();
     if (target?.team !== "blog") {
       return { error: "Solo puedes editar cuentas del equipo de blog" };
@@ -177,14 +191,16 @@ export async function updateUserAction(_prevState: UsersActionState, formData: F
   return { success: true };
 }
 
-export async function deleteUserAction(id: string): Promise<UsersActionState> {
+export async function deleteUserAction(id: string, opts?: { blogOnly?: boolean }): Promise<UsersActionState> {
   const check = await requireUserManager();
   if (!check.ok) return { error: check.error };
   if (id === check.userId) return { error: "No puedes eliminar tu propia cuenta" };
 
+  const scope = resolveScope(check.scope, opts?.blogOnly ?? false);
+
   const admin = createAdminClient();
 
-  if (check.scope === "blog") {
+  if (scope === "blog") {
     const { data: target } = await admin.from("profiles").select("team").eq("id", id).single();
     if (target?.team !== "blog") {
       return { error: "Solo puedes eliminar cuentas del equipo de blog" };

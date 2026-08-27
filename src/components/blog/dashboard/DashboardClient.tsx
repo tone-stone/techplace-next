@@ -13,14 +13,12 @@ export default function DashboardClient({
   initialRole,
   initialArticles,
   initialUsers,
-  canManageAllUsers,
 }: {
   email: string;
   userId: string;
   initialRole: DashboardRole;
   initialArticles: ManagedArticle[];
   initialUsers: ManagedUser[];
-  canManageAllUsers: boolean;
 }) {
   useEffect(() => {
     // pagehide fires when this tab/window actually closes or navigates away
@@ -80,7 +78,6 @@ export default function DashboardClient({
         email={email}
         userId={userId}
         initialUsers={initialUsers}
-        canManageAllUsers={canManageAllUsers}
         role={role}
         canPreview={isRealAdmin}
         onRoleChange={handleRoleChange}
