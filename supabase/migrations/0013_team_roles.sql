@@ -43,15 +43,11 @@ begin
 end;
 $$;
 
--- 3) profiles: solo el admin del CRM ve todos los perfiles (gestión de
--- usuarios centralizada).
-drop policy if exists "profiles_select_admin" on public.profiles;
-create policy "profiles_select_admin"
-  on public.profiles for select
-  using (exists (
-    select 1 from public.profiles p
-    where p.id = auth.uid() and p.team = 'crm' and p.role = 'admin'
-  ));
+-- 3) profiles: NO se agrega una política "select admin" aquí — 0002_fix_profiles_recursion.sql
+-- ya la había eliminado porque una política de "profiles" que a su vez consulta
+-- "profiles" causa "infinite recursion detected in policy for relation profiles"
+-- en Postgres. La gestión de usuarios ya lee todos los perfiles con el cliente
+-- service-role (createAdminClient(), que ignora RLS), así que no hace falta.
 
 -- 4) articles / activity_log: admin del blog O admin del CRM (admin general).
 drop policy if exists "articles_delete_admin" on public.articles;

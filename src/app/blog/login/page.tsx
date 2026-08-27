@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { ArrowLeft, Home, Newspaper, PenSquare, Sparkles, Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { canAccessBlog, type ProfileRole } from "@/lib/auth/roles";
 import LoginFooter from "@/components/auth/LoginFooter";
 import LoginForm from "../../login/LoginForm";
 
@@ -30,7 +31,11 @@ export default async function BlogLoginPage({
   } = await supabase.auth.getUser();
 
   if (user) {
-    redirect("/blog/dashboard");
+    // Already signed in with an account that isn't blog — send them to their
+    // actual portal instead of dropping them into /blog/dashboard (proxy.ts
+    // would just bounce them out again).
+    const { data: profile } = await supabase.from("profiles").select("team, role").eq("id", user.id).single();
+    redirect(profile && canAccessBlog(profile as ProfileRole) ? "/blog/dashboard" : "/admin");
   }
 
   return (
@@ -132,7 +137,7 @@ export default async function BlogLoginPage({
             </p>
           )}
 
-          <LoginForm redirectTo="/blog/dashboard" />
+          <LoginForm redirectTo="/blog/dashboard" portal="blog" />
 
           <LoginFooter
             accent="indigo"

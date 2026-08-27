@@ -2,7 +2,8 @@
 
 import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
-import { Lock, LogIn, Mail } from "lucide-react";
+import Link from "next/link";
+import { ArrowRight, Lock, LogIn, Mail } from "lucide-react";
 import { motion } from "motion/react";
 import { login, type LoginState } from "@/lib/auth/actions";
 
@@ -28,7 +29,13 @@ function SubmitButton() {
   );
 }
 
-export default function LoginForm({ redirectTo = "/admin" }: { redirectTo?: string }) {
+export default function LoginForm({
+  redirectTo = "/admin",
+  portal = "crm",
+}: {
+  redirectTo?: string;
+  portal?: "crm" | "blog";
+}) {
   const [state, formAction] = useActionState<LoginState, FormData>(login, null);
   const [prevState, setPrevState] = useState(state);
   const [shake, setShake] = useState(0);
@@ -41,6 +48,7 @@ export default function LoginForm({ redirectTo = "/admin" }: { redirectTo?: stri
   return (
     <form action={formAction} className="space-y-4 sm:space-y-5">
       <input type="hidden" name="redirectTo" value={redirectTo} />
+      <input type="hidden" name="portal" value={portal} />
       <div className="relative">
         <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-purple-400" />
         <input
@@ -66,15 +74,23 @@ export default function LoginForm({ redirectTo = "/admin" }: { redirectTo?: stri
       </div>
 
       {state?.error && (
-        <motion.p
+        <motion.div
           key={shake}
           initial={{ x: -6, opacity: 0 }}
           animate={{ x: [-6, 6, -4, 4, 0], opacity: 1 }}
           transition={{ duration: 0.4 }}
-          className="text-red-400 text-sm text-center"
+          className="text-center"
         >
-          {state.error}
-        </motion.p>
+          <p className="text-red-400 text-sm">{state.error}</p>
+          {state.otherPortalHref && (
+            <Link
+              href={state.otherPortalHref}
+              className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-brand-blue hover:underline"
+            >
+              {state.otherPortalLabel} <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          )}
+        </motion.div>
       )}
 
       <SubmitButton />

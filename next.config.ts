@@ -48,39 +48,42 @@ const nextConfig: NextConfig = {
     // script-src doesn't need 'unsafe-inline'/'unsafe-eval'. style-src does,
     // for the inline style={{...}} props used across the UI (animation
     // delays, hand-rolled SVG charts).
-    const csp = [
-      "default-src 'self'",
-      "script-src 'self'",
-      "style-src 'self' 'unsafe-inline'",
-      `img-src 'self' data: https://res.cloudinary.com https://*.fbcdn.net${
-        supabaseHostname ? ` https://${supabaseHostname}` : ""
-      }`,
-      "media-src 'self' https://res.cloudinary.com",
-      "font-src 'self'",
-      `connect-src 'self'${supabaseHostname ? ` https://${supabaseHostname}` : ""}`,
-      "frame-src https://www.google.com",
-      "object-src 'none'",
-      "base-uri 'self'",
-      "form-action 'self'",
-      "frame-ancestors 'self'",
-    ].join("; ");
-
-    return [
-      {
-        source: "/:path*",
-        headers: [
-          { key: "Content-Security-Policy", value: csp },
-          { key: "X-Content-Type-Options", value: "nosniff" },
-          { key: "X-Frame-Options", value: "SAMEORIGIN" },
-          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-          { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
-          {
-            key: "Strict-Transport-Security",
-            value: "max-age=63072000; includeSubDomains; preload",
-          },
-        ],
-      },
+    //
+    // CSP only applies to the production build: `next dev`/Turbopack's HMR
+    // client relies on `eval()` to run updated chunks, which a `script-src`
+    // without 'unsafe-eval' silently blocks — the whole app stops hydrating
+    // (dead navbar, no client-side content) with no error beyond the
+    // browser console. Not worth relaxing script-src in prod just to cover
+    // a dev-only need.
+    const headers: { key: string; value: string }[] = [
+      { key: "X-Content-Type-Options", value: "nosniff" },
+      { key: "X-Frame-Options", value: "SAMEORIGIN" },
+      { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+      { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+      { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
     ];
+
+    if (process.env.NODE_ENV === "production") {
+      const csp = [
+        "default-src 'self'",
+        "script-src 'self'",
+        "style-src 'self' 'unsafe-inline'",
+        `img-src 'self' data: https://res.cloudinary.com https://*.fbcdn.net${
+          supabaseHostname ? ` https://${supabaseHostname}` : ""
+        }`,
+        "media-src 'self' https://res.cloudinary.com",
+        "font-src 'self'",
+        `connect-src 'self'${supabaseHostname ? ` https://${supabaseHostname}` : ""}`,
+        "frame-src https://www.google.com",
+        "object-src 'none'",
+        "base-uri 'self'",
+        "form-action 'self'",
+        "frame-ancestors 'self'",
+      ].join("; ");
+      headers.unshift({ key: "Content-Security-Policy", value: csp });
+    }
+
+    return [{ source: "/:path*", headers }];
   },
 };
 

@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { ArrowLeft, Briefcase, Home, LayoutDashboard, Receipt, Sparkles, Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { canAccessCrm, type ProfileRole } from "@/lib/auth/roles";
 import LoginFooter from "@/components/auth/LoginFooter";
 import LoginForm from "./LoginForm";
 
@@ -31,7 +32,11 @@ export default async function LoginPage({
   } = await supabase.auth.getUser();
 
   if (user) {
-    redirect("/admin");
+    // Already signed in with an account that isn't CRM — send them to their
+    // actual portal instead of dropping them into /admin (proxy.ts would
+    // just bounce them out again).
+    const { data: profile } = await supabase.from("profiles").select("team, role").eq("id", user.id).single();
+    redirect(profile && canAccessCrm(profile as ProfileRole) ? "/admin" : "/blog/dashboard");
   }
 
   return (
@@ -135,7 +140,7 @@ export default async function LoginPage({
             </p>
           )}
 
-          <LoginForm />
+          <LoginForm portal="crm" />
 
           <LoginFooter accent="blue" switchHref="/blog/login" switchLabel="Ir al portal de redacción" />
         </div>

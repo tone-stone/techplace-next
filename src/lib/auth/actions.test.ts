@@ -25,9 +25,18 @@ vi.mock("next/server", () => ({
   after: (_fn: () => void) => {},
 }));
 
+let profileData: { team: string; role: string } | null = { team: "crm", role: "admin" };
+
 vi.mock("@/lib/supabase/server", () => ({
   createClient: async () => ({
     auth: { signInWithPassword, signOut },
+    from: () => ({
+      select: () => ({
+        eq: () => ({
+          single: async () => ({ data: profileData }),
+        }),
+      }),
+    }),
   }),
 }));
 
@@ -42,8 +51,10 @@ function formDataFrom(fields: Record<string, string>) {
 describe("login", () => {
   beforeEach(() => {
     signInWithPassword.mockReset();
+    signOut.mockReset();
     redirectMock.mockReset();
     revalidatePathMock.mockReset();
+    profileData = { team: "crm", role: "admin" };
   });
 
   it("rejects an empty email/password without calling Supabase", async () => {
@@ -84,6 +95,52 @@ describe("login", () => {
     await login(null, formDataFrom({ email: "a@b.com", password: "right" }));
 
     expect(revalidatePathMock).toHaveBeenCalledWith("/", "layout");
+  });
+
+  it("rejects a blog account signing in at the CRM portal, with a link to its own portal", async () => {
+    profileData = { team: "blog", role: "redactor" };
+    signInWithPassword.mockResolvedValue({ data: { user: { id: "u1" } }, error: null });
+
+    const result = await login(null, formDataFrom({ email: "a@b.com", password: "right", portal: "crm" }));
+
+    expect(result).toEqual({
+      error: "Esta cuenta es del equipo de redacción — no tiene acceso al CRM.",
+      otherPortalHref: "/blog/login",
+      otherPortalLabel: "Ir al portal de redacción",
+    });
+    expect(signOut).toHaveBeenCalled();
+    expect(redirectMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects a CRM account signing in at the blog portal, with a link to its own portal", async () => {
+    profileData = { team: "crm", role: "operativo" };
+    signInWithPassword.mockResolvedValue({ data: { user: { id: "u1" } }, error: null });
+
+    const result = await login(
+      null,
+      formDataFrom({ email: "a@b.com", password: "right", portal: "blog", redirectTo: "/blog/dashboard" })
+    );
+
+    expect(result).toEqual({
+      error: "Esta cuenta es del CRM — no tiene acceso al portal de redacción.",
+      otherPortalHref: "/login",
+      otherPortalLabel: "Ir al panel de administración",
+    });
+    expect(signOut).toHaveBeenCalled();
+    expect(redirectMock).not.toHaveBeenCalled();
+  });
+
+  it("lets a CRM admin (general admin) sign in at the blog portal", async () => {
+    profileData = { team: "crm", role: "admin" };
+    signInWithPassword.mockResolvedValue({ data: { user: { id: "u1" } }, error: null });
+
+    await login(
+      null,
+      formDataFrom({ email: "a@b.com", password: "right", portal: "blog", redirectTo: "/blog/dashboard" })
+    );
+
+    expect(redirectMock).toHaveBeenCalledWith("/blog/dashboard");
+    expect(signOut).not.toHaveBeenCalled();
   });
 });
 
