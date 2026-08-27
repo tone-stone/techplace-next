@@ -24,7 +24,12 @@ export default function GalleryDropzone({
   const [previews, setPreviews] = useState<string[]>([]);
 
   useEffect(() => {
+    // Object URLs need paired create/revoke lifecycle management, which only
+    // an effect's cleanup function provides — this isn't a redundant
+    // prop-to-state sync (useMemo can't revoke the *previous* URLs when it
+    // recomputes), so setState here is the correct pattern despite the rule.
     const urls = files.map((file) => URL.createObjectURL(file));
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setPreviews(urls);
     return () => {
       urls.forEach((url) => URL.revokeObjectURL(url));

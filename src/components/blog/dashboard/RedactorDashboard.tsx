@@ -101,6 +101,7 @@ export default function RedactorDashboard({
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-5">
           <div className="lg:col-span-2">
             <ArticleForm
+              key={editingArticle?.id ?? "new"}
               editingArticle={editingArticle}
               defaultAuthor={email}
               role="redactor"

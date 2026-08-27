@@ -38,15 +38,21 @@ export default function ArticleForm({
   const iconClass = isAdmin ? "text-purple-300" : "text-indigo-300";
   const inputClasses = isAdmin ? inputClassesPurple : inputClassesIndigo;
   const formRef = useRef<HTMLFormElement>(null);
-  const [title, setTitle] = useState("");
-  const [author, setAuthor] = useState(defaultAuthor);
-  const [category, setCategory] = useState(CATEGORIES[0]);
-  const [excerpt, setExcerpt] = useState("");
-  const [content, setContent] = useState("");
+  // Initial values only — the parent keys this component on
+  // `editingArticle?.id`, so switching edit targets (or entering/leaving
+  // "new article" mode) remounts it with fresh initial state instead of
+  // needing an effect to re-sync fields on every prop change. That also
+  // means a background refetch that hands down a new `editingArticle`
+  // object for the *same* id no longer clobbers in-progress unsaved edits.
+  const [title, setTitle] = useState(editingArticle?.title ?? "");
+  const [author, setAuthor] = useState(editingArticle?.authorName ?? defaultAuthor);
+  const [category, setCategory] = useState(editingArticle?.category ?? CATEGORIES[0]);
+  const [excerpt, setExcerpt] = useState(editingArticle?.excerpt ?? "");
+  const [content, setContent] = useState(editingArticle?.content ?? "");
   const [coverImage, setCoverImage] = useState<File | null>(null);
   const [video, setVideo] = useState<File | null>(null);
   const [galleryFiles, setGalleryFiles] = useState<File[]>([]);
-  const [keepGalleryUrls, setKeepGalleryUrls] = useState<string[]>([]);
+  const [keepGalleryUrls, setKeepGalleryUrls] = useState<string[]>(editingArticle?.galleryUrls ?? []);
   const [confirmation, setConfirmation] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -59,29 +65,14 @@ export default function ArticleForm({
   }, []);
 
   useEffect(() => {
-    if (editingArticle) {
-      setTitle(editingArticle.title);
-      setAuthor(editingArticle.authorName);
-      setCategory(editingArticle.category);
-      setExcerpt(editingArticle.excerpt);
-      setContent(editingArticle.content);
-    } else {
-      setTitle("");
-      setAuthor(defaultAuthor);
-      setCategory(CATEGORIES[0]);
-      setExcerpt("");
-      setContent("");
-    }
-    setCoverImage(null);
-    setVideo(null);
-    setGalleryFiles([]);
-    setKeepGalleryUrls(editingArticle?.galleryUrls ?? []);
-    setError(null);
-
+    // Mount-only: this instance is dedicated to one editing target for its
+    // whole lifetime (remounts via `key` when that target changes), so
+    // there's no case where it should scroll again after the initial mount.
     if (editingArticle) {
       formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     }
-  }, [editingArticle, defaultAuthor]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();

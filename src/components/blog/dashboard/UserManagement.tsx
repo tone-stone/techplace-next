@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition, type FormEvent } from "react";
+import { useState, useTransition, type FormEvent } from "react";
 import { Pencil, ShieldCheck, Trash2, User as UserIcon, UserPlus, X } from "lucide-react";
 import { createUserAction, deleteUserAction, listUsers, updateUserAction, type ManagedUser } from "@/lib/auth/users";
 import type { DashboardRole } from "./types";
@@ -35,17 +35,7 @@ export default function UserManagement({
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
-  const editingUser = editingId ? (users.find((u) => u.id === editingId) ?? null) : null;
   const isSelf = editingId === currentUserId;
-
-  useEffect(() => {
-    if (editingUser) {
-      setName(editingUser.name);
-      setEmail(editingUser.email);
-      setRole(editingUser.role);
-      setPassword("");
-    }
-  }, [editingUser]);
 
   const refresh = async () => {
     const result = await listUsers();
@@ -74,6 +64,10 @@ export default function UserManagement({
 
   const startEdit = (user: ManagedUser) => {
     setEditingId(user.id);
+    setName(user.name);
+    setEmail(user.email);
+    setRole(user.role);
+    setPassword("");
     setError(null);
     setFormOpen(true);
   };
