@@ -15,18 +15,16 @@ describe("Navbar mobile menu", () => {
     expect(screen.queryByRole("button", { name: "Cerrar menú" })).not.toBeInTheDocument();
   });
 
-  it("opens the full-screen menu and locks page scroll when the hamburger is tapped", async () => {
+  it("opens the full-screen menu when the hamburger is tapped", async () => {
     const user = userEvent.setup();
     render(<Navbar />);
 
     await user.click(screen.getByRole("button", { name: "Abrir menú" }));
 
     expect(screen.getByRole("button", { name: "Cerrar menú" })).toBeInTheDocument();
-    // Scroll is locked by pinning the body (iOS Safari ignores overflow:hidden here).
-    expect(document.body.style.position).toBe("fixed");
   });
 
-  it("closes the menu and restores scroll when the close button is tapped again", async () => {
+  it("closes the menu when the close button is tapped again", async () => {
     const user = userEvent.setup();
     render(<Navbar />);
 
@@ -35,7 +33,6 @@ describe("Navbar mobile menu", () => {
     await user.click(screen.getByRole("button", { name: "Cerrar menú" }));
 
     expect(screen.getByRole("button", { name: "Abrir menú" })).toBeInTheDocument();
-    expect(document.body.style.position).toBe("");
   });
 
   it("closes the menu when a nav link inside it is clicked", async () => {

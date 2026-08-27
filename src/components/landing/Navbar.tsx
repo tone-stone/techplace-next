@@ -29,10 +29,6 @@ export default function Navbar() {
   const [active, setActive] = useState("home");
   const [blogMenuOpen, setBlogMenuOpen] = useState(false);
   const blogMenuRef = useRef<HTMLDivElement>(null);
-  // Set right before a menu link closes the menu, so the scroll-lock cleanup
-  // knows not to restore the old scroll offset (the link's own navigation /
-  // #anchor scroll should win instead).
-  const closingViaNavRef = useRef(false);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 30);
@@ -83,47 +79,17 @@ export default function Navbar() {
     };
   }, [blogMenuOpen]);
 
-  useEffect(() => {
-    if (!menuOpen) return;
-
-    // `overflow: hidden` on body doesn't stop touch-scrolling on iOS Safari —
-    // a long-standing WebKit quirk. Pinning the body to a fixed position
-    // instead (and restoring the scroll offset on close) is the reliable
-    // cross-browser way to lock background scroll while the menu is open.
-    // Do NOT also set `overflow: hidden` on <html>/<body> here: on iOS 18 that
-    // combination leaves the whole viewport unresponsive to taps until the
-    // next reflow, which is what made the toggle button feel dead.
-    const scrollY = window.scrollY;
-    const body = document.body;
-    body.style.position = "fixed";
-    body.style.top = `-${scrollY}px`;
-    body.style.left = "0";
-    body.style.right = "0";
-    body.style.width = "100%";
-
-    return () => {
-      body.style.position = "";
-      body.style.top = "";
-      body.style.left = "";
-      body.style.right = "";
-      body.style.width = "";
-      // When a menu link closed the menu, let its route change / #anchor scroll
-      // decide where the page lands. Restoring the old offset here fights that
-      // — and on iOS it won, dumping you back at the top instead of the section.
-      if (closingViaNavRef.current) {
-        closingViaNavRef.current = false;
-      } else {
-        window.scrollTo(0, scrollY);
-      }
-    };
-  }, [menuOpen]);
+  // No JS body-scroll lock here on purpose: this menu is a `fixed inset-0`
+  // panel that fully covers the viewport, so it already intercepts every
+  // touch — the body underneath can't receive scroll gestures regardless.
+  // An earlier version pinned <body> to `position: fixed` (and before that,
+  // `overflow: hidden` on <html>/<body>) to belt-and-suspenders the lock, but
+  // both techniques raced with iOS Safari's touch/hit-testing pipeline and
+  // could leave the whole viewport unresponsive to taps until the next
+  // reflow — the toggle button (and every link) going dead on open.
 
   const toggleMenu = () => setMenuOpen((open) => !open);
   const closeMenu = () => setMenuOpen(false);
-  const closeMenuForNav = () => {
-    closingViaNavRef.current = true;
-    setMenuOpen(false);
-  };
 
   return (
     <nav className="fixed z-50 top-2 inset-x-2 sm:top-3 sm:inset-x-3 md:top-4 md:inset-x-6 lg:left-1/2 lg:right-auto lg:-translate-x-1/2 lg:w-full lg:max-w-6xl">
@@ -246,7 +212,7 @@ export default function Navbar() {
             <div key={link.href} className="flex flex-col items-center gap-4">
               <Link
                 href={link.href}
-                onClick={closeMenuForNav}
+                onClick={closeMenu}
                 style={{ animationDelay: `${0.05 * i}s` }}
                 className={`touch-manipulation tp-menu-link-in tp-nav-link-underline tp-mobile-nav-link${
                   isActive(link.href) ? " active" : ""
@@ -258,7 +224,7 @@ export default function Navbar() {
                 <Link
                   key={child.href}
                   href={child.href}
-                  onClick={closeMenuForNav}
+                  onClick={closeMenu}
                   style={{ animationDelay: `${0.05 * i}s` }}
                   className="touch-manipulation tp-menu-link-in flex items-center gap-1.5 rounded-lg px-3 py-2 text-base font-normal text-gray-400 hover:text-brand-blue transition-colors"
                 >
@@ -274,7 +240,7 @@ export default function Navbar() {
           >
             <Link
               href="/login"
-              onClick={closeMenuForNav}
+              onClick={closeMenu}
               className="tp-btn-animated inline-flex items-center gap-1.5 rounded-full px-6 py-3 text-lg font-bold text-white shadow-lg transition-transform active:scale-95"
             >
               <LogIn className="h-5 w-5" />
