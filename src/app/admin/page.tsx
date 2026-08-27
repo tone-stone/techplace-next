@@ -6,6 +6,15 @@ import { getProjects } from "@/lib/crm/projects";
 import { getInvoices } from "@/lib/crm/invoices";
 import { getQuotes } from "@/lib/crm/quotes";
 import { getAllTasks } from "@/lib/crm/tasks";
+import { isCrmAdmin, type ProfileRole } from "@/lib/auth/roles";
+import {
+  getErrorStats,
+  getFailedLogins,
+  getRecentErrors,
+  getSlowOperations,
+  getSlowPagesByTtfb,
+  getWebVitalsSummary,
+} from "@/lib/monitoring/queries";
 import CrmDashboard from "@/components/admin/CrmDashboard";
 
 export const metadata: Metadata = {
@@ -18,7 +27,30 @@ export default async function AdminPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const [clients, payments, projects, invoices, quotes, tasks, usersResult] = await Promise.all([
+  const currentUserIsAdmin = user
+    ? await supabase
+        .from("profiles")
+        .select("team, role")
+        .eq("id", user.id)
+        .single()
+        .then(({ data }) => Boolean(data) && isCrmAdmin(data as ProfileRole))
+    : false;
+
+  const [
+    clients,
+    payments,
+    projects,
+    invoices,
+    quotes,
+    tasks,
+    usersResult,
+    recentErrors,
+    errorStats,
+    webVitals,
+    slowOperations,
+    slowPages,
+    failedLogins,
+  ] = await Promise.all([
     getClients(),
     getAllPayments(),
     getProjects(),
@@ -26,6 +58,12 @@ export default async function AdminPage() {
     getQuotes(),
     getAllTasks(),
     listUsers(),
+    getRecentErrors(),
+    getErrorStats(),
+    getWebVitalsSummary(),
+    getSlowOperations(),
+    getSlowPagesByTtfb(),
+    getFailedLogins(),
   ]);
 
   const users = "users" in usersResult ? usersResult.users : [];
@@ -35,12 +73,19 @@ export default async function AdminPage() {
       email={user?.email ?? ""}
       userId={user?.id ?? ""}
       users={users}
+      currentUserIsAdmin={currentUserIsAdmin}
       clients={clients}
       payments={payments}
       projects={projects}
       invoices={invoices}
       quotes={quotes}
       tasks={tasks}
+      recentErrors={recentErrors}
+      errorStats={errorStats}
+      webVitals={webVitals}
+      slowOperations={slowOperations}
+      slowPages={slowPages}
+      failedLogins={failedLogins}
     />
   );
 }

@@ -114,11 +114,28 @@ describe("CrmDashboard", () => {
     expect(screen.getByText(/crea un proyecto primero/i)).toBeInTheDocument();
   });
 
-  it("switches to Usuarios when that nav item is clicked", async () => {
+  it("hides the Usuarios nav item for non-admin (operativo) users", () => {
+    render(
+      <CrmDashboard
+        email="ana@techplacetj.com"
+        clients={[]}
+        payments={[]}
+        projects={[]}
+        invoices={[]}
+        quotes={[]}
+        tasks={[]}
+      />
+    );
+
+    expect(screen.queryByRole("button", { name: "Usuarios" })).not.toBeInTheDocument();
+  });
+
+  it("switches to Usuarios when that nav item is clicked (CRM admin only)", async () => {
     const user = userEvent.setup();
     render(
       <CrmDashboard
         email="ana@techplacetj.com"
+        currentUserIsAdmin
         clients={[]}
         payments={[]}
         projects={[]}

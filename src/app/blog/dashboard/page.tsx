@@ -1,8 +1,8 @@
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
-import { listUsers } from "@/lib/auth/users";
 import { listArticles } from "@/lib/blog/articles";
+import { showsBlogAdminView, type ProfileRole } from "@/lib/auth/roles";
 import DashboardClient from "@/components/blog/dashboard/DashboardClient";
 
 export const metadata: Metadata = {
@@ -19,19 +19,18 @@ export default async function BlogDashboardPage() {
     redirect("/blog/login");
   }
 
-  const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
-  const initialRole = profile?.role === "admin" ? "admin" : "redactor";
+  const { data: profile } = await supabase.from("profiles").select("team, role").eq("id", user.id).single();
+  // showsBlogAdminView covers both the blog team's own admin and the CRM
+  // general admin (who has full access to the blog too).
+  const initialRole = profile && showsBlogAdminView(profile as ProfileRole) ? "admin" : "redactor";
 
-  const [usersResult, articlesResult] = await Promise.all([listUsers(), listArticles()]);
-  const initialUsers = "users" in usersResult ? usersResult.users : [];
+  const articlesResult = await listArticles();
   const initialArticles = "articles" in articlesResult ? articlesResult.articles : [];
 
   return (
     <DashboardClient
       email={user.email ?? ""}
-      userId={user.id}
       initialRole={initialRole}
-      initialUsers={initialUsers}
       initialArticles={initialArticles}
     />
   );

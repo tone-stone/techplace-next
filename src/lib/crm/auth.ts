@@ -1,12 +1,13 @@
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { ACTIVITY_COOKIE, IDLE_TIMEOUT_MS } from "@/lib/auth/session";
+import { canAccessCrm, isCrmAdmin, type ProfileRole } from "@/lib/auth/roles";
 
-// Not a "use server" file: requireAdmin() is only ever called from within
-// other server action files, never invoked directly from a client component,
-// so it doesn't need to (and shouldn't) be its own callable server action.
+// Not a "use server" file: these are only ever called from within other
+// server action files, never invoked directly from a client component, so
+// they don't need to (and shouldn't) be their own callable server actions.
 
-export async function requireAdmin() {
+async function requireCrmRole(predicate: (p: ProfileRole) => boolean, deniedMessage: string) {
   const cookieStore = await cookies();
 
   // Inactivity check — same window the proxy and the client timer use.
@@ -26,8 +27,10 @@ export async function requireAdmin() {
 
   if (!user) return { ok: false as const, error: "No autenticado" };
 
-  const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
-  if (profile?.role !== "admin") return { ok: false as const, error: "No tienes permisos de administrador" };
+  const { data: profile } = await supabase.from("profiles").select("team, role").eq("id", user.id).single();
+  if (!profile || !predicate(profile as ProfileRole)) {
+    return { ok: false as const, error: deniedMessage };
+  }
 
   // Slide the inactivity window forward on every authenticated mutation.
   try {
@@ -43,4 +46,14 @@ export async function requireAdmin() {
   }
 
   return { ok: true as const, userId: user.id };
+}
+
+// CRM admin or operativo — create/update access. Most CRM mutations use this.
+export function requireCrmAccess() {
+  return requireCrmRole(canAccessCrm, "No tienes permisos para el CRM");
+}
+
+// CRM admin only — reserved for delete actions and other admin-only operations.
+export function requireCrmAdmin() {
+  return requireCrmRole(isCrmAdmin, "Solo un administrador del CRM puede hacer esto");
 }

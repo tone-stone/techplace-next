@@ -2,7 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { requireAdmin } from "./auth";
+import { withTiming } from "@/lib/monitoring/timing";
+import { requireCrmAccess } from "./auth";
 import { addHistory } from "./history";
 import { insertWithSequentialNumber } from "./numbering";
 import { formatCurrencyMXN } from "./format";
@@ -93,9 +94,11 @@ function mapQuoteItem(row: {
 }
 
 export async function getQuotes(): Promise<CrmQuote[]> {
-  const supabase = await createClient();
-  const { data } = await supabase.from("crm_quotes").select("*").order("created_at", { ascending: false });
-  return (data ?? []).map(mapQuote);
+  return withTiming("crm.getQuotes", async () => {
+    const supabase = await createClient();
+    const { data } = await supabase.from("crm_quotes").select("*").order("created_at", { ascending: false });
+    return (data ?? []).map(mapQuote);
+  });
 }
 
 export async function getQuoteDetail(quoteId: string): Promise<QuoteDetail | null> {
@@ -115,7 +118,7 @@ export async function createQuoteAction(
   _prevState: CrmActionState,
   formData: FormData
 ): Promise<CrmActionState> {
-  const check = await requireAdmin();
+  const check = await requireCrmAccess();
   if (!check.ok) return { error: check.error };
 
   const clientId = String(formData.get("clientId") ?? "").trim();
@@ -196,7 +199,7 @@ export async function updateQuoteStatusAction(
   clientId: string | null,
   status: QuoteStatus
 ): Promise<CrmActionState> {
-  const check = await requireAdmin();
+  const check = await requireCrmAccess();
   if (!check.ok) return { error: check.error };
 
   const supabase = await createClient();

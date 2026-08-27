@@ -2,7 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { requireAdmin } from "./auth";
+import { withTiming } from "@/lib/monitoring/timing";
+import { requireCrmAccess } from "./auth";
 import { addHistory, mapHistory, type ClientHistoryEntry, type HistoryEntryType } from "./history";
 
 export type { HistoryEntryType, ClientHistoryEntry } from "./history";
@@ -130,15 +131,19 @@ function mapPayment(row: {
 }
 
 export async function getClients(): Promise<CrmClient[]> {
-  const supabase = await createClient();
-  const { data } = await supabase.from("crm_clients").select("*").order("created_at", { ascending: false });
-  return (data ?? []).map(mapClient);
+  return withTiming("crm.getClients", async () => {
+    const supabase = await createClient();
+    const { data } = await supabase.from("crm_clients").select("*").order("created_at", { ascending: false });
+    return (data ?? []).map(mapClient);
+  });
 }
 
 export async function getAllPayments(): Promise<ClientPayment[]> {
-  const supabase = await createClient();
-  const { data } = await supabase.from("crm_payments").select("*").order("due_date", { ascending: true });
-  return (data ?? []).map(mapPayment);
+  return withTiming("crm.getAllPayments", async () => {
+    const supabase = await createClient();
+    const { data } = await supabase.from("crm_payments").select("*").order("due_date", { ascending: true });
+    return (data ?? []).map(mapPayment);
+  });
 }
 
 export async function getClientDetail(clientId: string): Promise<ClientDetail | null> {
@@ -169,7 +174,7 @@ export async function createClientAction(
   _prevState: CrmActionState,
   formData: FormData
 ): Promise<CrmActionState> {
-  const check = await requireAdmin();
+  const check = await requireCrmAccess();
   if (!check.ok) return { error: check.error };
 
   const name = String(formData.get("name") ?? "").trim();
@@ -204,7 +209,7 @@ export async function createClientAction(
 }
 
 export async function updateClientStatusAction(clientId: string, status: ClientStatus): Promise<CrmActionState> {
-  const check = await requireAdmin();
+  const check = await requireCrmAccess();
   if (!check.ok) return { error: check.error };
 
   const supabase = await createClient();
@@ -220,7 +225,7 @@ export async function addHistoryEntryAction(
   _prevState: CrmActionState,
   formData: FormData
 ): Promise<CrmActionState> {
-  const check = await requireAdmin();
+  const check = await requireCrmAccess();
   if (!check.ok) return { error: check.error };
 
   const clientId = String(formData.get("clientId") ?? "");
@@ -238,7 +243,7 @@ export async function addHistoryEntryAction(
 }
 
 export async function createPlanAction(_prevState: CrmActionState, formData: FormData): Promise<CrmActionState> {
-  const check = await requireAdmin();
+  const check = await requireCrmAccess();
   if (!check.ok) return { error: check.error };
 
   const clientId = String(formData.get("clientId") ?? "");
@@ -282,7 +287,7 @@ export async function recordPaymentAction(
   _prevState: CrmActionState,
   formData: FormData
 ): Promise<CrmActionState> {
-  const check = await requireAdmin();
+  const check = await requireCrmAccess();
   if (!check.ok) return { error: check.error };
 
   const clientId = String(formData.get("clientId") ?? "");
@@ -325,7 +330,7 @@ export async function recordPaymentAction(
 }
 
 export async function markPaymentPaidAction(paymentId: string, clientId: string): Promise<CrmActionState> {
-  const check = await requireAdmin();
+  const check = await requireCrmAccess();
   if (!check.ok) return { error: check.error };
 
   const supabase = await createClient();

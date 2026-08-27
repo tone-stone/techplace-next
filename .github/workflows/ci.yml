@@ -28,6 +28,9 @@ jobs:
       - name: Test
         run: npm test
 
+      - name: Audit dependencies
+        run: npm audit --audit-level=high
+
       # Vercel already builds with real secrets on every deploy, so this step
       # isn't the only build check — it's what catches a broken build on a PR
       # *before* it merges, instead of after it's live. Only runs once the repo

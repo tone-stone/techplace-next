@@ -2,7 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { requireAdmin } from "./auth";
+import { withTiming } from "@/lib/monitoring/timing";
+import { requireCrmAccess } from "./auth";
 import { addHistory } from "./history";
 import { insertWithSequentialNumber } from "./numbering";
 import { formatCurrencyMXN } from "./format";
@@ -50,16 +51,18 @@ function mapInvoice(row: {
 }
 
 export async function getInvoices(): Promise<CrmInvoice[]> {
-  const supabase = await createClient();
-  const { data } = await supabase.from("crm_invoices").select("*").order("due_date", { ascending: true });
-  return (data ?? []).map(mapInvoice);
+  return withTiming("crm.getInvoices", async () => {
+    const supabase = await createClient();
+    const { data } = await supabase.from("crm_invoices").select("*").order("due_date", { ascending: true });
+    return (data ?? []).map(mapInvoice);
+  });
 }
 
 export async function createInvoiceAction(
   _prevState: CrmActionState,
   formData: FormData
 ): Promise<CrmActionState> {
-  const check = await requireAdmin();
+  const check = await requireCrmAccess();
   if (!check.ok) return { error: check.error };
 
   const clientId = String(formData.get("clientId") ?? "");
@@ -98,7 +101,7 @@ export async function updateInvoiceStatusAction(
   clientId: string,
   status: InvoiceStatus
 ): Promise<CrmActionState> {
-  const check = await requireAdmin();
+  const check = await requireCrmAccess();
   if (!check.ok) return { error: check.error };
 
   const supabase = await createClient();

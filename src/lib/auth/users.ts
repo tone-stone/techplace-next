@@ -2,15 +2,33 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { withTiming } from "@/lib/monitoring/timing";
+import { isCrmAdmin, type Role, type Team } from "@/lib/auth/roles";
 
 export type ManagedUser = {
   id: string;
   name: string;
   email: string;
-  role: "admin" | "redactor";
+  team: Team;
+  role: Role;
 };
 
 export type UsersActionState = { error: string } | { success: true } | null;
+
+// (team, role) combos the profiles_team_role_check constraint allows.
+const VALID_COMBOS: Record<Team, Role[]> = {
+  crm: ["admin", "operativo"],
+  blog: ["admin", "redactor"],
+};
+
+function parseTeamRole(formData: FormData): { team: Team; role: Role } | { error: string } {
+  const team = String(formData.get("team") ?? "") as Team;
+  const role = String(formData.get("role") ?? "") as Role;
+  if (!VALID_COMBOS[team]?.includes(role)) {
+    return { error: "Combinación de equipo y rol inválida" };
+  }
+  return { team, role };
+}
 
 async function requireAdmin() {
   const supabase = await createClient();
@@ -20,10 +38,10 @@ async function requireAdmin() {
 
   if (!user) return { ok: false as const, error: "No autenticado" };
 
-  const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
+  const { data: profile } = await supabase.from("profiles").select("team, role").eq("id", user.id).single();
 
-  if (profile?.role !== "admin") {
-    return { ok: false as const, error: "Solo un administrador puede hacer esto" };
+  if (!profile || !isCrmAdmin(profile as { team: Team; role: Role })) {
+    return { ok: false as const, error: "Solo un administrador del CRM puede hacer esto" };
   }
 
   return { ok: true as const, userId: user.id };
@@ -34,22 +52,27 @@ export async function listUsers(): Promise<{ users: ManagedUser[] } | { error: s
   if (!check.ok) return { error: check.error };
 
   const admin = createAdminClient();
-  const [{ data: authData, error: authError }, { data: profiles, error: profilesError }] = await Promise.all([
-    admin.auth.admin.listUsers(),
-    admin.from("profiles").select("id, role"),
-  ]);
+  const [{ data: authData, error: authError }, { data: profiles, error: profilesError }] = await withTiming(
+    "auth.listUsers",
+    () =>
+      Promise.all([admin.auth.admin.listUsers(), admin.from("profiles").select("id, team, role")])
+  );
 
   if (authError) return { error: authError.message };
   if (profilesError) return { error: profilesError.message };
 
-  const roleById = new Map((profiles ?? []).map((p) => [p.id, p.role as "admin" | "redactor"]));
+  const profileById = new Map((profiles ?? []).map((p) => [p.id, p]));
 
-  const users: ManagedUser[] = authData.users.map((u) => ({
-    id: u.id,
-    name: (u.user_metadata?.full_name as string | undefined) || u.email?.split("@")[0] || "Sin nombre",
-    email: u.email ?? "",
-    role: roleById.get(u.id) ?? "redactor",
-  }));
+  const users: ManagedUser[] = authData.users.map((u) => {
+    const profile = profileById.get(u.id);
+    return {
+      id: u.id,
+      name: (u.user_metadata?.full_name as string | undefined) || u.email?.split("@")[0] || "Sin nombre",
+      email: u.email ?? "",
+      team: (profile?.team as Team) ?? "blog",
+      role: (profile?.role as Role) ?? "redactor",
+    };
+  });
 
   users.sort((a, b) => a.name.localeCompare(b.name));
 
@@ -63,7 +86,7 @@ export async function createUserAction(_prevState: UsersActionState, formData: F
   const name = String(formData.get("name") ?? "").trim();
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
-  const role = String(formData.get("role") ?? "redactor") as "admin" | "redactor";
+  const teamRole = parseTeamRole(formData);
 
   if (!name || !email || !password) {
     return { error: "Completa nombre, email y contraseña" };
@@ -71,6 +94,7 @@ export async function createUserAction(_prevState: UsersActionState, formData: F
   if (password.length < 8) {
     return { error: "La contraseña debe tener al menos 8 caracteres" };
   }
+  if ("error" in teamRole) return teamRole;
 
   const admin = createAdminClient();
   const { data, error } = await admin.auth.admin.createUser({
@@ -82,10 +106,10 @@ export async function createUserAction(_prevState: UsersActionState, formData: F
 
   if (error) return { error: error.message };
 
-  if (role === "admin" && data.user) {
+  if (data.user) {
     const { error: profileError } = await admin
       .from("profiles")
-      .update({ role: "admin" })
+      .update({ team: teamRole.team, role: teamRole.role })
       .eq("id", data.user.id);
     if (profileError) return { error: profileError.message };
   }
@@ -100,12 +124,13 @@ export async function updateUserAction(_prevState: UsersActionState, formData: F
   const id = String(formData.get("id") ?? "");
   const name = String(formData.get("name") ?? "").trim();
   const email = String(formData.get("email") ?? "").trim();
-  const role = String(formData.get("role") ?? "redactor") as "admin" | "redactor";
   const password = String(formData.get("password") ?? "");
+  const teamRole = parseTeamRole(formData);
 
   if (!id || !name || !email) {
     return { error: "Completa nombre y email" };
   }
+  if ("error" in teamRole) return teamRole;
 
   const admin = createAdminClient();
 
@@ -124,7 +149,7 @@ export async function updateUserAction(_prevState: UsersActionState, formData: F
   const isSelf = id === check.userId;
   const { error: profileError } = await admin
     .from("profiles")
-    .update({ email, ...(isSelf ? {} : { role }) })
+    .update({ email, ...(isSelf ? {} : { team: teamRole.team, role: teamRole.role }) })
     .eq("id", id);
   if (profileError) return { error: profileError.message };
 

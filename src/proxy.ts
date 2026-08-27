@@ -1,6 +1,10 @@
 import { createServerClient } from '@supabase/ssr'
-import { NextResponse, type NextRequest } from 'next/server'
+import { NextResponse, after, type NextRequest } from 'next/server'
 import { ACTIVITY_COOKIE, IDLE_TIMEOUT_MS } from '@/lib/auth/session'
+import { logSlowOperation } from '@/lib/monitoring/server'
+import { canAccessBlog, canAccessCrm, type ProfileRole } from '@/lib/auth/roles'
+
+const SLOW_AUTH_CHECK_MS = 300
 
 export async function proxy(request: NextRequest) {
   const isUnderPath = (base: string) =>
@@ -36,15 +40,49 @@ export async function proxy(request: NextRequest) {
     }
   )
 
+  const authCheckStart = performance.now()
   const {
     data: { user },
   } = await supabase.auth.getUser()
 
-  const loginPath = isUnderPath('/admin') ? '/login' : '/blog/login'
+  let profile: ProfileRole | null = null
+  if (user) {
+    const { data } = await supabase.from('profiles').select('team, role').eq('id', user.id).single()
+    profile = data as ProfileRole | null
+  }
+
+  const authCheckDuration = performance.now() - authCheckStart
+  if (authCheckDuration >= SLOW_AUTH_CHECK_MS) {
+    after(() =>
+      logSlowOperation({
+        label: 'proxy.authCheck',
+        durationMs: authCheckDuration,
+        path: request.nextUrl.pathname,
+      })
+    )
+  }
+
+  const onCrmPath = isUnderPath('/admin')
+  const loginPath = onCrmPath ? '/login' : '/blog/login'
 
   if (!user) {
     const url = request.nextUrl.clone()
     url.pathname = loginPath
+    return NextResponse.redirect(url)
+  }
+
+  // Wrong portal for this account's team: send them to the one they
+  // actually belong to instead of rendering an empty/broken dashboard (RLS
+  // would block the data either way, but this avoids the confusing blank
+  // shell). CRM admin reaches both portals — it's the app's general admin.
+  const hasAccess = onCrmPath ? canAccessCrm : canAccessBlog
+  if (!profile || !hasAccess(profile)) {
+    const url = request.nextUrl.clone()
+    if (profile && (onCrmPath ? canAccessBlog(profile) : canAccessCrm(profile))) {
+      url.pathname = onCrmPath ? '/blog/dashboard' : '/admin'
+    } else {
+      url.pathname = loginPath
+    }
     return NextResponse.redirect(url)
   }
 

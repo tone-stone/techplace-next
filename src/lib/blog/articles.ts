@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createPublicClient } from "@/lib/supabase/public";
 import cloudinary from "@/lib/cloudinary";
 import { MAX_IMAGE_BYTES, MAX_VIDEO_BYTES, formatBytes } from "@/lib/blog/media-limits";
+import { canAccessBlog, canDeleteArticles, type ProfileRole } from "@/lib/auth/roles";
 
 export type ManagedArticle = {
   id: string;
@@ -41,10 +42,12 @@ async function requireStaff() {
 
   if (!user) return { ok: false as const, error: "No autenticado" };
 
-  const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
-  if (!profile) return { ok: false as const, error: "No tienes un perfil de equipo asociado" };
+  const { data: profile } = await supabase.from("profiles").select("team, role").eq("id", user.id).single();
+  if (!profile || !canAccessBlog(profile as ProfileRole)) {
+    return { ok: false as const, error: "No tienes un perfil de equipo asociado" };
+  }
 
-  return { ok: true as const, userId: user.id, role: profile.role as "admin" | "redactor" };
+  return { ok: true as const, userId: user.id, profile: profile as ProfileRole };
 }
 
 function mapRow(row: {
@@ -271,7 +274,7 @@ export async function updateArticleAction(
 export async function deleteArticleAction(id: string): Promise<ArticleActionState> {
   const check = await requireStaff();
   if (!check.ok) return { error: check.error };
-  if (check.role !== "admin") return { error: "Solo un administrador puede eliminar artículos" };
+  if (!canDeleteArticles(check.profile)) return { error: "Solo un administrador puede eliminar artículos" };
 
   const supabase = await createClient();
   const { error } = await supabase.from("articles").delete().eq("id", id);

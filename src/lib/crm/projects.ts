@@ -2,7 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { requireAdmin } from "./auth";
+import { withTiming } from "@/lib/monitoring/timing";
+import { requireCrmAccess } from "./auth";
 import { addHistory } from "./history";
 import type { CrmActionState } from "./clients";
 
@@ -45,9 +46,11 @@ function mapProject(row: {
 }
 
 export async function getProjects(): Promise<CrmProject[]> {
-  const supabase = await createClient();
-  const { data } = await supabase.from("crm_projects").select("*").order("created_at", { ascending: false });
-  return (data ?? []).map(mapProject);
+  return withTiming("crm.getProjects", async () => {
+    const supabase = await createClient();
+    const { data } = await supabase.from("crm_projects").select("*").order("created_at", { ascending: false });
+    return (data ?? []).map(mapProject);
+  });
 }
 
 export async function getProjectDetail(projectId: string): Promise<CrmProject | null> {
@@ -60,7 +63,7 @@ export async function createProjectAction(
   _prevState: CrmActionState,
   formData: FormData
 ): Promise<CrmActionState> {
-  const check = await requireAdmin();
+  const check = await requireCrmAccess();
   if (!check.ok) return { error: check.error };
 
   const clientId = String(formData.get("clientId") ?? "");
@@ -95,7 +98,7 @@ export async function updateProjectStatusAction(
   clientId: string,
   status: ProjectStatus
 ): Promise<CrmActionState> {
-  const check = await requireAdmin();
+  const check = await requireCrmAccess();
   if (!check.ok) return { error: check.error };
 
   const supabase = await createClient();
@@ -111,7 +114,7 @@ export async function updateProjectProgressAction(
   projectId: string,
   progress: number
 ): Promise<CrmActionState> {
-  const check = await requireAdmin();
+  const check = await requireCrmAccess();
   if (!check.ok) return { error: check.error };
 
   const supabase = await createClient();

@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { ManagedUser } from "@/lib/auth/users";
 import { deleteArticleAction, listArticles, type ManagedArticle } from "@/lib/blog/articles";
 import AdminDashboard from "./AdminDashboard";
 import RedactorDashboard from "./RedactorDashboard";
@@ -9,15 +8,11 @@ import type { ActivityAction, ActivityEntry, DashboardRole } from "./types";
 
 export default function DashboardClient({
   email,
-  userId,
   initialRole,
-  initialUsers,
   initialArticles,
 }: {
   email: string;
-  userId: string;
   initialRole: DashboardRole;
-  initialUsers: ManagedUser[];
   initialArticles: ManagedArticle[];
 }) {
   useEffect(() => {
@@ -76,8 +71,6 @@ export default function DashboardClient({
     return (
       <AdminDashboard
         email={email}
-        userId={userId}
-        initialUsers={initialUsers}
         role={role}
         canPreview={isRealAdmin}
         onRoleChange={handleRoleChange}

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Orbitron } from "next/font/google";
+import MonitoringClient from "@/components/monitoring/MonitoringClient";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -69,7 +70,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       data-scroll-behavior="smooth"
       className={`${geistSans.variable} ${geistMono.variable} ${orbitron.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        <MonitoringClient />
+        {children}
+      </body>
     </html>
   );
 }

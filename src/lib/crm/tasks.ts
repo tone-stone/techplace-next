@@ -2,7 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { requireAdmin } from "./auth";
+import { withTiming } from "@/lib/monitoring/timing";
+import { requireCrmAccess } from "./auth";
 import type { CrmActionState } from "./clients";
 
 export type TaskStatus = "por_hacer" | "en_progreso" | "terminado";
@@ -41,16 +42,18 @@ function mapTask(row: {
 }
 
 export async function getAllTasks(): Promise<CrmTask[]> {
-  const supabase = await createClient();
-  const { data } = await supabase.from("crm_tasks").select("*").order("created_at", { ascending: true });
-  return (data ?? []).map(mapTask);
+  return withTiming("crm.getAllTasks", async () => {
+    const supabase = await createClient();
+    const { data } = await supabase.from("crm_tasks").select("*").order("created_at", { ascending: true });
+    return (data ?? []).map(mapTask);
+  });
 }
 
 export async function createTaskAction(
   _prevState: CrmActionState,
   formData: FormData
 ): Promise<CrmActionState> {
-  const check = await requireAdmin();
+  const check = await requireCrmAccess();
   if (!check.ok) return { error: check.error };
 
   const projectId = String(formData.get("projectId") ?? "");
@@ -80,7 +83,7 @@ export async function createTaskAction(
 }
 
 export async function updateTaskStatusAction(taskId: string, status: TaskStatus): Promise<CrmActionState> {
-  const check = await requireAdmin();
+  const check = await requireCrmAccess();
   if (!check.ok) return { error: check.error };
 
   const supabase = await createClient();

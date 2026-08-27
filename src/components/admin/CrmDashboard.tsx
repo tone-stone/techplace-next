@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Image from "next/image";
 import {
+  Activity,
   Briefcase,
   ChevronRight,
   FileText,
@@ -24,12 +25,21 @@ import type { CrmProject } from "@/lib/crm/projects";
 import type { CrmInvoice } from "@/lib/crm/invoices";
 import type { CrmQuote } from "@/lib/crm/quotes";
 import type { CrmTask } from "@/lib/crm/tasks";
+import type {
+  ErrorStats,
+  FailedLoginStats,
+  MonitoringErrorEvent,
+  SlowOperation,
+  SlowPage,
+  WebVitalSummary,
+} from "@/lib/monitoring/queries";
 import OverviewSection from "./crm/OverviewSection";
 import ClientsSection from "./crm/ClientsSection";
 import ProjectsSection from "./crm/ProjectsSection";
 import InvoicesSection from "./crm/InvoicesSection";
 import QuotesSection from "./crm/QuotesSection";
 import TasksSection from "./crm/TasksSection";
+import MonitoringSection from "./monitoring/MonitoringSection";
 
 type Section =
   | "resumen"
@@ -38,7 +48,8 @@ type Section =
   | "facturacion"
   | "cotizaciones"
   | "tareas"
-  | "usuarios";
+  | "usuarios"
+  | "monitoreo";
 
 const NAV_ITEMS: { id: Section; label: string; icon: typeof Users }[] = [
   { id: "resumen", label: "Resumen", icon: LayoutDashboard },
@@ -48,33 +59,51 @@ const NAV_ITEMS: { id: Section; label: string; icon: typeof Users }[] = [
   { id: "cotizaciones", label: "Cotizaciones", icon: FileText },
   { id: "tareas", label: "Tareas", icon: Kanban },
   { id: "usuarios", label: "Usuarios", icon: UserCog },
+  { id: "monitoreo", label: "Monitoreo", icon: Activity },
 ];
 
 export default function CrmDashboard({
   email,
   userId = "",
   users = [],
+  currentUserIsAdmin = false,
   clients,
   payments,
   projects,
   invoices,
   quotes,
   tasks,
+  recentErrors = [],
+  errorStats = { daily: [], last24h: 0, last7d: 0 },
+  webVitals = [],
+  slowOperations = [],
+  slowPages = [],
+  failedLogins = { last24h: 0, last7d: 0, recent: [] },
 }: {
   email: string;
   userId?: string;
   users?: ManagedUser[];
+  currentUserIsAdmin?: boolean;
   clients: CrmClient[];
   payments: ClientPayment[];
   projects: CrmProject[];
   invoices: CrmInvoice[];
   quotes: CrmQuote[];
   tasks: CrmTask[];
+  recentErrors?: MonitoringErrorEvent[];
+  errorStats?: ErrorStats;
+  webVitals?: WebVitalSummary[];
+  slowOperations?: SlowOperation[];
+  slowPages?: SlowPage[];
+  failedLogins?: FailedLoginStats;
 }) {
   const [section, setSection] = useState<Section>("resumen");
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const currentLabel = NAV_ITEMS.find((n) => n.id === section)?.label ?? "Resumen";
+  // "Usuarios" is CRM-admin-only — the CRM admin is the app's general admin
+  // and assigns accounts for both the CRM and blog teams.
+  const navItems = currentUserIsAdmin ? NAV_ITEMS : NAV_ITEMS.filter((n) => n.id !== "usuarios");
+  const currentLabel = navItems.find((n) => n.id === section)?.label ?? "Resumen";
 
   const navButtonClass = (active: boolean) =>
     `flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${
@@ -100,7 +129,7 @@ export default function CrmDashboard({
       </div>
 
       <nav className="mt-8 flex-1 space-y-1">
-        {NAV_ITEMS.map((item) => (
+        {navItems.map((item) => (
           <button
             key={item.id}
             type="button"
@@ -192,7 +221,7 @@ export default function CrmDashboard({
 
           {/* Mobile quick-nav: every section at a glance, horizontal scroll */}
           <div className="flex gap-2 overflow-x-auto px-4 pb-2.5 sm:px-6 lg:hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {NAV_ITEMS.map((item) => (
+            {navItems.map((item) => (
               <button
                 key={item.id}
                 type="button"
@@ -229,8 +258,18 @@ export default function CrmDashboard({
           )}
           {section === "cotizaciones" && <QuotesSection quotes={quotes} clients={clients} />}
           {section === "tareas" && <TasksSection tasks={tasks} projects={projects} />}
-          {section === "usuarios" && (
-            <UserManagement currentUserId={userId} initialUsers={users} accent="sky" />
+          {section === "usuarios" && currentUserIsAdmin && (
+            <UserManagement currentUserId={userId} initialUsers={users} />
+          )}
+          {section === "monitoreo" && (
+            <MonitoringSection
+              recentErrors={recentErrors}
+              errorStats={errorStats}
+              webVitals={webVitals}
+              slowOperations={slowOperations}
+              slowPages={slowPages}
+              failedLogins={failedLogins}
+            />
           )}
         </main>
       </div>

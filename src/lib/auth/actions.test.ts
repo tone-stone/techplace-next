@@ -16,6 +16,13 @@ vi.mock("next/cache", () => ({
 
 vi.mock("next/headers", () => ({
   cookies: async () => ({ get: () => undefined, set: vi.fn(), delete: cookieDelete }),
+  headers: async () => ({ get: () => null }),
+}));
+
+vi.mock("next/server", () => ({
+  // Not exercising the post-response logging path here — just confirming
+  // login() doesn't blow up calling `after()` outside a request scope.
+  after: (_fn: () => void) => {},
 }));
 
 vi.mock("@/lib/supabase/server", () => ({
