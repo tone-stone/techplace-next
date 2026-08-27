@@ -12,6 +12,7 @@ import {
 import { formatCurrencyMXN } from "@/lib/crm/format";
 import type { CrmClient } from "@/lib/crm/clients";
 import StatusBadge from "./StatusBadge";
+import ModalPortal from "./ModalPortal";
 
 const STATUS_OPTIONS: ProjectStatus[] = ["planeacion", "en_progreso", "revision", "completado"];
 
@@ -67,12 +68,13 @@ export default function ProjectDetailModal({
   const client = project ? clients.find((c) => c.id === project.clientId) : null;
 
   return (
+    <ModalPortal>
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md"
+      className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/80 p-4 backdrop-blur-md"
       onClick={onClose}
     >
       <div
-        className="tp-dark-card-crm relative max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-3xl p-6 sm:p-8"
+        className="tp-dark-card-crm relative my-auto max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-3xl p-6 sm:p-8"
         onClick={(e) => e.stopPropagation()}
       >
         <button
@@ -148,5 +150,6 @@ export default function ProjectDetailModal({
         )}
       </div>
     </div>
+    </ModalPortal>
   );
 }

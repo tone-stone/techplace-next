@@ -5,6 +5,7 @@ import { Plus, X } from "lucide-react";
 import { createQuoteAction } from "@/lib/crm/quotes";
 import { formatCurrencyMXN } from "@/lib/crm/format";
 import type { CrmActionState, CrmClient } from "@/lib/crm/clients";
+import ModalPortal from "./ModalPortal";
 
 type DraftItem = { concept: string; quantity: string; unitPrice: string };
 
@@ -67,12 +68,13 @@ export default function QuoteFormModal({
   );
 
   return (
+    <ModalPortal>
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md"
+      className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/80 p-4 backdrop-blur-md"
       onClick={onClose}
     >
       <div
-        className="tp-dark-card-crm relative max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-3xl p-6 sm:p-8"
+        className="tp-dark-card-crm relative my-auto max-h-[90dvh] w-full max-w-2xl overflow-y-auto rounded-3xl p-6 sm:p-8"
         onClick={(e) => e.stopPropagation()}
       >
         <button
@@ -243,5 +245,6 @@ export default function QuoteFormModal({
         </form>
       </div>
     </div>
+    </ModalPortal>
   );
 }
