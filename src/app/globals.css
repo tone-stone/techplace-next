@@ -101,22 +101,31 @@ html {
   display: grid;
 }
 
+/* Self-contained on purpose: don't add the shared `.tp-heading` class to
+   these slides even though they need its color+glow. Both classes set the
+   `animation` shorthand, and whichever rule the cascade picks wins ALL of
+   it (name/duration/fill-mode) — not just the parts that differ. That
+   silently dropped the crossfade entirely in favor of the glow, leaving
+   opacity stuck at 0 forever. Declaring both animations in one rule sidesteps
+   the collision instead of fighting it with specificity. */
 .tp-hero-slide {
   grid-area: 1 / 1;
+  color: #ffffff;
   opacity: 0;
-  animation: tp-hero-crossfade 8.4s ease-in-out infinite;
+  animation:
+    tp-hero-crossfade 8.4s ease-in-out infinite,
+    tp-heading-glow 4s ease-in-out infinite;
 }
 
 @keyframes tp-hero-crossfade {
-  0%,
-  4% {
+  0% {
     opacity: 0;
   }
-  8%,
-  25% {
+  4%,
+  29% {
     opacity: 1;
   }
-  29%,
+  33%,
   100% {
     opacity: 0;
   }

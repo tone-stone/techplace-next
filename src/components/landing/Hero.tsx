@@ -39,7 +39,7 @@ export default function Hero() {
             <h1
               key={text}
               style={{ animationDelay: `${i * 2.8}s` }}
-              className="tp-hero-slide tp-heading font-heading text-3xl sm:text-4xl md:text-6xl font-extrabold drop-shadow-xl tracking-tight"
+              className="tp-hero-slide font-heading text-3xl sm:text-4xl md:text-6xl font-extrabold drop-shadow-xl tracking-tight"
             >
               {text}
             </h1>
@@ -50,13 +50,21 @@ export default function Hero() {
           <br />
           Innovación y seguridad para negocios modernos.
         </p>
-        <a
-          href="#contacto"
-          className="tp-btn-animated inline-flex items-center text-white px-6 sm:px-8 md:px-10 py-3 md:py-4 rounded-full text-base sm:text-lg font-bold shadow-lg shadow-blue-900/40 transition-transform duration-300 hover:scale-105 active:scale-97"
-        >
-          <ShieldCheck className="mr-2 h-5 w-5" />
-          Solicita tu consultoría
-        </a>
+        {/* Wrapped so the entrance animation (from `.tp-hero-content > *`)
+            lands on this div instead of the <a>. The <a> already runs its
+            own `animation` (tp-gradient-shift, via .tp-btn-animated) — same
+            collision as the headline slides above, avoided the same way:
+            keep the two animated elements separate instead of letting two
+            classes fight over one `animation` property. */}
+        <div>
+          <a
+            href="#contacto"
+            className="tp-btn-animated inline-flex items-center text-white px-6 sm:px-8 md:px-10 py-3 md:py-4 rounded-full text-base sm:text-lg font-bold shadow-lg shadow-blue-900/40 transition-transform duration-300 hover:scale-105 active:scale-[0.97]"
+          >
+            <ShieldCheck className="mr-2 h-5 w-5" />
+            Solicita tu consultoría
+          </a>
+        </div>
       </div>
     </section>
   );
