@@ -73,9 +73,9 @@ export default function Footer() {
             </div>
 
             <div>
-              <h4 className="font-heading text-purple-400 font-bold mb-3 sm:mb-4 text-sm tracking-wide uppercase">
+              <h3 className="font-heading text-purple-400 font-bold mb-3 sm:mb-4 text-sm tracking-wide uppercase">
                 Navegación
-              </h4>
+              </h3>
               {/* Mobile: links wrap in a horizontal row to cut footer height.
                   From sm up (footer becomes a multi-column grid) it's a
                   normal vertical list again. */}
@@ -94,9 +94,9 @@ export default function Footer() {
             </div>
 
             <div>
-              <h4 className="font-heading text-purple-400 font-bold mb-4 text-sm tracking-wide uppercase">
+              <h3 className="font-heading text-purple-400 font-bold mb-4 text-sm tracking-wide uppercase">
                 Contacto
-              </h4>
+              </h3>
               <ul className="space-y-3 text-sm">
                 <li>
                   <a
