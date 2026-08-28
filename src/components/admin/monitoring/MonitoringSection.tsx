@@ -1,5 +1,14 @@
 "use client";
 
+/**
+ * Admin dashboard view for the monitoring system. Renders the data fetched
+ * server-side via `src/lib/monitoring/queries.ts` (recent errors, error
+ * trend, Web Vitals summary, slow operations/pages, failed logins) as KPI
+ * tiles, small inline SVG charts, and scrollable lists. Purely presentational
+ * — all aggregation happens in the queries module; this file only formats
+ * and lays out the results.
+ */
+
 import { useState } from "react";
 import {
   AlertOctagon,
@@ -36,6 +45,7 @@ type Stat = {
   glow: string;
 };
 
+/** Grid of KPI tiles (top-line stats) shown at the head of the dashboard. */
 function StatTiles({ stats }: { stats: Stat[] }) {
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -67,6 +77,7 @@ function StatTiles({ stats }: { stats: Stat[] }) {
 /*  Error trend bar chart (N days)                                     */
 /* ------------------------------------------------------------------ */
 
+/** Hand-rolled inline SVG bar chart of daily error counts (no charting lib). */
 function ErrorTrendChart({ data }: { data: { date: string; count: number }[] }) {
   const W = 560;
   const H = 170;
@@ -161,11 +172,13 @@ const RATING_STYLE: Record<WebVitalRating, { bar: string; text: string; label: s
   poor: { bar: "bg-red-500", text: "text-red-400", label: "Mal" },
 };
 
+/** Formats a metric value for display: CLS as a 3-decimal ratio, others as rounded ms. */
 function formatMetricValue(name: string, value: number): string {
   if (name === "CLS") return value.toFixed(3);
   return `${Math.round(value)} ms`;
 }
 
+/** Per-metric horizontal bar gauges showing p75 and rating for each Web Vital. */
 function WebVitalsGauges({ vitals }: { vitals: WebVitalSummary[] }) {
   if (vitals.length === 0) {
     return <p className="text-sm text-gray-500">Todavía no hay suficientes visitas registradas.</p>;
@@ -201,6 +214,7 @@ function WebVitalsGauges({ vitals }: { vitals: WebVitalSummary[] }) {
 /*  Recent errors list                                                 */
 /* ------------------------------------------------------------------ */
 
+/** Formats an ISO timestamp as a coarse relative-time string, in Spanish. */
 function timeAgo(iso: string): string {
   const diffMs = Date.now() - new Date(iso).getTime();
   const mins = Math.floor(diffMs / 60000);
@@ -211,6 +225,7 @@ function timeAgo(iso: string): string {
   return `hace ${Math.floor(hours / 24)} d`;
 }
 
+/** Single recent-error list item; expands to show the stack trace when present. */
 function ErrorRow({ event }: { event: MonitoringErrorEvent }) {
   const [open, setOpen] = useState(false);
   const hasDetail = Boolean(event.stack);
@@ -256,6 +271,7 @@ function ErrorRow({ event }: { event: MonitoringErrorEvent }) {
 /*  Slow operations (Supabase queries / auth checks over threshold)    */
 /* ------------------------------------------------------------------ */
 
+/** Scrollable list of the slowest recorded server operations, worst first. */
 function SlowOperationsList({ operations }: { operations: SlowOperation[] }) {
   if (operations.length === 0) {
     return <p className="text-sm text-gray-500">Sin operaciones lentas registradas — buena señal.</p>;
@@ -290,6 +306,7 @@ function SlowOperationsList({ operations }: { operations: SlowOperation[] }) {
 /*  Slowest pages by TTFB                                              */
 /* ------------------------------------------------------------------ */
 
+/** Horizontal bar list ranking pages by TTFB p75, worst first. */
 function SlowPagesBarList({ pages }: { pages: SlowPage[] }) {
   if (pages.length === 0) {
     return <p className="text-sm text-gray-500">Todavía no hay suficientes visitas registradas.</p>;
@@ -322,6 +339,7 @@ function SlowPagesBarList({ pages }: { pages: SlowPage[] }) {
 /*  Failed login attempts                                               */
 /* ------------------------------------------------------------------ */
 
+/** Scrollable list of recent failed-login security events. */
 function FailedLoginsList({ attempts }: { attempts: FailedLoginStats["recent"] }) {
   if (attempts.length === 0) {
     return <p className="text-sm text-gray-500">Sin intentos fallidos registrados.</p>;
@@ -353,6 +371,12 @@ function FailedLoginsList({ attempts }: { attempts: FailedLoginStats["recent"] }
 /*  Section                                                             */
 /* ------------------------------------------------------------------ */
 
+/**
+ * Top-level monitoring dashboard section, composed of KPI tiles, the error
+ * trend chart, Web Vitals gauges, and the recent-errors / slow-pages /
+ * slow-operations / failed-logins lists. All data is passed in as props —
+ * fetched server-side by the caller via `src/lib/monitoring/queries.ts`.
+ */
 export default function MonitoringSection({
   recentErrors,
   errorStats,

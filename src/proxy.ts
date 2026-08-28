@@ -4,6 +4,32 @@ import { ACTIVITY_COOKIE, IDLE_TIMEOUT_MS } from '@/lib/auth/session'
 import { logSlowOperation } from '@/lib/monitoring/server'
 import { canAccessBlog, canAccessCrm, type ProfileRole } from '@/lib/auth/roles'
 
+/**
+ * Next.js middleware (Edge runtime), run on every request matched by
+ * `config.matcher` below — i.e. everything except static assets. Only
+ * `/admin` and `/blog/dashboard` actually gate on auth; every other request
+ * short-circuits before the Supabase round trip so this stays cheap on the
+ * common path.
+ *
+ * For a gated route it enforces two things, in order:
+ *  1. Team-aware access: not just "is logged in", but "does this account's
+ *     team (crm | blog) match the portal being requested". A CRM account
+ *     hitting /blog/dashboard (or vice versa) is redirected to the portal
+ *     it *does* have access to, rather than shown a broken/empty dashboard
+ *     RLS would block the data from anyway. The general CRM admin passes
+ *     both checks (see roles.ts).
+ *  2. A 30-minute inactivity timeout, tracked via a rolling `ACTIVITY_COOKIE`
+ *     timestamp: if it's stale the auth cookies are wiped and the user is
+ *     bounced to login with `?expired=1`; otherwise the timestamp slides
+ *     forward. This is the server-side backstop for the same window
+ *     IdleTimeout.tsx enforces client-side and each server action's
+ *     requireAdmin() enforces per-mutation (see session.ts).
+ *
+ * Auth-check duration is measured and reported via `logSlowOperation` when
+ * it exceeds `SLOW_AUTH_CHECK_MS`, since this runs on every gated page load
+ * and a slow Supabase round trip here directly delays navigation.
+ */
+
 const SLOW_AUTH_CHECK_MS = 300
 
 export async function proxy(request: NextRequest) {
@@ -115,6 +141,7 @@ export async function proxy(request: NextRequest) {
   return response
 }
 
+/** Runs the proxy on all paths except Next static assets and common image files. */
 export const config = {
   matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|webp)$).*)'],
 }

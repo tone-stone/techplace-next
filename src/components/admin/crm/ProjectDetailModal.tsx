@@ -1,5 +1,11 @@
 "use client";
 
+/**
+ * Full-screen modal (via `ModalPortal`) for a single project: status
+ * selector and a progress slider that commits to the server on release
+ * (mouse-up/touch-end/blur) rather than on every drag tick.
+ */
+
 import { useEffect, useState } from "react";
 import { Calendar, Loader2, X } from "lucide-react";
 import {
@@ -16,6 +22,7 @@ import ModalPortal from "./ModalPortal";
 
 const STATUS_OPTIONS: ProjectStatus[] = ["planeacion", "en_progreso", "revision", "completado"];
 
+/** Portaled modal: loads the project's detail and lets it be updated (status, progress) in place. */
 export default function ProjectDetailModal({
   projectId,
   clients,

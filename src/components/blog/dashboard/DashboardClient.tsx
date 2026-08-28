@@ -1,5 +1,13 @@
 "use client";
 
+/**
+ * Client-side controller for the blog dashboard: owns the articles list,
+ * in-session activity log, and which article (if any) is being edited, and
+ * renders `AdminDashboard` or `RedactorDashboard` depending on the current
+ * role. Also ends the auth session via a `pagehide` beacon when the tab is
+ * actually closed.
+ */
+
 import { useEffect, useState } from "react";
 import type { ManagedUser } from "@/lib/auth/users";
 import { deleteArticleAction, listArticles, type ManagedArticle } from "@/lib/blog/articles";
@@ -7,6 +15,14 @@ import AdminDashboard from "./AdminDashboard";
 import RedactorDashboard from "./RedactorDashboard";
 import type { ActivityAction, ActivityEntry, DashboardRole } from "./types";
 
+/**
+ * Renders the admin or redactor dashboard for `initialRole`, wiring up
+ * article CRUD callbacks and local activity logging for both.
+ *
+ * @param initialRole - The account's real role, resolved server-side. Only
+ * an actual admin can flip `role` via the preview switch — this stays fixed
+ * as the source of truth for what the account is really allowed to do.
+ */
 export default function DashboardClient({
   email,
   userId,

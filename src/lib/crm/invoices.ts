@@ -1,5 +1,12 @@
 "use server";
 
+/**
+ * CRM invoicing: data fetching plus server actions for creating invoices
+ * (with an auto-generated sequential folio via `insertWithSequentialNumber`)
+ * and updating their status. Every mutation requires `requireCrmAccess()`
+ * and logs a matching entry to the associated client's history.
+ */
+
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { withTiming } from "@/lib/monitoring/timing";
@@ -24,6 +31,7 @@ export type CrmInvoice = {
   createdAt: string;
 };
 
+/** Converts a raw `crm_invoices` row (snake_case) into a `CrmInvoice`. */
 function mapInvoice(row: {
   id: string;
   client_id: string;
@@ -50,6 +58,7 @@ function mapInvoice(row: {
   };
 }
 
+/** Fetches every invoice, ordered by due date ascending. */
 export async function getInvoices(): Promise<CrmInvoice[]> {
   return withTiming("crm.getInvoices", async () => {
     const supabase = await createClient();
@@ -58,6 +67,7 @@ export async function getInvoices(): Promise<CrmInvoice[]> {
   });
 }
 
+/** `useActionState` action backing the "Nueva factura" form; assigns the next sequential folio. */
 export async function createInvoiceAction(
   _prevState: CrmActionState,
   formData: FormData
@@ -96,6 +106,7 @@ export async function createInvoiceAction(
   return { success: true };
 }
 
+/** Updates an invoice's status (e.g. to "pagada") and logs the change to the client's history. */
 export async function updateInvoiceStatusAction(
   invoiceId: string,
   clientId: string,

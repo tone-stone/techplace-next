@@ -7,9 +7,18 @@ import { ArrowRight, Lock, LogIn, Mail } from "lucide-react";
 import { motion } from "motion/react";
 import { login, type LoginState } from "@/lib/auth/actions";
 
+/**
+ * Email/password form for both the CRM and blog logins, driven by the
+ * shared `login()` server action. Renders the action's error state,
+ * including the "wrong portal" case where valid credentials belong to the
+ * other team — shown with a link to that portal's login instead of a plain
+ * error, per the UX `login()` sets up via `otherPortalHref`/`otherPortalLabel`.
+ */
+
 const inputClasses =
   "tp-glass-input w-full pl-12 pr-4 py-2.5 sm:py-3 rounded-xl text-purple-100 placeholder-purple-400 focus:border-brand-blue focus:ring focus:ring-brand-blue/40 outline-none transition";
 
+/** Submit button that disables and swaps its label while the form action is pending. */
 function SubmitButton() {
   const { pending } = useFormStatus();
 
@@ -29,6 +38,11 @@ function SubmitButton() {
   );
 }
 
+/**
+ * Renders the login form and wires it to the `login()` server action.
+ * @param redirectTo Path to send the user to on successful login.
+ * @param portal Which portal this form was rendered on (`crm` or `blog`); sent as a hidden field so `login()` can check it against the account's team.
+ */
 export default function LoginForm({
   redirectTo = "/admin",
   portal = "crm",
@@ -38,6 +52,8 @@ export default function LoginForm({
 }) {
   const [state, formAction] = useActionState<LoginState, FormData>(login, null);
   const [prevState, setPrevState] = useState(state);
+  // Retriggers the shake animation on every new error, including a repeat of
+  // the same error message, since `key={shake}` alone wouldn't change.
   const [shake, setShake] = useState(0);
 
   if (state !== prevState) {

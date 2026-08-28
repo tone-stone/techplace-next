@@ -1,3 +1,11 @@
+/**
+ * Public blog post page — renders a single published article at
+ * `/blog/[slug]`. Statically pre-rendered for every published slug at build
+ * time and revalidated on a timer (ISR), with unknown slugs rendered on
+ * demand via Next's `dynamicParams` fallback. Also builds the page's SEO
+ * metadata (OpenGraph/Twitter cards) and a BlogPosting JSON-LD block for
+ * search engines.
+ */
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -20,6 +28,10 @@ import {
 
 export const revalidate = 60;
 
+/**
+ * Enumerates the slugs to pre-render at build time — one entry per
+ * published article.
+ */
 // Pre-renders every published post at build time so it's served from the
 // static ISR cache on first visit too, instead of doing a live render (and a
 // Supabase round-trip) the first time each slug is hit. New posts published
@@ -30,6 +42,11 @@ export async function generateStaticParams() {
   return articles.map((post) => ({ slug: post.slug }));
 }
 
+/**
+ * Builds this page's `<head>` metadata (title, description, OpenGraph,
+ * Twitter card) from the matching article. Returns an empty object for an
+ * unknown slug so the 404 page keeps its own metadata.
+ */
 export async function generateMetadata({
   params,
 }: {
@@ -67,6 +84,11 @@ export async function generateMetadata({
   };
 }
 
+/**
+ * Renders the full article view: hero/cover image, sanitized HTML content,
+ * optional photo gallery, a CTA block, and a carousel of related articles.
+ * Calls `notFound()` for a slug with no published article.
+ */
 export default async function BlogPostPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const post = await getPublishedArticleBySlug(slug);

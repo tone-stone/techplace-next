@@ -1,9 +1,19 @@
+/**
+ * Blog article preview card used on the public blog index and in the
+ * related-articles carousel. Server component: computes the estimated read
+ * time server-side before rendering.
+ */
+
 import Link from "next/link";
 import { ArrowRight, Calendar, Clock } from "lucide-react";
 import { CATEGORY_ICONS, formatPostDate } from "@/lib/blog-posts";
 import { estimateReadTime, type ManagedArticle } from "@/lib/blog/articles";
 import FitImage from "./FitImage";
 
+/**
+ * Renders a clickable card linking to the full article, showing its cover
+ * image (or a category icon fallback), title, excerpt, date, and read time.
+ */
 export default async function BlogPostCard({ post }: { post: ManagedArticle }) {
   const Icon = CATEGORY_ICONS[post.category];
   const readTime = await estimateReadTime(post.content);

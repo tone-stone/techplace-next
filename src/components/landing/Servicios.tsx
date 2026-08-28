@@ -3,6 +3,12 @@ import Reveal from "./Reveal";
 import ServiceCard from "./ServiceCard";
 import MobileAccordion from "./MobileAccordion";
 
+/**
+ * Landing section (`#servicios`) listing TechPlace's service offerings.
+ * Presents the same data two ways depending on viewport: a card grid on
+ * desktop (`ServiceCard`) and a one-open-at-a-time accordion on mobile
+ * (`MobileAccordion`).
+ */
 const SERVICES = [
   {
     icon: <SquareCode className="h-12 w-12" strokeWidth={1.75} />,
@@ -54,6 +60,7 @@ const SERVICES = [
   },
 ];
 
+/** Services section with a responsive card grid / accordion layout. */
 export default function Servicios() {
   return (
     <section id="servicios" className="relative py-24">
@@ -64,7 +71,7 @@ export default function Servicios() {
           </h2>
         </Reveal>
         <Reveal delay={0.1}>
-          <p className="max-w-2xl mx-auto text-gray-300 text-lg font-light mb-14">
+          <p className="max-w-2xl mx-auto text-gray-300 text-lg font-light mb-14 text-justify">
             Desarrollo, seguridad e infraestructura bajo un mismo equipo de
             ingeniería, con inteligencia artificial aplicada en todo el ciclo:
             del diseño y el código a la automatización de tu operación. Cada

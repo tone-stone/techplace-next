@@ -1,3 +1,10 @@
+/**
+ * `/legal/encargo-tratamiento-datos`: Data Processing Agreement template
+ * used when TechPlace processes a client's end-user personal data on the
+ * client's behalf (e.g. hosting their database or CRM). Static content
+ * rendered through `LegalDocument`, with `Fill` marking per-project values
+ * still pending completion.
+ */
 import type { Metadata } from "next";
 import LegalDocument from "@/components/legal/LegalDocument";
 import Fill from "@/components/legal/Fill";

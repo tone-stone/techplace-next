@@ -1,10 +1,21 @@
 "use client";
 
+/**
+ * Account management panel shared between the CRM portal (`/admin`, full
+ * `scope="all"`, team/role both editable) and this blog dashboard (always
+ * `scope="blog"`, hard-locked to blog-team accounts — the team select is
+ * hidden and a hidden `team=blog` field is submitted instead). Handles
+ * listing, creating, editing, and deleting accounts via the
+ * `createUserAction`/`updateUserAction`/`deleteUserAction`/`listUsers`
+ * server actions, all of which respect the `blogOnly` scoping.
+ */
+
 import { useState, useTransition, type FormEvent } from "react";
 import { Pencil, ShieldCheck, Trash2, User as UserIcon, UserPlus, X } from "lucide-react";
 import { createUserAction, deleteUserAction, listUsers, updateUserAction, type ManagedUser } from "@/lib/auth/users";
 import type { Role, Team } from "@/lib/auth/roles";
 
+// Formats a user's initials (up to two) for their avatar badge.
 function initials(name: string): string {
   return name
     .split(" ")
@@ -25,6 +36,8 @@ const TEAM_ROLE_OPTIONS: Record<Team, { value: Role; label: string }[]> = {
   ],
 };
 
+// Formats a role for display, optionally prefixed with its team (CRM/Blog)
+// when both teams are shown together.
 function roleLabel(team: Team, role: Role, showTeam: boolean): string {
   const nivel = TEAM_ROLE_OPTIONS[team].find((o) => o.value === role)?.label ?? role;
   return showTeam ? `${team === "crm" ? "CRM" : "Blog"} · ${nivel}` : nivel;
@@ -53,6 +66,13 @@ const ACCENTS = {
   },
 } as const;
 
+/**
+ * Renders the user list plus an inline create/edit form, scoped to either
+ * every account (CRM) or just the blog team (this blog dashboard).
+ *
+ * @param accent - Color theme: "sky" for the CRM panel, "purple" for the
+ * blog dashboard's admin panel.
+ */
 export default function UserManagement({
   currentUserId,
   initialUsers,

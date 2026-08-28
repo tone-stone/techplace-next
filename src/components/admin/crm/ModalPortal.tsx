@@ -3,6 +3,13 @@
 import type { ReactNode } from "react";
 import { createPortal } from "react-dom";
 
+/**
+ * Portals its children to `document.body` so CRM modals escape the
+ * containing block created by their parent section card's backdrop-filter
+ * (see the inline comment below for the full CSS explanation) and render as
+ * true full-viewport overlays.
+ */
+
 // CRM section cards use `.tp-dark-card-crm`, which sets `backdrop-filter` —
 // that creates a new containing block for `position: fixed` descendants per
 // the CSS spec. A modal mounted inline inside one of those cards (as these
@@ -15,6 +22,7 @@ import { createPortal } from "react-dom";
 // No mount-check needed: every modal here is only rendered in response to a
 // client-side click (`{show && <Modal />}` with `show` starting false/null),
 // so this never runs during SSR — `document` is always available.
+/** Portals `children` into `document.body`. */
 export default function ModalPortal({ children }: { children: ReactNode }) {
   return createPortal(children, document.body);
 }

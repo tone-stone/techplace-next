@@ -1,5 +1,14 @@
 "use server";
 
+/**
+ * Core CRM entity: clients, their recurring billing plans, and their
+ * payments. Exports both the data-fetching functions used to hydrate the
+ * admin dashboard and the server actions (create client, update status, add
+ * a plan, record/mark payments) invoked from the CRM UI. Every mutation here
+ * requires `requireCrmAccess()` (admin or operativo) and logs a
+ * corresponding entry to the client's history via `addHistory`.
+ */
+
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { withTiming } from "@/lib/monitoring/timing";
@@ -58,6 +67,7 @@ export type ClientDetail = {
 
 export type CrmActionState = { error: string } | { success: true } | null;
 
+/** Converts a raw `crm_clients` row (snake_case) into a `CrmClient`. */
 function mapClient(row: {
   id: string;
   name: string;
@@ -82,6 +92,7 @@ function mapClient(row: {
   };
 }
 
+/** Converts a raw `crm_plans` row (snake_case) into a `ClientPlan`. */
 function mapPlan(row: {
   id: string;
   client_id: string;
@@ -104,6 +115,7 @@ function mapPlan(row: {
   };
 }
 
+/** Converts a raw `crm_payments` row (snake_case) into a `ClientPayment`. */
 function mapPayment(row: {
   id: string;
   client_id: string;
@@ -130,6 +142,7 @@ function mapPayment(row: {
   };
 }
 
+/** Fetches every CRM client, most recently created first. */
 export async function getClients(): Promise<CrmClient[]> {
   return withTiming("crm.getClients", async () => {
     const supabase = await createClient();
@@ -138,6 +151,7 @@ export async function getClients(): Promise<CrmClient[]> {
   });
 }
 
+/** Fetches every payment across all clients, ordered by due date. */
 export async function getAllPayments(): Promise<ClientPayment[]> {
   return withTiming("crm.getAllPayments", async () => {
     const supabase = await createClient();
@@ -146,6 +160,12 @@ export async function getAllPayments(): Promise<ClientPayment[]> {
   });
 }
 
+/**
+ * Fetches a single client's full profile (client, history, plans, payments)
+ * for the client detail modal, in parallel.
+ *
+ * @returns `null` if no client matches `clientId`.
+ */
 export async function getClientDetail(clientId: string): Promise<ClientDetail | null> {
   const supabase = await createClient();
 
@@ -170,6 +190,7 @@ export async function getClientDetail(clientId: string): Promise<ClientDetail | 
   };
 }
 
+/** `useActionState` action backing the "Nuevo cliente" form. */
 export async function createClientAction(
   _prevState: CrmActionState,
   formData: FormData
@@ -208,6 +229,7 @@ export async function createClientAction(
   return { success: true };
 }
 
+/** Updates a client's lifecycle status and logs the change to their history. */
 export async function updateClientStatusAction(clientId: string, status: ClientStatus): Promise<CrmActionState> {
   const check = await requireCrmAccess();
   if (!check.ok) return { error: check.error };
@@ -221,6 +243,7 @@ export async function updateClientStatusAction(clientId: string, status: ClientS
   return { success: true };
 }
 
+/** `useActionState` action backing the manual "add a note" form on the client detail modal. */
 export async function addHistoryEntryAction(
   _prevState: CrmActionState,
   formData: FormData
@@ -242,6 +265,7 @@ export async function addHistoryEntryAction(
   return { success: true };
 }
 
+/** `useActionState` action backing the "Nuevo plan" form on the client detail modal. */
 export async function createPlanAction(_prevState: CrmActionState, formData: FormData): Promise<CrmActionState> {
   const check = await requireCrmAccess();
   if (!check.ok) return { error: check.error };
@@ -283,6 +307,7 @@ export async function createPlanAction(_prevState: CrmActionState, formData: For
   return { success: true };
 }
 
+/** `useActionState` action backing the "Nuevo pago" form; can insert as already-paid via `markPaidNow`. */
 export async function recordPaymentAction(
   _prevState: CrmActionState,
   formData: FormData
@@ -329,6 +354,7 @@ export async function recordPaymentAction(
   return { success: true };
 }
 
+/** Marks an existing payment as paid today (used by the "Marcar pagado" button). */
 export async function markPaymentPaidAction(paymentId: string, clientId: string): Promise<CrmActionState> {
   const check = await requireCrmAccess();
   if (!check.ok) return { error: check.error };

@@ -1,5 +1,12 @@
 "use client";
 
+/**
+ * Redactor-level view of the blog dashboard: a single-page layout for
+ * creating/editing articles, with no delete button and no user-management
+ * access. Rendered by `DashboardClient` for redactor accounts, or by an
+ * admin using the role-preview switch.
+ */
+
 import Image from "next/image";
 import Link from "next/link";
 import { FileText, LayoutDashboard, LogOut, Newspaper, Tags } from "lucide-react";
@@ -12,6 +19,13 @@ import ArticleList from "./ArticleList";
 import RolePreviewSwitch from "./RolePreviewSwitch";
 import type { DashboardRole } from "./types";
 
+/**
+ * Renders the redactor dashboard header, stats, and the article
+ * form/list pair.
+ *
+ * @param canPreview - Whether the role-preview switch is shown (true only
+ * when a real admin is previewing this view).
+ */
 export default function RedactorDashboard({
   email,
   role,

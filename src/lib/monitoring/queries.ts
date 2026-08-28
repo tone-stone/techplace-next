@@ -1,8 +1,18 @@
 "use server";
 
+/**
+ * Read-side queries for the admin monitoring dashboard
+ * (`MonitoringSection.tsx`). Each function reads from the shared
+ * `monitoring_events` table via the cookie-bound (RLS-respecting) Supabase
+ * client, aggregates rows into a dashboard-friendly shape, and fails soft —
+ * a query error returns an empty/zeroed result rather than throwing, so a
+ * flaky read never breaks the admin page.
+ */
+
 import { createClient } from "@/lib/supabase/server";
 import type { WebVitalName, WebVitalRating } from "./types";
 
+/** A single `"error"` event as displayed in the recent-errors list. */
 export type MonitoringErrorEvent = {
   id: string;
   createdAt: string;
@@ -15,14 +25,17 @@ export type MonitoringErrorEvent = {
   digest: string | null;
 };
 
+/** One day's error count, used to render the error trend chart. */
 export type ErrorDailyCount = { date: string; count: number };
 
+/** Aggregated error counts for the dashboard's error KPIs and trend chart. */
 export type ErrorStats = {
   daily: ErrorDailyCount[];
   last24h: number;
   last7d: number;
 };
 
+/** p75 summary for one Web Vital metric over the queried window. */
 export type WebVitalSummary = {
   name: WebVitalName;
   p75: number;
@@ -30,6 +43,7 @@ export type WebVitalSummary = {
   sampleSize: number;
 };
 
+/** A single `"timing"` event that crossed the slow-operation threshold. */
 export type SlowOperation = {
   id: string;
   createdAt: string;
@@ -38,6 +52,7 @@ export type SlowOperation = {
   path: string | null;
 };
 
+/** A single failed-login `"security"` event, decoded from its `meta` JSON. */
 export type FailedLoginAttempt = {
   id: string;
   createdAt: string;
@@ -45,12 +60,14 @@ export type FailedLoginAttempt = {
   ip: string | null;
 };
 
+/** Aggregated failed-login counts plus the most recent attempts. */
 export type FailedLoginStats = {
   last24h: number;
   last7d: number;
   recent: FailedLoginAttempt[];
 };
 
+/** A page path ranked by its TTFB p75, used for the slowest-pages list. */
 export type SlowPage = {
   path: string;
   p75: number;
@@ -69,6 +86,7 @@ const THRESHOLDS: Record<WebVitalName, { good: number; poor: number }> = {
   FCP: { good: 1800, poor: 3000 },
 };
 
+/** Buckets a metric value into "good" / "needs-improvement" / "poor". */
 function rateMetric(name: WebVitalName, value: number): WebVitalRating {
   const t = THRESHOLDS[name];
   if (value <= t.good) return "good";
@@ -76,6 +94,7 @@ function rateMetric(name: WebVitalName, value: number): WebVitalRating {
   return "poor";
 }
 
+/** Maps a raw `monitoring_events` row (snake_case) to {@link MonitoringErrorEvent}. */
 function mapErrorRow(row: {
   id: string;
   created_at: string;
@@ -100,6 +119,7 @@ function mapErrorRow(row: {
   };
 }
 
+/** Fetches the most recent `"error"` events, newest first. */
 export async function getRecentErrors(limit = 50): Promise<MonitoringErrorEvent[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -113,6 +133,7 @@ export async function getRecentErrors(limit = 50): Promise<MonitoringErrorEvent[
   return data.map(mapErrorRow);
 }
 
+/** Builds the per-day error trend and 24h/7d counts over the last `days` days. */
 export async function getErrorStats(days = 14): Promise<ErrorStats> {
   const supabase = await createClient();
   const since = new Date(Date.now() - days * DAY_MS).toISOString();
@@ -147,6 +168,10 @@ export async function getErrorStats(days = 14): Promise<ErrorStats> {
   return { daily, last24h, last7d };
 }
 
+/**
+ * Computes p75 per Web Vital metric across all pages over the last `days`
+ * days, ordered LCP, INP, CLS, TTFB, FCP. Metrics with no samples are omitted.
+ */
 export async function getWebVitalsSummary(days = 7): Promise<WebVitalSummary[]> {
   const supabase = await createClient();
   const since = new Date(Date.now() - days * DAY_MS).toISOString();
@@ -182,6 +207,7 @@ export async function getWebVitalsSummary(days = 7): Promise<WebVitalSummary[]> 
   return results;
 }
 
+/** Fetches the slowest recorded `"timing"` events, ordered by duration descending. */
 export async function getSlowOperations(limit = 30): Promise<SlowOperation[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -204,6 +230,10 @@ export async function getSlowOperations(limit = 30): Promise<SlowOperation[]> {
     }));
 }
 
+/**
+ * Ranks pages by TTFB p75 over the last `days` days, worst first, capped to
+ * the top 10.
+ */
 export async function getSlowPagesByTtfb(days = 7): Promise<SlowPage[]> {
   const supabase = await createClient();
   const since = new Date(Date.now() - days * DAY_MS).toISOString();
@@ -237,6 +267,11 @@ export async function getSlowPagesByTtfb(days = 7): Promise<SlowPage[]> {
   return pages.sort((a, b) => b.p75 - a.p75).slice(0, 10);
 }
 
+/**
+ * Fetches failed-login `"security"` events over the last `days` days:
+ * 24h/7d counts plus up to `limit` of the most recent attempts, with
+ * email/IP decoded from each event's `meta` JSON.
+ */
 export async function getFailedLogins(days = 7, limit = 30): Promise<FailedLoginStats> {
   const supabase = await createClient();
   const since = new Date(Date.now() - days * DAY_MS).toISOString();

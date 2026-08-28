@@ -1,5 +1,12 @@
 "use server";
 
+/**
+ * CRM projects: data fetching plus server actions for creating projects and
+ * updating their status/progress. Projects are the parent entity for tasks
+ * (see tasks.ts) and can be linked to an invoice. Every mutation requires
+ * `requireCrmAccess()`.
+ */
+
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { withTiming } from "@/lib/monitoring/timing";
@@ -21,6 +28,7 @@ export type CrmProject = {
   createdAt: string;
 };
 
+/** Converts a raw `crm_projects` row (snake_case) into a `CrmProject`. */
 function mapProject(row: {
   id: string;
   client_id: string;
@@ -45,6 +53,7 @@ function mapProject(row: {
   };
 }
 
+/** Fetches every project, most recently created first. */
 export async function getProjects(): Promise<CrmProject[]> {
   return withTiming("crm.getProjects", async () => {
     const supabase = await createClient();
@@ -53,12 +62,14 @@ export async function getProjects(): Promise<CrmProject[]> {
   });
 }
 
+/** Fetches a single project by id, used to refresh `ProjectDetailModal`. */
 export async function getProjectDetail(projectId: string): Promise<CrmProject | null> {
   const supabase = await createClient();
   const { data } = await supabase.from("crm_projects").select("*").eq("id", projectId).single();
   return data ? mapProject(data) : null;
 }
 
+/** `useActionState` action backing the "Nuevo proyecto" form. */
 export async function createProjectAction(
   _prevState: CrmActionState,
   formData: FormData
@@ -93,6 +104,7 @@ export async function createProjectAction(
   return { success: true };
 }
 
+/** Updates a project's status and logs the change to the client's history. */
 export async function updateProjectStatusAction(
   projectId: string,
   clientId: string,
@@ -110,6 +122,7 @@ export async function updateProjectStatusAction(
   return { success: true };
 }
 
+/** Updates a project's completion percentage (from the detail modal's slider); not logged to history. */
 export async function updateProjectProgressAction(
   projectId: string,
   progress: number

@@ -1,3 +1,10 @@
+/**
+ * Shared constants for the inactivity-timeout mechanism used across both
+ * the CRM and blog dashboards. This file holds no logic — it's the single
+ * definition of the timeout window and cookie name so the three
+ * enforcement points below can't drift out of sync with each other.
+ */
+
 // Inactivity timeout for the admin / dashboard areas. After this long with no
 // interaction the session is dropped and the user has to sign in again.
 // Enforced in three places that all read the same window:

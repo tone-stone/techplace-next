@@ -1,5 +1,12 @@
 "use server";
 
+/**
+ * CRM tasks: data fetching plus server actions for creating tasks and
+ * moving them across the kanban-style status columns in `TasksSection`.
+ * Tasks belong to a project and are not logged to client history. Every
+ * mutation requires `requireCrmAccess()`.
+ */
+
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { withTiming } from "@/lib/monitoring/timing";
@@ -19,6 +26,7 @@ export type CrmTask = {
   createdAt: string;
 };
 
+/** Converts a raw `crm_tasks` row (snake_case) into a `CrmTask`. */
 function mapTask(row: {
   id: string;
   project_id: string;
@@ -41,6 +49,7 @@ function mapTask(row: {
   };
 }
 
+/** Fetches every task across all projects, oldest first. */
 export async function getAllTasks(): Promise<CrmTask[]> {
   return withTiming("crm.getAllTasks", async () => {
     const supabase = await createClient();
@@ -49,6 +58,7 @@ export async function getAllTasks(): Promise<CrmTask[]> {
   });
 }
 
+/** `useActionState` action backing the "Nueva tarea" form. */
 export async function createTaskAction(
   _prevState: CrmActionState,
   formData: FormData
@@ -82,6 +92,7 @@ export async function createTaskAction(
   return { success: true };
 }
 
+/** Moves a task to a new kanban column (status). */
 export async function updateTaskStatusAction(taskId: string, status: TaskStatus): Promise<CrmActionState> {
   const check = await requireCrmAccess();
   if (!check.ok) return { error: check.error };

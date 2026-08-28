@@ -1,8 +1,23 @@
 "use client";
 
+/**
+ * Toggle shown only to real admins, letting them preview the dashboard as
+ * either role without actually changing their account's permissions
+ * (`DashboardClient` ignores the change unless the account is a real
+ * admin). Has a compact variant for the admin sidebar and a full-width
+ * variant for the redactor dashboard header.
+ */
+
 import { ShieldCheck, User } from "lucide-react";
 import type { DashboardRole } from "./types";
 
+/**
+ * Renders the redactor/admin toggle buttons.
+ *
+ * @param compact - Renders the condensed sidebar version (used in
+ * `AdminDashboard`) instead of the full-width header version (used in
+ * `RedactorDashboard`).
+ */
 export default function RolePreviewSwitch({
   role,
   onChange,

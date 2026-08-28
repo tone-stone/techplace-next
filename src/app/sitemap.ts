@@ -4,6 +4,11 @@ import { LEGAL_DOCS } from "@/lib/legal-docs";
 
 const BASE_URL = "https://techplacetj.com";
 
+/**
+ * Next.js file convention that generates `/sitemap.xml`. Combines the
+ * static marketing/legal routes with one entry per published blog article
+ * (fetched at build/request time) so new posts are picked up automatically.
+ */
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const articles = await getPublishedArticles();
 

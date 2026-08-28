@@ -2,6 +2,11 @@
 
 import { FaWhatsapp } from "react-icons/fa6";
 
+/**
+ * Floating action button pinned to the bottom-right corner of the viewport
+ * across the whole site, offering a one-tap link into a WhatsApp chat with
+ * TechPlace. Purely presentational — no internal state.
+ */
 export default function WhatsAppButton() {
   return (
     <a

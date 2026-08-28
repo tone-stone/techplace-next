@@ -24,6 +24,11 @@ const SOCIAL_LINKS = [
 const WATER_BACK = "M0,80C240,130,480,130,720,80C960,30,1200,30,1440,80V150H0Z";
 const WATER_FRONT = "M0,100C240,60,480,60,720,100C960,140,1200,140,1440,100V150H0Z";
 
+/**
+ * The site-wide footer: brand recap, navigation links, contact details, an
+ * embedded map, and social links, all sitting above an animated SVG "water"
+ * effect at the very bottom of the page.
+ */
 export default function Footer() {
   return (
     <footer

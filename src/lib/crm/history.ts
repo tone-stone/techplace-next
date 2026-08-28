@@ -1,5 +1,13 @@
 import type { createClient } from "@/lib/supabase/server";
 
+/**
+ * Per-client activity log shared across the CRM. Every mutation that touches
+ * a client (status changes, plans, payments, invoices, quotes, projects, or
+ * manual notes) appends a `ClientHistoryEntry` via `addHistory`, giving the
+ * client detail modal a single chronological feed of everything that
+ * happened with that account.
+ */
+
 // Not a "use server" file — see auth.ts for why: addHistory() is only ever
 // called from within other server action files.
 
@@ -24,6 +32,7 @@ export type ClientHistoryEntry = {
   createdAt: string;
 };
 
+/** Converts a raw `crm_client_history` row (snake_case) into a `ClientHistoryEntry`. */
 export function mapHistory(row: {
   id: string;
   client_id: string;
@@ -40,6 +49,13 @@ export function mapHistory(row: {
   };
 }
 
+/**
+ * Appends one entry to a client's history log. Called by the CRM action
+ * functions after a successful mutation (client, plan, payment, project,
+ * invoice, or quote change) so the client detail view stays up to date.
+ *
+ * @param supabase - Server-side Supabase client from the calling action.
+ */
 export async function addHistory(
   supabase: Awaited<ReturnType<typeof createClient>>,
   clientId: string,

@@ -1,5 +1,11 @@
 "use client";
 
+/**
+ * Full-screen modal (via `ModalPortal`) for a single quote: line items,
+ * totals, a status selector, and a "Descargar PDF" button that dynamically
+ * imports `downloadQuotePdf` so jsPDF only loads on demand.
+ */
+
 import { useEffect, useState } from "react";
 import { FileDown, Loader2, X } from "lucide-react";
 import { getQuoteDetail, updateQuoteStatusAction, type QuoteDetail, type QuoteStatus } from "@/lib/crm/quotes";
@@ -9,6 +15,7 @@ import ModalPortal from "./ModalPortal";
 
 const STATUS_OPTIONS: QuoteStatus[] = ["borrador", "enviada", "aceptada", "rechazada"];
 
+/** Portaled modal: loads the quote's detail and lets its status be updated or the PDF downloaded. */
 export default function QuoteDetailModal({
   quoteId,
   onClose,

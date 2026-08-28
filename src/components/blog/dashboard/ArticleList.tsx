@@ -1,5 +1,11 @@
 "use client";
 
+/**
+ * List of blog articles in the dashboard, shown next to `ArticleForm`.
+ * Clicking a row starts editing it; admins additionally get a delete
+ * button. Styled per `role` (indigo for redactor, purple for admin).
+ */
+
 import Image from "next/image";
 import Link from "next/link";
 import { ExternalLink, Pencil, Trash2, Video as VideoIcon } from "lucide-react";
@@ -7,6 +13,13 @@ import { CATEGORY_ICONS, formatPostDate } from "@/lib/blog-posts";
 import type { ManagedArticle } from "@/lib/blog/articles";
 import type { DashboardRole } from "./types";
 
+/**
+ * Renders the article list with status badges (draft/published), a link to
+ * the live article once published, and edit/delete actions.
+ *
+ * @param canDelete - Whether the delete button is shown; false for
+ * redactors, who can create/edit but not delete.
+ */
 export default function ArticleList({
   articles,
   editingId,

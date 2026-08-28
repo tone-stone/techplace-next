@@ -1,5 +1,13 @@
 "use client";
 
+/**
+ * Client-side shell for the CRM at `/admin`: renders the sidebar/mobile nav,
+ * tracks which section is active, and mounts the corresponding section
+ * component with the data `AdminPage` fetched server-side. Also gates the
+ * "Usuarios" nav item and section to CRM admins (`currentUserIsAdmin`),
+ * since only the general admin manages accounts.
+ */
+
 import { useState } from "react";
 import Image from "next/image";
 import {
@@ -62,6 +70,14 @@ const NAV_ITEMS: { id: Section; label: string; icon: typeof Users }[] = [
   { id: "monitoreo", label: "Monitoreo", icon: Activity },
 ];
 
+/**
+ * CRM dashboard shell: sidebar navigation, mobile header/quick-nav, and the
+ * active section's content area.
+ *
+ * @param currentUserIsAdmin - Whether the signed-in user is a CRM admin;
+ * controls visibility of the "Usuarios" section (user management is
+ * admin-only, not available to operativo).
+ */
 export default function CrmDashboard({
   email,
   userId = "",

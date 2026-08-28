@@ -1,5 +1,13 @@
 "use server";
 
+/**
+ * CRM quotes: data fetching plus server actions for creating quotes (with
+ * their line items and an auto-generated sequential folio via
+ * `insertWithSequentialNumber`) and updating status. Quotes can target
+ * either an existing CRM client or a standalone prospect entered by hand
+ * (`clientId` is nullable). Every mutation requires `requireCrmAccess()`.
+ */
+
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { withTiming } from "@/lib/monitoring/timing";
@@ -41,6 +49,7 @@ export type QuoteDetail = { quote: CrmQuote; items: QuoteItem[] };
 
 type RawLineItem = { concept: string; quantity: number; unitPrice: number };
 
+/** Converts a raw `crm_quotes` row (snake_case) into a `CrmQuote`. */
 function mapQuote(row: {
   id: string;
   number: string;
@@ -75,6 +84,7 @@ function mapQuote(row: {
   };
 }
 
+/** Converts a raw `crm_quote_items` row (snake_case) into a `QuoteItem`. */
 function mapQuoteItem(row: {
   id: string;
   quote_id: string;
@@ -93,6 +103,7 @@ function mapQuoteItem(row: {
   };
 }
 
+/** Fetches every quote, most recently created first. */
 export async function getQuotes(): Promise<CrmQuote[]> {
   return withTiming("crm.getQuotes", async () => {
     const supabase = await createClient();
@@ -101,6 +112,7 @@ export async function getQuotes(): Promise<CrmQuote[]> {
   });
 }
 
+/** Fetches a quote and its line items, used by `QuoteDetailModal` and the PDF export. */
 export async function getQuoteDetail(quoteId: string): Promise<QuoteDetail | null> {
   const supabase = await createClient();
 
@@ -114,6 +126,11 @@ export async function getQuoteDetail(quoteId: string): Promise<QuoteDetail | nul
   return { quote: mapQuote(quote), items: (items ?? []).map(mapQuoteItem) };
 }
 
+/**
+ * `useActionState` action backing the "Nueva cotización" form. Parses the
+ * `items` field (a JSON-encoded array built client-side by `QuoteFormModal`)
+ * and validates each line before computing subtotal/tax/total server-side.
+ */
 export async function createQuoteAction(
   _prevState: CrmActionState,
   formData: FormData
@@ -194,6 +211,7 @@ export async function createQuoteAction(
   return { success: true };
 }
 
+/** Updates a quote's status; logs the change to the client's history only when `clientId` is set. */
 export async function updateQuoteStatusAction(
   quoteId: string,
   clientId: string | null,

@@ -1,5 +1,12 @@
 "use client";
 
+/**
+ * Swiper carousel that renders a Facebook post per slide for the "Síguenos
+ * en redes" landing section. Split out of `RedesSociales.tsx` and loaded
+ * through `RedesCarousel.tsx`'s `next/dynamic({ ssr: false })` wrapper (see
+ * that file) to keep Swiper out of the homepage's initial bundle.
+ */
+
 import { ExternalLink } from "lucide-react";
 import { FaFacebookF } from "react-icons/fa6";
 import { Swiper, SwiperSlide } from "swiper/react";
@@ -10,6 +17,7 @@ import "swiper/css";
 import "swiper/css/pagination";
 import "swiper/css/navigation";
 
+/** Formats an ISO timestamp as a long-form Spanish (es-MX) date. */
 function formatPostDate(timestamp: string): string {
   return new Date(timestamp).toLocaleDateString("es-MX", {
     day: "numeric",
@@ -18,6 +26,7 @@ function formatPostDate(timestamp: string): string {
   });
 }
 
+/** Truncates post text to `max` characters, appending an ellipsis if cut. */
 function excerpt(text: string | null, max = 140): string {
   if (!text) return "";
   return text.length > max ? `${text.slice(0, max).trimEnd()}…` : text;
@@ -27,6 +36,7 @@ function excerpt(text: string | null, max = 140): string {
 // (scontent-*.fbcdn.net), so allowlisting them for next/image isn't practical
 // — Meta already serves these pre-optimized, so a plain <img> is the right
 // call here rather than double-processing them.
+/** Single Facebook post rendered as a clickable card linking to the post. */
 function PostCard({ post }: { post: SocialPost }) {
   return (
     <a
@@ -51,7 +61,7 @@ function PostCard({ post }: { post: SocialPost }) {
       </div>
 
       <div className="flex flex-1 flex-col p-5">
-        <p className="mb-3 flex-1 text-sm text-gray-300">{excerpt(post.message)}</p>
+        <p className="mb-3 flex-1 text-sm text-gray-300 text-justify">{excerpt(post.message)}</p>
         <div className="flex items-center justify-between text-xs text-gray-400">
           <span>{formatPostDate(post.timestamp)}</span>
           <span className="inline-flex items-center gap-1 font-semibold text-brand-blue group-hover:underline">
@@ -66,6 +76,12 @@ function PostCard({ post }: { post: SocialPost }) {
 // Split out of RedesSociales.tsx and loaded via next/dynamic({ ssr: false })
 // from RedesCarousel.tsx so Swiper's JS/CSS isn't part of the homepage's
 // initial bundle — same treatment as PortafolioCarousel.
+/**
+ * Renders one `PostCard` slide per Facebook post. Loops only when there are
+ * enough posts (>2) for Swiper's loop mode to work correctly.
+ *
+ * @param posts - Facebook posts to render as slides.
+ */
 export default function RedesCarouselSwiper({ posts }: { posts: SocialPost[] }) {
   return (
     <div className="relative">

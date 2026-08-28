@@ -1,5 +1,13 @@
 "use client";
 
+/**
+ * Drag-and-drop / click-to-browse picker for an article's extra photo
+ * gallery, used inside `ArticleForm`. Enforces the gallery size limits from
+ * `media-limits.ts`, previews newly picked files via object URLs, and lets
+ * the user remove either a newly added file or a previously saved gallery
+ * image.
+ */
+
 import { useEffect, useRef, useState } from "react";
 import { ImagePlus, X } from "lucide-react";
 import { formatBytes, MAX_GALLERY_IMAGES, MAX_IMAGE_BYTES } from "@/lib/blog/media-limits";
@@ -12,6 +20,14 @@ type GalleryDropzoneProps = {
   onRemoveExisting: (url: string) => void;
 };
 
+/**
+ * Renders the dropzone plus a thumbnail grid combining already-saved
+ * gallery images (`existingUrls`) and newly picked files (`files`), each
+ * removable independently.
+ *
+ * @param onRemoveExisting - Called when a previously saved gallery image is
+ * removed; new files are removed locally via `onFilesChange` instead.
+ */
 export default function GalleryDropzone({
   files,
   existingUrls,

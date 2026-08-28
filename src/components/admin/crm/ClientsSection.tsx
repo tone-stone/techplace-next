@@ -1,5 +1,11 @@
 "use client";
 
+/**
+ * "Clientes" tab: a filterable/searchable client list with an inline
+ * "Nuevo cliente" form, and an entry point into `ClientDetailModal` for
+ * plans, payments, and history.
+ */
+
 import { useActionState, useMemo, useState } from "react";
 import { Mail, Phone, Plus, Search } from "lucide-react";
 import { createClientAction, type ClientStatus, type CrmActionState, type CrmClient } from "@/lib/crm/clients";
@@ -14,6 +20,7 @@ const FILTERS: { id: ClientStatus | "todos"; label: string }[] = [
   { id: "inactivo", label: "Inactivos" },
 ];
 
+/** Renders the client list with status filters, search, and the "new client" form. */
 export default function ClientsSection({ clients }: { clients: CrmClient[] }) {
   const [filter, setFilter] = useState<ClientStatus | "todos">("todos");
   const [query, setQuery] = useState("");
@@ -118,6 +125,7 @@ export default function ClientsSection({ clients }: { clients: CrmClient[] }) {
   );
 }
 
+/** Inline form for `createClientAction`; calls `onDone` on success to collapse itself. */
 function NewClientForm({ onDone }: { onDone: () => void }) {
   const [state, formAction] = useActionState<CrmActionState, FormData>(async (prevState, formData) => {
     const result = await createClientAction(prevState, formData);

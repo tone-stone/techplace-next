@@ -1,3 +1,10 @@
+/**
+ * Sign-in page for the blog/CMS portal at `/blog/login`. Redirects an
+ * already-authenticated user straight to their dashboard (blog staff to
+ * `/blog/dashboard`, anyone else to `/admin`) instead of showing the form,
+ * and otherwise renders the branded split-screen login layout around the
+ * shared `LoginForm`.
+ */
 import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -19,6 +26,13 @@ const FEATURES = [
   { icon: Users, text: "Acceso exclusivo para el equipo de contenido" },
 ];
 
+/**
+ * Renders the blog portal's login screen, or redirects away if the visitor
+ * is already signed in.
+ *
+ * @param searchParams - May carry `expired=1` after an idle-timeout logout,
+ * shown as a banner prompting the user to sign in again.
+ */
 export default async function BlogLoginPage({
   searchParams,
 }: {

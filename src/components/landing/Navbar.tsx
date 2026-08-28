@@ -6,6 +6,12 @@ import { usePathname } from "next/navigation";
 import { ChevronDown, LogIn, Menu, PenSquare, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
+/**
+ * Fixed, floating pill navbar shown on every page. Tracks scroll position to
+ * swap its light/dark background and to auto-hide on mobile while scrolling,
+ * highlights the in-view landing section via IntersectionObserver, and hosts
+ * a desktop dropdown / full-screen mobile menu for the Blog submenu.
+ */
 const NAV_LINKS = [
   { href: "/#home", label: "Inicio" },
   { href: "/#servicios", label: "Servicios" },
@@ -22,6 +28,7 @@ const NAV_LINKS = [
   { href: "/#contacto", label: "Contacto" },
 ];
 
+/** Site-wide navigation bar: logo, section links, Blog dropdown, and mobile menu. */
 export default function Navbar() {
   const pathname = usePathname();
   const [scrolled, setScrolled] = useState(false);
@@ -29,12 +36,30 @@ export default function Navbar() {
   const [active, setActive] = useState("home");
   const [blogMenuOpen, setBlogMenuOpen] = useState(false);
   const blogMenuRef = useRef<HTMLDivElement>(null);
+  // Mobile only (forced back to visible at md: — see the nav's className):
+  // hidden while actively scrolling in either direction, shown again once
+  // scrolling settles. Keeps the bar out of the way while reading/scrolling
+  // through a long page on a small screen, without permanently losing it.
+  const [navHidden, setNavHidden] = useState(false);
+  const hideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 30);
-    window.addEventListener("scroll", onScroll);
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
+    const onScroll = () => {
+      const y = window.scrollY;
+      setScrolled(y > 30);
+
+      if (!menuOpen) {
+        setNavHidden(y > 30);
+        if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current);
+        hideTimeoutRef.current = setTimeout(() => setNavHidden(false), 350);
+      }
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current);
+    };
+  }, [menuOpen]);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -93,10 +118,15 @@ export default function Navbar() {
 
   return (
     <nav className="fixed z-50 top-2 inset-x-2 sm:top-3 sm:inset-x-3 md:top-4 md:inset-x-6 lg:left-1/2 lg:right-auto lg:-translate-x-1/2 lg:w-full lg:max-w-6xl">
+      {/* The hide-on-scroll transform lives on this pill, not on <nav> itself:
+          any element with a `transform` becomes the containing block for its
+          `position: fixed` descendants — putting it on <nav> shrank the
+          full-screen mobile menu overlay down to the pill's own box instead
+          of the viewport, since the overlay is a fixed-position child of nav. */}
       <div
-        className={`relative z-50 shadow-lg rounded-2xl md:rounded-full md:backdrop-blur-md transition-all duration-300 ${
-          scrolled ? "tp-navbar-bg-dark" : "tp-navbar-bg-light"
-        }`}
+        className={`relative z-50 shadow-lg rounded-2xl md:rounded-full md:backdrop-blur-md transition-all duration-300 ease-out md:translate-y-0! ${
+          navHidden ? "-translate-y-24" : "translate-y-0"
+        } ${scrolled ? "tp-navbar-bg-dark" : "tp-navbar-bg-light"}`}
       >
       <div className="max-w-7xl mx-auto flex items-center justify-between px-6 py-3">
         <Link href="/#home" className="flex items-center gap-3">
@@ -203,49 +233,60 @@ export default function Navbar() {
 
       {menuOpen && (
         <div
-          onClick={(e) => {
-            if (e.target === e.currentTarget) closeMenu();
-          }}
-          className="tp-menu-overlay-in fixed inset-0 z-40 md:hidden flex flex-col items-center justify-center gap-7 overflow-y-auto overscroll-contain text-xl font-semibold bg-[#0a0a18]/95"
+          className="tp-menu-overlay-in fixed inset-0 z-40 md:hidden overflow-y-auto overscroll-contain bg-[#0a0a18]/95"
         >
-          {NAV_LINKS.map((link, i) => (
-            <div key={link.href} className="flex flex-col items-center gap-4">
-              <Link
-                href={link.href}
-                onClick={closeMenu}
-                style={{ animationDelay: `${0.05 * i}s` }}
-                className={`touch-manipulation tp-menu-link-in tp-nav-link-underline tp-mobile-nav-link${
-                  isActive(link.href) ? " active" : ""
-                }`}
-              >
-                {link.label}
-              </Link>
-              {link.children?.map((child) => (
+          {/* `min-h-full` (not the outer div's own `flex justify-center`) does
+              the centering: a flex container with `justify-content: center`
+              can't be scrolled to reach content that overflows past its
+              start edge — with enough links open (6 + the Blog submenu +
+              Entrar) that's exactly what happened, some links became
+              unreachable. This still centers short content but lets tall
+              content scroll normally from the top instead. */}
+          <div
+            onClick={(e) => {
+              if (e.target === e.currentTarget) closeMenu();
+            }}
+            className="flex min-h-full w-full flex-col items-center justify-center gap-7 py-10 text-xl font-semibold"
+          >
+            {NAV_LINKS.map((link, i) => (
+              <div key={link.href} className="flex flex-col items-center gap-4">
                 <Link
-                  key={child.href}
-                  href={child.href}
+                  href={link.href}
                   onClick={closeMenu}
                   style={{ animationDelay: `${0.05 * i}s` }}
-                  className="touch-manipulation tp-menu-link-in flex items-center gap-1.5 rounded-lg px-3 py-2 text-base font-normal text-gray-400 hover:text-brand-blue transition-colors"
+                  className={`touch-manipulation tp-menu-link-in tp-nav-link-underline tp-mobile-nav-link${
+                    isActive(link.href) ? " active" : ""
+                  }`}
                 >
-                  {child.href === "/blog/login" && <PenSquare className="h-3.5 w-3.5" />}
-                  {child.label}
+                  {link.label}
                 </Link>
-              ))}
-            </div>
-          ))}
-          <div
-            style={{ animationDelay: `${0.05 * NAV_LINKS.length}s` }}
-            className="tp-menu-link-in"
-          >
-            <Link
-              href="/login"
-              onClick={closeMenu}
-              className="tp-btn-animated inline-flex items-center gap-1.5 rounded-full px-6 py-3 text-lg font-bold text-white shadow-lg transition-transform active:scale-95"
+                {link.children?.map((child) => (
+                  <Link
+                    key={child.href}
+                    href={child.href}
+                    onClick={closeMenu}
+                    style={{ animationDelay: `${0.05 * i}s` }}
+                    className="touch-manipulation tp-menu-link-in flex items-center gap-1.5 rounded-lg px-3 py-2 text-base font-normal text-gray-400 hover:text-brand-blue transition-colors"
+                  >
+                    {child.href === "/blog/login" && <PenSquare className="h-3.5 w-3.5" />}
+                    {child.label}
+                  </Link>
+                ))}
+              </div>
+            ))}
+            <div
+              style={{ animationDelay: `${0.05 * NAV_LINKS.length}s` }}
+              className="tp-menu-link-in"
             >
-              <LogIn className="h-5 w-5" />
-              Entrar
-            </Link>
+              <Link
+                href="/login"
+                onClick={closeMenu}
+                className="tp-btn-animated inline-flex items-center gap-1.5 rounded-full px-6 py-3 text-lg font-bold text-white shadow-lg transition-transform active:scale-95"
+              >
+                <LogIn className="h-5 w-5" />
+                Entrar
+              </Link>
+            </div>
           </div>
         </div>
       )}

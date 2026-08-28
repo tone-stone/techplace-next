@@ -1,3 +1,7 @@
+/**
+ * `/legal` index page: lists every document in `LEGAL_DOCS` as a card
+ * linking to its `/legal/[slug]` page.
+ */
 import type { Metadata } from "next";
 import Link from "next/link";
 import { FileText } from "lucide-react";

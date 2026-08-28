@@ -1,5 +1,10 @@
 "use client";
 
+/**
+ * "Cotizaciones" tab: a quotes table (rows open `QuoteDetailModal`) plus the
+ * "Nueva cotización" entry point into `QuoteFormModal`.
+ */
+
 import { useState } from "react";
 import { Plus } from "lucide-react";
 import { formatCurrencyMXN } from "@/lib/crm/format";
@@ -16,6 +21,7 @@ function urgencyBadgeClass(urgency: ReturnType<typeof getDueDateUrgency>) {
   return "border-emerald-400/30 bg-emerald-500/10 text-emerald-300";
 }
 
+/** Renders the quotes table and manages the new-quote and quote-detail modals. */
 export default function QuotesSection({
   quotes,
   clients,

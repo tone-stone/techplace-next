@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { ReactNode } from "react";
 import { ChevronDown } from "lucide-react";
 
+/** One collapsible row of the accordion: a title/icon header plus its expandable body content. */
 export type AccordionItem = {
   id: string;
   title: string;
@@ -11,10 +12,14 @@ export type AccordionItem = {
   body: ReactNode;
 };
 
-// Mobile-only (`sm:hidden` from the caller). On phones the card grids collapse
-// to a single column, which turns each section into a long vertical scroll;
-// this shows the same content as a one-open-at-a-time accordion instead.
-// Desktop keeps rendering the original grid (`hidden sm:grid`).
+/**
+ * Mobile-only (`sm:hidden` from the caller). On phones the card grids collapse
+ * to a single column, which turns each section into a long vertical scroll;
+ * this shows the same content as a one-open-at-a-time accordion instead.
+ * Desktop keeps rendering the original grid (`hidden sm:grid`).
+ *
+ * @param items - The accordion rows to render, in order.
+ */
 export default function MobileAccordion({
   items,
   className = "",

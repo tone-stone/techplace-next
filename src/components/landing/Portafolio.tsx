@@ -8,6 +8,12 @@ import { ChevronLeft, ChevronRight, ExternalLink, X } from "lucide-react";
 import { FaFacebookF, FaGithub, FaLinkedinIn, FaWhatsapp } from "react-icons/fa6";
 import Reveal from "./Reveal";
 
+/**
+ * Landing section (`#portafolio`) presenting past projects in a carousel
+ * (loaded on the client only, see `PortafolioCarousel` below) plus a
+ * lightbox-style modal for viewing a selected project's full details, with
+ * keyboard (arrow/escape) and swipe navigation between projects.
+ */
 const PortafolioCarousel = dynamic(() => import("./PortafolioCarousel"), {
   ssr: false,
   loading: () => (
@@ -95,6 +101,7 @@ const SOCIAL_LINKS = [
   { href: "https://github.com/tone-stone", icon: FaGithub, label: "GitHub" },
 ];
 
+/** Portfolio grid section with project carousel and detail modal. */
 export default function Portafolio() {
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -149,7 +156,7 @@ export default function Portafolio() {
           </h2>
         </Reveal>
         <Reveal delay={0.05}>
-          <p className="max-w-2xl mx-auto text-gray-300 text-lg font-light mb-10">
+          <p className="max-w-2xl mx-auto text-gray-300 text-lg font-light mb-10 text-justify">
             Plataformas y sistemas en producción. Despachos, restaurantes, medios
             y startups que han confiado su presencia digital a TechPlace.
           </p>

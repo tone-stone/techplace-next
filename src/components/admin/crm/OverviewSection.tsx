@@ -15,9 +15,18 @@ import { formatCurrencyMXN } from "@/lib/crm/format";
 import type { CrmProject } from "@/lib/crm/projects";
 import StatusBadge from "./StatusBadge";
 
+/**
+ * "Resumen" tab: the CRM's dashboard-at-a-glance. Derives KPI tiles, a
+ * 6-month revenue chart, client/project funnel bar lists, a collections
+ * breakdown, and an upcoming-deliveries list — all computed client-side from
+ * the already-fetched `clients`/`projects`/`payments` props (no extra
+ * requests). All charts are hand-rolled inline SVG, not a charting library.
+ */
+
 // Dark surface the charts are drawn on — used for the end-dot's surface ring.
 const SURFACE = "#0e1420";
 
+/** Compact peso formatting for chart labels (e.g. `$1.2M`, `$40k`), unlike the full `formatCurrencyMXN`. */
 function compactMXN(value: number): string {
   if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
   if (value >= 1_000) return `$${Math.round(value / 1_000)}k`;
@@ -37,6 +46,7 @@ type Stat = {
   glow: string;
 };
 
+/** Grid of the top KPI cards (active clients, active projects, revenue this month, pending). */
 function StatTiles({ stats }: { stats: Stat[] }) {
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -68,6 +78,7 @@ function StatTiles({ stats }: { stats: Stat[] }) {
 /*  Revenue area chart (6 months, single series)                      */
 /* ------------------------------------------------------------------ */
 
+/** Hand-drawn SVG area/line chart of monthly collected revenue, with a labeled endpoint. */
 function RevenueChart({ data }: { data: { label: string; value: number }[] }) {
   const W = 560;
   const H = 170;
@@ -193,6 +204,7 @@ function RevenueChart({ data }: { data: { label: string; value: number }[] }) {
 /*  Horizontal ordinal bar list                                       */
 /* ------------------------------------------------------------------ */
 
+/** Horizontal bar list used for the client funnel and project-stage breakdowns. */
 function BarList({ rows }: { rows: { label: string; value: number; bar: string }[] }) {
   const max = Math.max(1, ...rows.map((r) => r.value));
   return (
@@ -219,6 +231,7 @@ function BarList({ rows }: { rows: { label: string; value: number; bar: string }
 /*  Section                                                            */
 /* ------------------------------------------------------------------ */
 
+/** Renders the full overview dashboard: KPI tiles, revenue chart, funnels, collections, and upcoming deliveries. */
 export default function OverviewSection({
   clients,
   projects,

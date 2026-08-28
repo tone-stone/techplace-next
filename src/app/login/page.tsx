@@ -8,6 +8,12 @@ import { canAccessCrm, type ProfileRole } from "@/lib/auth/roles";
 import LoginFooter from "@/components/auth/LoginFooter";
 import LoginForm from "./LoginForm";
 
+/**
+ * CRM login page (`/login`). Redirects an already-authenticated user
+ * straight to their correct portal rather than showing the login form, and
+ * renders the `?expired=1` notice from the inactivity-timeout flow.
+ */
+
 export const metadata: Metadata = {
   title: "Panel de Administración | TechPlace",
   description:
@@ -20,6 +26,10 @@ const FEATURES = [
   { icon: Receipt, text: "Cotizaciones, facturación y cobranza" },
 ];
 
+/**
+ * Server component for the CRM login screen.
+ * @param searchParams `expired=1` shows the inactivity-timeout notice (set by proxy.ts / IdleTimeout.tsx's logout redirect).
+ */
 export default async function LoginPage({
   searchParams,
 }: {

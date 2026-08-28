@@ -1,3 +1,9 @@
+/**
+ * Purely decorative full-page background: a handful of large, softly
+ * blurred color blobs that slowly drift via CSS keyframe animation. Sits
+ * behind the rest of the landing page content to give it an "aurora" glow;
+ * marked `aria-hidden` since it carries no information.
+ */
 export default function Aurora() {
   return (
     <div className="tp-aurora" aria-hidden>

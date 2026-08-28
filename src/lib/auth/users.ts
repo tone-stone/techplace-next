@@ -1,10 +1,19 @@
 "use server";
 
+/**
+ * Server actions for account management (list/create/update/delete) used by
+ * both the CRM's Usuarios tab and the blog CMS's own Usuarios panel. Access
+ * is gated by `requireUserManager()` below: only CRM admin and blog admin
+ * can manage accounts, and a caller's `scope` ("all" vs "blog") bounds which
+ * accounts they're allowed to touch.
+ */
+
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { withTiming } from "@/lib/monitoring/timing";
 import { isBlogAdmin, isCrmAdmin, type ProfileRole, type Role, type Team } from "@/lib/auth/roles";
 
+/** A user as shown/edited in the account management UI. */
 export type ManagedUser = {
   id: string;
   name: string;
@@ -21,6 +30,7 @@ const VALID_COMBOS: Record<Team, Role[]> = {
   blog: ["admin", "redactor"],
 };
 
+/** Validates and extracts `team`/`role` from a create/update form submission. */
 function parseTeamRole(formData: FormData): { team: Team; role: Role } | { error: string } {
   const team = String(formData.get("team") ?? "") as Team;
   const role = String(formData.get("role") ?? "") as Role;
@@ -33,6 +43,12 @@ function parseTeamRole(formData: FormData): { team: Team; role: Role } | { error
 // CRM admin manages every account (it's the app's general admin). Blog admin
 // manages only its own team's accounts — it can't reach into or promote
 // someone into the CRM.
+/**
+ * Authenticates the caller and resolves their user-management scope.
+ * @returns `{ ok: false, error }` if unauthenticated or not a manager;
+ * otherwise `{ ok: true, userId, scope }` where `scope` is `"all"` for CRM
+ * admin or `"blog"` for blog admin.
+ */
 async function requireUserManager() {
   const supabase = await createClient();
   const {
@@ -55,10 +71,16 @@ async function requireUserManager() {
 // it — even the CRM general admin, browsing user management from inside the
 // blog dashboard, shouldn't be able to reach into the CRM from there. That
 // capability already exists in its own place: the CRM's Usuarios tab.
+/** Narrows a caller's scope to "blog" when the panel calling in is blog-only. */
 function resolveScope(callerScope: "all" | "blog", blogOnly: boolean): "all" | "blog" {
   return blogOnly ? "blog" : callerScope;
 }
 
+/**
+ * Lists managed accounts, merging Supabase auth users with their `profiles`
+ * team/role.
+ * @param opts.blogOnly - Force blog-only scope, for the blog CMS's Usuarios panel.
+ */
 export async function listUsers(opts?: { blogOnly?: boolean }): Promise<{ users: ManagedUser[] } | { error: string }> {
   const check = await requireUserManager();
   if (!check.ok) return { error: check.error };
@@ -97,6 +119,7 @@ export async function listUsers(opts?: { blogOnly?: boolean }): Promise<{ users:
   return { users };
 }
 
+/** Creates a new account (Supabase auth user + profile team/role). Form action. */
 export async function createUserAction(_prevState: UsersActionState, formData: FormData): Promise<UsersActionState> {
   const check = await requireUserManager();
   if (!check.ok) return { error: check.error };
@@ -140,6 +163,11 @@ export async function createUserAction(_prevState: UsersActionState, formData: F
   return { success: true };
 }
 
+/**
+ * Updates an existing account's auth credentials and profile team/role. Form
+ * action. A manager editing their own account keeps their existing
+ * team/role — the form can't self-promote or self-demote.
+ */
 export async function updateUserAction(_prevState: UsersActionState, formData: FormData): Promise<UsersActionState> {
   const check = await requireUserManager();
   if (!check.ok) return { error: check.error };
@@ -191,6 +219,10 @@ export async function updateUserAction(_prevState: UsersActionState, formData: F
   return { success: true };
 }
 
+/**
+ * Deletes an account. A manager can't delete their own account.
+ * @param opts.blogOnly - Force blog-only scope, for the blog CMS's Usuarios panel.
+ */
 export async function deleteUserAction(id: string, opts?: { blogOnly?: boolean }): Promise<UsersActionState> {
   const check = await requireUserManager();
   if (!check.ok) return { error: check.error };

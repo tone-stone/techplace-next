@@ -1,4 +1,5 @@
 import Image from "next/image";
+import { Sparkles, Target } from "lucide-react";
 import Reveal from "./Reveal";
 import MobileAccordion from "./MobileAccordion";
 
@@ -78,6 +79,11 @@ const CULTURA = [
   "Seguridad desde el inicio",
 ];
 
+/**
+ * The "¿Quiénes Somos?" section (`#nosotros`): company intro copy, a grid of
+ * specialty areas (accordion on mobile), and a two-column mission/culture
+ * summary alongside the brand image.
+ */
 export default function Nosotros() {
   return (
     <section
@@ -127,36 +133,51 @@ export default function Nosotros() {
           }))}
         />
 
-        <div className="flex flex-col md:flex-row items-center justify-center gap-10">
-          <Reveal className="text-left max-w-lg" y={0}>
-            <h4 className="text-2xl font-bold text-white mb-2">Nuestra Misión</h4>
-            <p className="text-gray-300 mb-4 text-justify">
-              Impulsar el crecimiento de organizaciones y personas mediante{" "}
-              <span className="text-purple-400 font-semibold">inteligencia artificial</span>,{" "}
-              <span className="text-purple-400 font-semibold">tecnología de vanguardia</span> y{" "}
-              <span className="text-purple-400 font-semibold">protección digital</span>, entregando
-              soluciones seguras, eficientes y con estándares de calidad empresarial.
-            </p>
-            <h4 className="text-2xl font-bold text-white mt-6 mb-2">Cultura TechPlace</h4>
-            <ul className="text-gray-400 space-y-1 text-base ml-4 list-disc">
-              {CULTURA.map((item) => (
-                <li
-                  key={item}
-                  className="hover:translate-x-2 hover:text-purple-400 transition-all duration-200"
-                >
-                  {item}
-                </li>
-              ))}
-            </ul>
+        <Reveal className="mb-10 flex justify-center" y={0}>
+          <Image
+            src="/img/logos/techplace-brand.webp"
+            alt="TechPlace — desarrollo web, apps y ciberseguridad en Tijuana"
+            width={288}
+            height={288}
+            className="tp-branding-img w-48 h-auto sm:w-56 md:w-64"
+          />
+        </Reveal>
+
+        <div className="grid gap-6 md:grid-cols-2 items-stretch">
+          <Reveal y={0}>
+            <div className="tp-glass tp-glass-hover flex h-full flex-col rounded-2xl p-8 text-left">
+              <span className="mb-4 inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-purple-400/25 bg-purple-500/15">
+                <Target className="h-6 w-6 text-purple-300" strokeWidth={1.75} />
+              </span>
+              <h3 className="text-2xl font-bold text-white mb-3">Nuestra Misión</h3>
+              <p className="text-gray-300 text-justify leading-relaxed">
+                Impulsar el crecimiento de organizaciones y personas mediante{" "}
+                <span className="text-purple-400 font-semibold">inteligencia artificial</span>,{" "}
+                <span className="text-purple-400 font-semibold">tecnología de vanguardia</span> y{" "}
+                <span className="text-purple-400 font-semibold">protección digital</span>, entregando
+                soluciones seguras, eficientes y con estándares de calidad empresarial.
+              </p>
+            </div>
           </Reveal>
-          <Reveal className="w-full md:w-72" delay={0.15} y={0}>
-            <Image
-              src="/img/logos/techplace-brand.webp"
-              alt="TechPlace — desarrollo web, apps y ciberseguridad en Tijuana"
-              width={288}
-              height={288}
-              className="tp-branding-img w-full h-auto"
-            />
+
+          <Reveal delay={0.1} y={0}>
+            <div className="tp-glass tp-glass-hover flex h-full flex-col rounded-2xl p-8 text-left">
+              <span className="mb-4 inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-indigo-400/25 bg-indigo-500/15">
+                <Sparkles className="h-6 w-6 text-indigo-300" strokeWidth={1.75} />
+              </span>
+              <h3 className="text-2xl font-bold text-white mb-4">Cultura TechPlace</h3>
+              <div className="flex flex-wrap gap-2.5">
+                {CULTURA.map((item) => (
+                  <span
+                    key={item}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3.5 py-2 text-sm text-gray-300 transition-colors duration-200 hover:border-indigo-400/40 hover:text-indigo-300"
+                  >
+                    <Sparkles className="h-3.5 w-3.5 text-indigo-400" />
+                    {item}
+                  </span>
+                ))}
+              </div>
+            </div>
           </Reveal>
         </div>
       </div>

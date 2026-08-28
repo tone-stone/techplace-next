@@ -1,9 +1,22 @@
 "use client";
 
+/**
+ * Renders an article's extra photo gallery as a responsive thumbnail grid
+ * that opens into a full-screen lightbox with keyboard (arrow keys, Escape)
+ * and click navigation between photos.
+ */
+
 import { useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import FitImage from "./FitImage";
 
+/**
+ * Displays the gallery grid and, when a thumbnail is selected, a modal
+ * lightbox for browsing the full set of photos.
+ *
+ * @param urls - Gallery image URLs for the current article, in display
+ * order.
+ */
 export default function PostGallery({ urls }: { urls: string[] }) {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
 

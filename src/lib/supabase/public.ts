@@ -1,6 +1,12 @@
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 
 /**
+ * One of four Supabase client factories in this directory, each scoped to a
+ * different execution context — see client.ts (browser), server.ts (server
+ * component/action, cookie-bound), admin.ts (service-role) for the others.
+ */
+
+/**
  * Anon-key client for public, unauthenticated reads (published articles) that
  * doesn't touch `cookies()`. The cookie-bound client in `server.ts` is a
  * Request-time API — using it anywhere in a page forces that whole route to

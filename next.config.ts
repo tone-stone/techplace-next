@@ -45,9 +45,16 @@ const nextConfig: NextConfig = {
     // src/lib/cloudinary.ts), Supabase for auth/API, Facebook's CDN for the
     // social carousel's plain <img> posts (no live FB/IG iframe embed), and
     // a Google Maps iframe in the footer. No third-party scripts, no eval —
-    // script-src doesn't need 'unsafe-inline'/'unsafe-eval'. style-src does,
-    // for the inline style={{...}} props used across the UI (animation
-    // delays, hand-rolled SVG charts).
+    // but script-src DOES need 'unsafe-inline': Next.js itself injects inline
+    // <script> tags to stream RSC payload data for hydration (independent of
+    // whether the app's own code has inline scripts), and without a nonce
+    // (which forces every page into dynamic rendering, killing static
+    // generation/ISR — a real cost not worth it for this site) Next's own
+    // docs list 'unsafe-inline' as the required default. Confirmed the hard
+    // way: blocking it silently broke hydration in production (dead navbar,
+    // dead hamburger menu, React error #412) even though the build and every
+    // curl-level check looked fine. style-src needs 'unsafe-inline' too, for
+    // the inline style={{...}} props used across the UI.
     //
     // CSP only applies to the production build: `next dev`/Turbopack's HMR
     // client relies on `eval()` to run updated chunks, which a `script-src`
@@ -66,7 +73,7 @@ const nextConfig: NextConfig = {
     if (process.env.NODE_ENV === "production") {
       const csp = [
         "default-src 'self'",
-        "script-src 'self'",
+        "script-src 'self' 'unsafe-inline'",
         "style-src 'self' 'unsafe-inline'",
         `img-src 'self' data: https://res.cloudinary.com https://*.fbcdn.net${
           supabaseHostname ? ` https://${supabaseHostname}` : ""

@@ -1,4 +1,12 @@
 import type { Metadata } from "next";
+
+/**
+ * Server-rendered entry point for the CRM at `/admin`. Resolves the current
+ * user's admin status, fetches every dataset the dashboard needs (clients,
+ * payments, projects, invoices, quotes, tasks, users, and monitoring stats)
+ * in parallel, and hands it all off to the client-side `CrmDashboard` shell.
+ */
+
 import { createClient } from "@/lib/supabase/server";
 import { listUsers } from "@/lib/auth/users";
 import { getAllPayments, getClients } from "@/lib/crm/clients";
@@ -21,6 +29,7 @@ export const metadata: Metadata = {
   title: "CRM | TechPlace",
 };
 
+/** CRM page (RSC): loads all dashboard data server-side and renders `CrmDashboard`. */
 export default async function AdminPage() {
   const supabase = await createClient();
   const {

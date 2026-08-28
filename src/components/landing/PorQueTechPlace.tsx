@@ -30,6 +30,7 @@ const RAZONES = [
   },
 ];
 
+// Renders one RAZONES entry's inline SVG icon, including its optional extra shapes.
 function RazonIcon({ razon }: { razon: (typeof RAZONES)[number] }) {
   return (
     <svg fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
@@ -40,6 +41,11 @@ function RazonIcon({ razon }: { razon: (typeof RAZONES)[number] }) {
   );
 }
 
+/**
+ * The "¿Por qué elegir TechPlace?" section (`#porque-techplace`): a grid of
+ * differentiators (accordion on mobile) followed by a closing call to
+ * action.
+ */
 export default function PorQueTechPlace() {
   return (
     <section

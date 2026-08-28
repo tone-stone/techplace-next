@@ -1,5 +1,12 @@
 "use client";
 
+/**
+ * Drag-and-drop / click-to-browse picker for a single cover image or video,
+ * used inside `ArticleForm`. Enforces the size limit from `media-limits.ts`
+ * for the given `kind` and previews the picked file (or the existing saved
+ * media when editing and nothing new has been picked yet).
+ */
+
 import { useEffect, useMemo, useRef, useState } from "react";
 import { UploadCloud, X } from "lucide-react";
 import { formatBytes, MAX_IMAGE_BYTES, MAX_VIDEO_BYTES } from "@/lib/blog/media-limits";
@@ -13,6 +20,13 @@ type MediaDropzoneProps = {
   onChange: (file: File | null) => void;
 };
 
+/**
+ * Renders the dropzone and, once a file is picked (or an `existingUrl` is
+ * set), a preview of the image or video.
+ *
+ * @param existingUrl - Previously saved media URL to preview when editing
+ * an article and no new file has been picked yet.
+ */
 export default function MediaDropzone({
   label,
   accept,

@@ -1,3 +1,10 @@
+/**
+ * Root layout for the whole site. Loads the Geist/Geist Mono/Orbitron fonts
+ * and the base site metadata (title, description, keywords, Open Graph and
+ * Twitter cards), then mounts `MonitoringClient` inside `<body>` so
+ * site-wide error and Web Vitals reporting is active on every route before
+ * `children` renders.
+ */
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Orbitron } from "next/font/google";
 import MonitoringClient from "@/components/monitoring/MonitoringClient";
@@ -63,6 +70,7 @@ export const metadata: Metadata = {
   },
 };
 
+/** Wraps every page with the shared `<html>`/`<body>` shell, site fonts, and the monitoring client. */
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html

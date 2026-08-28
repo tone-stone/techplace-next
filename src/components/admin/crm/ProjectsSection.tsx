@@ -1,5 +1,11 @@
 "use client";
 
+/**
+ * "Proyectos" tab: a card grid of projects with progress bars and an inline
+ * "Nuevo proyecto" form, opening `ProjectDetailModal` for status/progress
+ * updates.
+ */
+
 import { useActionState, useState } from "react";
 import { Calendar, Plus } from "lucide-react";
 import { formatCurrencyMXN } from "@/lib/crm/format";
@@ -8,6 +14,7 @@ import type { CrmActionState, CrmClient } from "@/lib/crm/clients";
 import StatusBadge from "./StatusBadge";
 import ProjectDetailModal from "./ProjectDetailModal";
 
+/** Renders the project card grid and the "new project" form. */
 export default function ProjectsSection({
   projects,
   clients,
@@ -82,6 +89,7 @@ export default function ProjectsSection({
   );
 }
 
+/** Inline form for `createProjectAction`; calls `onDone` on success to collapse itself. */
 function NewProjectForm({ clients, onDone }: { clients: CrmClient[]; onDone: () => void }) {
   const [state, formAction] = useActionState<CrmActionState, FormData>(async (prevState, formData) => {
     const result = await createProjectAction(prevState, formData);

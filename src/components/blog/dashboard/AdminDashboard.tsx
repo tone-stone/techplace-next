@@ -1,5 +1,13 @@
 "use client";
 
+/**
+ * Full admin view of the blog dashboard: sidebar navigation between
+ * Artículos/Usuarios/Actividad sections, article create/edit/delete, the
+ * blog-scoped user management panel (`UserManagement` with `scope="blog"`),
+ * and the activity log. Rendered by `DashboardClient` for accounts with
+ * admin-level access (blog admins and the CRM general admin).
+ */
+
 import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
@@ -34,6 +42,17 @@ const NAV_ITEMS: { id: Section; label: string; icon: typeof Newspaper }[] = [
   { id: "activity", label: "Actividad", icon: History },
 ];
 
+/**
+ * Renders the admin dashboard shell (sidebar + header) and swaps between
+ * the articles, users, and activity sections.
+ *
+ * @param canPreview - Whether the role-preview switch is shown, letting a
+ * real admin temporarily view the dashboard as a redactor would see it.
+ * @param onRoleChange - Callback invoked when the admin toggles the preview
+ * role.
+ * @param onSaved - Callback invoked after an article is created or updated,
+ * used to log the action and exit edit mode.
+ */
 export default function AdminDashboard({
   email,
   userId,

@@ -1,10 +1,20 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { MAX_MESSAGE_LENGTH, MAX_STACK_LENGTH, type MonitoringEventPayload } from "./types";
 
-// Inserts straight through the service-role client instead of hitting our own
-// /api/monitoring/events endpoint — this only ever runs in trusted server
-// contexts (instrumentation.ts), so the extra HTTP hop back into the app
-// would just add latency for no benefit.
+/**
+ * Server-only writers for the `monitoring_events` table. Each function
+ * inserts straight through the service-role client instead of hitting our
+ * own `/api/monitoring/events` endpoint — these only ever run in trusted
+ * server contexts (instrumentation.ts, server actions), so the extra HTTP
+ * hop back into the app would just add latency for no benefit. Every writer
+ * swallows its own errors: logging failures must never take down the
+ * request that triggered them.
+ */
+
+/**
+ * Records a server-side error (typically called from
+ * {@link import("@/instrumentation").onRequestError}).
+ */
 export async function logServerError(payload: MonitoringEventPayload) {
   try {
     const supabase = createAdminClient();
@@ -25,9 +35,12 @@ export async function logServerError(payload: MonitoringEventPayload) {
   }
 }
 
-// Called from `after()` (see src/lib/monitoring/timing.ts and src/proxy.ts),
-// so this always runs post-response — never adds latency to the request that
-// triggered it.
+/**
+ * Records a `"timing"` event for an operation that exceeded its threshold.
+ * Called from `after()` (see src/lib/monitoring/timing.ts and src/proxy.ts),
+ * so this always runs post-response — never adds latency to the request that
+ * triggered it.
+ */
 export async function logSlowOperation(params: {
   label: string;
   durationMs: number;
@@ -47,8 +60,11 @@ export async function logSlowOperation(params: {
   }
 }
 
-// Called from `after()` in login() (src/lib/auth/actions.ts) — never blocks
-// the login response, and never changes what the user sees either way.
+/**
+ * Records a `"security"` event (e.g. a failed login attempt). Called from
+ * `after()` in login() (src/lib/auth/actions.ts) — never blocks the login
+ * response, and never changes what the user sees either way.
+ */
 export async function logSecurityEvent(params: {
   message: string;
   path?: string;

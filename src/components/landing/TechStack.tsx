@@ -70,9 +70,12 @@ const TECHS: { name: string; Icon: IconType }[] = [
   { name: "ChatGPT", Icon: TbBrandOpenai },
 ];
 
-// The list is rendered twice back-to-back; the CSS animation translates the
-// track by -50% so the second copy lands exactly where the first began,
-// giving a seamless infinite loop with zero JavaScript.
+/**
+ * Infinite horizontal marquee of the technologies/platforms TechPlace works
+ * with. The list is rendered twice back-to-back; the CSS animation translates
+ * the track by -50% so the second copy lands exactly where the first began,
+ * giving a seamless infinite loop with zero JavaScript.
+ */
 export default function TechStack() {
   return (
     <section

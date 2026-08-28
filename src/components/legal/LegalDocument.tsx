@@ -1,7 +1,19 @@
+/**
+ * Shared chrome for every static legal page under `/legal/[slug]`: a
+ * back link to the `/legal` index, the document title and "last updated"
+ * date, and a styled card that renders the document body passed as
+ * `children` (typically raw HTML-ish JSX with `<h2>`/`<h3>`/`<ul>` etc.,
+ * plus `Fill` placeholders for values still pending per project).
+ */
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import type { ReactNode } from "react";
 
+/**
+ * @param title Document heading shown at the top of the page.
+ * @param updated "Last updated" date string, shown as-is under the title.
+ * @param children Document body content.
+ */
 export default function LegalDocument({
   title,
   updated,

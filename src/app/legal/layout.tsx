@@ -1,3 +1,9 @@
+/**
+ * Layout for the `/legal` route group. Wraps the legal index and each
+ * individual document page with the same landing-page chrome (Aurora
+ * background, Navbar, Footer, WhatsApp button) so these static legal pages
+ * feel consistent with the rest of the site.
+ */
 import Aurora from "@/components/landing/Aurora";
 import Navbar from "@/components/landing/Navbar";
 import Footer from "@/components/landing/Footer";

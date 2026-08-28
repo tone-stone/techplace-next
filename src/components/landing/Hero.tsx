@@ -6,6 +6,12 @@ const SLIDES = [
   "Tecnología de vanguardia, resultados medibles",
 ];
 
+/**
+ * The landing page's opening section (`#home`): a looping background video
+ * with a crossfading decorative tagline, the SEO-facing `<h1>`, an intro
+ * paragraph, and the two primary calls to action (quote request / view
+ * projects).
+ */
 export default function Hero() {
   return (
     <section
@@ -33,27 +39,27 @@ export default function Hero() {
         className="pointer-events-none absolute -bottom-24 -right-16 h-96 w-96 rounded-full bg-indigo-600/25 blur-3xl z-[1] animate-[tp-float_11s_ease-in-out_infinite_reverse]"
       />
 
-      <div className="tp-hero-content relative z-20 text-center w-full max-w-full md:max-w-2xl mx-auto">
+      <div className="tp-hero-content relative z-20 text-center w-full max-w-full px-5 sm:px-6 md:max-w-2xl mx-auto">
         {/* Decorative crossfading tagline — not a heading. The single real
             <h1> for SEO is the line below it. */}
         <div
           aria-hidden
-          className="tp-hero-slides select-none mb-4 w-full max-w-full md:max-w-2xl mx-auto"
+          className="tp-hero-slides select-none mb-5 sm:mb-6 w-full max-w-full md:max-w-2xl mx-auto"
         >
           {SLIDES.map((text, i) => (
             <span
               key={text}
               style={{ animationDelay: `${i * 2.8}s` }}
-              className="tp-hero-slide font-heading text-3xl sm:text-4xl md:text-6xl font-extrabold drop-shadow-xl tracking-tight"
+              className="tp-hero-slide font-heading text-2xl sm:text-4xl md:text-6xl font-extrabold drop-shadow-xl tracking-tight leading-tight"
             >
               {text}
             </span>
           ))}
         </div>
-        <h1 className="font-heading text-lg sm:text-xl md:text-2xl font-bold text-white/95 mb-3 tracking-tight drop-shadow-lg">
+        <h1 className="font-heading text-base sm:text-xl md:text-2xl font-bold text-white/95 mb-3 tracking-tight drop-shadow-lg leading-snug">
           Desarrollo web, apps y ciberseguridad en Tijuana
         </h1>
-        <p className="text-base sm:text-lg md:text-xl text-gray-200 mb-8 drop-shadow-lg font-light tp-animate-fadein">
+        <p className="text-base sm:text-lg md:text-xl text-gray-200 mb-8 drop-shadow-lg font-light tp-animate-fadein text-justify">
           Diseñamos, desarrollamos y aseguramos productos digitales a la medida,
           con inteligencia artificial integrada en cada etapa del proceso.
           Operamos desde Tijuana y Baja California, con cobertura remota en todo

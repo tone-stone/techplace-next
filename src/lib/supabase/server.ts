@@ -1,6 +1,20 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 
+/**
+ * One of four Supabase client factories in this directory, each scoped to a
+ * different execution context — see client.ts (browser), admin.ts
+ * (service-role), public.ts (anon, no cookies) for the others. This one is
+ * for Server Components and Server Actions: it reads and writes the
+ * Supabase auth cookies via `next/headers`, so RLS sees the same signed-in
+ * user as the request that hit the server, and a `login()`/`logout()` call
+ * can actually mutate the session cookies for the response.
+ */
+
+/**
+ * Cookie-bound Supabase client for Server Components and Server Actions.
+ * @returns A Supabase client whose session is read from and written back to the request's cookies.
+ */
 export async function createClient() {
   const cookieStore = await cookies()
 

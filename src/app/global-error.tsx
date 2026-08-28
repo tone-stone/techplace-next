@@ -3,9 +3,14 @@
 import { useEffect } from "react";
 import { reportEvent } from "@/lib/monitoring/client";
 
-// Catches errors thrown by the root layout itself — replaces the whole
-// document when active, so it can't rely on globals.css or the site's fonts
-// being loaded. Inline styles only, on purpose.
+/**
+ * Root-level error boundary (App Router `global-error.tsx` convention).
+ * Catches errors thrown by the root layout itself — replaces the whole
+ * document when active, so it can't rely on globals.css or the site's fonts
+ * being loaded. Inline styles only, on purpose. Like `error.tsx`, reports
+ * the error to the monitoring system before rendering the fallback, and
+ * uses this Next.js version's renamed `retry` prop (not `reset`).
+ */
 export default function GlobalError({
   error,
   retry,

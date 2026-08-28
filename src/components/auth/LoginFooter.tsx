@@ -5,6 +5,19 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 
+/**
+ * Footer shared by both login pages: a back button, a "forgot password"
+ * dialog (contact IT — there's no self-service reset flow), and a link to
+ * switch to the other portal's login. Purely presentational/client-side; it
+ * doesn't call any auth APIs itself.
+ */
+
+/**
+ * Renders the login footer's back/forgot-password/switch-portal controls.
+ * @param accent Color theme matching the portal: `blue` for CRM, `indigo` for blog.
+ * @param switchHref Login URL of the other portal.
+ * @param switchLabel Link text for switching to the other portal.
+ */
 // Shared footer for both login screens so they behave identically. They differ
 // only by `accent` (blue = administración / CRM, indigo = redacción) and the
 // wording passed in `switchLabel`.

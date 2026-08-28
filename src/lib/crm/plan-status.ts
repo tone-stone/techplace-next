@@ -1,3 +1,10 @@
+/**
+ * Date-urgency helpers shared across the CRM for anything with a due date:
+ * plan renewals, payments, quote validity, and task due dates. Centralizing
+ * the "overdue / due soon / fine" thresholds here keeps badges and sort
+ * order consistent everywhere they're used.
+ */
+
 export type DueDateUrgency = "vencido" | "por_vencer" | "al_dia";
 
 const DUE_SOON_WINDOW_DAYS = 7;
@@ -17,6 +24,7 @@ export function getDueDateUrgency(dueDate: string, today: Date = new Date()): Du
   return "al_dia";
 }
 
+/** Number of calendar days between `today` and `dueDate` (negative if past). */
 export function daysUntil(dueDate: string, today: Date = new Date()): number {
   const due = new Date(`${dueDate}T00:00:00`);
   const start = new Date(today.getFullYear(), today.getMonth(), today.getDate());

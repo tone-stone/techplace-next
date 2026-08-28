@@ -1,5 +1,11 @@
 "use client";
 
+/**
+ * "More articles" section shown at the bottom of a blog post — a Swiper
+ * carousel of other published articles with tabs to filter by same category,
+ * same author, or show everything.
+ */
+
 import { useMemo, useState, type ReactNode } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Swiper, SwiperSlide } from "swiper/react";
@@ -17,6 +23,17 @@ type RelatedArticleItem = {
 
 type Filter = "todos" | "similares" | "redactor";
 
+/**
+ * Renders the filter tabs and the Swiper carousel of related article cards.
+ *
+ * @param items - Candidate related articles (already excluding the current
+ * one), each carrying the metadata needed for the "similares"/"redactor"
+ * filters plus its pre-rendered card node.
+ * @param currentCategory - Category of the article being viewed, used by
+ * the "Noticias parecidas" filter.
+ * @param currentAuthor - Author of the article being viewed, used by the
+ * "Mismo redactor" filter.
+ */
 export default function RelatedArticlesCarousel({
   items,
   currentCategory,

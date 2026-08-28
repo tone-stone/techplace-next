@@ -1,6 +1,12 @@
 import type { QuoteDetail } from "./quotes";
 import { formatCurrencyMXN } from "./format";
 
+/**
+ * Client-side quote-to-PDF export, used by the "Descargar PDF" button in
+ * `QuoteDetailModal`. Renders the TechPlace header, client info, line-item
+ * table, and totals into a jsPDF document and triggers a browser download.
+ */
+
 // Only ever call this from a client-side event handler (a "use client"
 // component's onClick). jsPDF/jspdf-autotable are dynamically imported here,
 // inside the function body, so the browser only loads them after a real user

@@ -1,3 +1,9 @@
+/**
+ * Renders an image so it "fits" any aspect-ratio box without cropping or
+ * empty letterboxing — used for blog cover images, gallery thumbnails, and
+ * post gallery grids across the site.
+ */
+
 import Image from "next/image";
 
 /**

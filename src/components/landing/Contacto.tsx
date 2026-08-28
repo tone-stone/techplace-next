@@ -6,12 +6,20 @@ import { FaFacebookF, FaWhatsapp } from "react-icons/fa6";
 import { useState } from "react";
 import Reveal from "./Reveal";
 
+/** Status/feedback message shown under the contact form after a submit attempt, or `null` before one happens. */
 type EstadoForm = { message: string; error: boolean } | null;
 
+/**
+ * The "Contáctanos" section (`#contacto`): a contact form that posts to
+ * Formspree, plus direct WhatsApp/website/Facebook links and business hours.
+ * Handles form submission asynchronously so the page never navigates away.
+ */
 export default function Contacto() {
   const [estado, setEstado] = useState<EstadoForm>(null);
   const [enviando, setEnviando] = useState(false);
 
+  // Submits the form via fetch (instead of a normal POST navigation) so we can
+  // show inline success/error feedback without leaving the page.
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const form = e.currentTarget;

@@ -1,5 +1,12 @@
 "use client";
 
+/**
+ * Create/edit form for a single blog article — title, author, category,
+ * excerpt, rich-text content, cover image, video, and photo gallery — used
+ * by both the admin and redactor dashboards (styled per `role`). Submits to
+ * the `createArticleAction`/`updateArticleAction` server actions.
+ */
+
 import { useEffect, useRef, useState, useTransition, type FormEvent } from "react";
 import { PenSquare, Send, X } from "lucide-react";
 import { CATEGORIES } from "@/lib/blog-posts";
@@ -9,6 +16,8 @@ import MediaDropzone from "./MediaDropzone";
 import RichTextEditor from "./RichTextEditor";
 import type { DashboardRole } from "./types";
 
+// Whether stripped-of-tags HTML content has no visible text — used to block
+// submitting an empty article body.
 function isHtmlEmpty(html: string): boolean {
   return html.replace(/<[^>]*>/g, "").trim() === "";
 }
@@ -26,6 +35,15 @@ type ArticleFormProps = {
   onCancelEdit: () => void;
 };
 
+/**
+ * Renders the article form, seeded from `editingArticle` when editing (the
+ * parent remounts this component via `key` on the target's id, so this
+ * component's own state only ever needs to track ONE editing target for its
+ * lifetime). Calls `onSaved` after a successful create/update.
+ *
+ * @param role - Styles the form (indigo for redactor, purple for admin);
+ * has no effect on what the form can submit.
+ */
 export default function ArticleForm({
   editingArticle,
   defaultAuthor,

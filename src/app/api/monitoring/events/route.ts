@@ -9,16 +9,30 @@ import {
   type MonitoringSource,
 } from "@/lib/monitoring/types";
 
+/**
+ * Public ingestion endpoint for the monitoring system's browser-side
+ * reporter (`reportEvent` in `src/lib/monitoring/client.ts`). Accepts
+ * `"error"` and `"web_vital"` events only — `"timing"` and `"security"`
+ * events are written server-side directly, never through this route.
+ */
+
 const KINDS: MonitoringKind[] = ["error", "web_vital"];
 const SOURCES: MonitoringSource[] = ["client", "server"];
 const LEVELS: MonitoringLevel[] = ["error", "warning", "info"];
 
-// Public, unauthenticated ingestion endpoint — hit via sendBeacon from every
-// page on the site (see src/lib/monitoring/client.ts), so it must never throw
-// on malformed input and must respond fast. Auth, when present, is read from
-// the request's own cookies (the same client used for cookie-bound reads
-// elsewhere) so a logged-in admin/redactor's user_id is captured for free;
-// anonymous public visitors insert the same way, just without a user_id.
+/**
+ * Validates and inserts a client-reported monitoring event. Public,
+ * unauthenticated — hit via sendBeacon from every page on the site, so it
+ * must never throw on malformed input and must respond fast. Auth, when
+ * present, is read from the request's own cookies (the same client used for
+ * cookie-bound reads elsewhere) so a logged-in admin/redactor's user_id is
+ * captured for free; anonymous public visitors insert the same way, just
+ * without a user_id.
+ *
+ * @returns 400 on malformed/invalid input, 204 on success, or 202 if the
+ * insert itself failed (e.g. the table doesn't exist yet) — the beacon
+ * caller never inspects the response, so this deliberately avoids a 500.
+ */
 export async function POST(request: NextRequest) {
   let body: unknown;
   try {

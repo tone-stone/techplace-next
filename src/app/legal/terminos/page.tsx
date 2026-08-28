@@ -1,3 +1,8 @@
+/**
+ * `/legal/terminos`: Terms and Conditions governing use of the site and the
+ * blog's writer portal. Static content rendered through `LegalDocument`,
+ * with `Fill` marking legal-entity values still pending completion.
+ */
 import type { Metadata } from "next";
 import LegalDocument from "@/components/legal/LegalDocument";
 import Fill from "@/components/legal/Fill";

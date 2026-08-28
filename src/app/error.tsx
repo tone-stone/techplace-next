@@ -4,6 +4,13 @@ import { useEffect } from "react";
 import { RefreshCw } from "lucide-react";
 import { reportEvent } from "@/lib/monitoring/client";
 
+/**
+ * Route-level error boundary (App Router `error.tsx` convention). Reports
+ * the caught error to the monitoring system as a client `"error"` event on
+ * mount/change, then renders a themed fallback with a retry action. Note:
+ * this Next.js version renames the boundary's recovery callback from
+ * `reset` to `retry` — that's intentional here, not a bug.
+ */
 export default function Error({
   error,
   retry,

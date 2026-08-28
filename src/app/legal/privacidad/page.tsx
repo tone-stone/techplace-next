@@ -1,3 +1,9 @@
+/**
+ * `/legal/privacidad`: Privacy Notice (Aviso de Privacidad) required under
+ * the LFPDPPP, covering what personal data is collected and how it's used.
+ * Static content rendered through `LegalDocument`, with `Fill` marking
+ * legal-entity values still pending completion.
+ */
 import type { Metadata } from "next";
 import LegalDocument from "@/components/legal/LegalDocument";
 import Fill from "@/components/legal/Fill";

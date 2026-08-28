@@ -1,5 +1,12 @@
 "use client";
 
+/**
+ * Client-side wrapper around the blog index's article grid. Renders the
+ * category filter pills and keeps the currently selected category in state,
+ * filtering the pre-rendered article cards it receives from the server
+ * without re-fetching anything.
+ */
+
 import { useMemo, useState, type ReactNode } from "react";
 import Reveal from "@/components/landing/Reveal";
 
@@ -8,6 +15,14 @@ type BlogListItem = {
   node: ReactNode;
 };
 
+/**
+ * Renders the category filter bar and the (possibly filtered) grid of blog
+ * post cards, each wrapped in a `Reveal` for a staggered scroll-in
+ * animation.
+ *
+ * @param items - Pre-rendered article cards paired with their category, so
+ * filtering never needs to touch the server.
+ */
 export default function BlogListClient({
   items,
   categories,

@@ -1,5 +1,13 @@
 "use client";
 
+/**
+ * Full-screen modal (via `ModalPortal`) showing a single client's profile:
+ * billing plans, payments, and activity history, each with its own inline
+ * add-form. Fetches the client's detail on mount/`clientId` change and
+ * refetches after every mutation so the modal always reflects the latest
+ * server state.
+ */
+
 import { useActionState, useEffect, useState } from "react";
 import {
   Calendar,
@@ -38,18 +46,21 @@ const HISTORY_LABELS: Record<string, string> = {
   otro: "Otro",
 };
 
+/** Badge color class for a due-date urgency (shared by plans and payments panels). */
 function urgencyBadgeClass(urgency: ReturnType<typeof getDueDateUrgency>) {
   if (urgency === "vencido") return "border-red-400/30 bg-red-500/10 text-red-300";
   if (urgency === "por_vencer") return "border-amber-400/30 bg-amber-500/10 text-amber-300";
   return "border-emerald-400/30 bg-emerald-500/10 text-emerald-300";
 }
 
+/** Spanish label for a due-date urgency. */
 function urgencyLabel(urgency: ReturnType<typeof getDueDateUrgency>) {
   if (urgency === "vencido") return "Vencido";
   if (urgency === "por_vencer") return "Por vencer";
   return "Al día";
 }
 
+/** Portaled modal shell: loads the client's detail and shows a spinner until it's ready. */
 export default function ClientDetailModal({ clientId, onClose }: { clientId: string; onClose: () => void }) {
   const [detail, setDetail] = useState<ClientDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -108,6 +119,7 @@ export default function ClientDetailModal({ clientId, onClose }: { clientId: str
   );
 }
 
+/** Modal body once the client detail has loaded: header info plus the plans/payments/history panels. */
 function ClientDetailContent({ detail, onChanged }: { detail: ClientDetail; onChanged: () => void }) {
   const { client, history, plans, payments } = detail;
 
@@ -140,6 +152,7 @@ function ClientDetailContent({ detail, onChanged }: { detail: ClientDetail; onCh
   );
 }
 
+/** Small icon + uppercase title heading shared by the panels below. */
 function SectionHeading({ icon: Icon, title }: { icon: typeof Calendar; title: string }) {
   return (
     <h3 className="mb-3 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-gray-300">
@@ -148,6 +161,7 @@ function SectionHeading({ icon: Icon, title }: { icon: typeof Calendar; title: s
   );
 }
 
+/** Lists a client's billing plans with urgency badges and an inline "new plan" form. */
 function PlansPanel({
   clientId,
   plans,
@@ -269,6 +283,10 @@ function PlansPanel({
   );
 }
 
+/**
+ * Lists a client's payments with an inline "new payment" form and a
+ * one-click "mark as paid" action for pending/overdue entries.
+ */
 function PaymentsPanel({
   clientId,
   plans,
@@ -411,6 +429,7 @@ function PaymentsPanel({
   );
 }
 
+/** Shows the client's chronological activity feed with a quick "add a note" input. */
 function HistoryPanel({
   clientId,
   history,

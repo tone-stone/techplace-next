@@ -1,5 +1,11 @@
 "use client";
 
+/**
+ * "Facturación" tab: an invoices table with an inline status selector per
+ * row and an inline "Nueva factura" form. Shows total pending-to-collect
+ * across "enviada"/"vencida" invoices.
+ */
+
 import { useActionState, useState } from "react";
 import { Plus } from "lucide-react";
 import { formatCurrencyMXN } from "@/lib/crm/format";
@@ -15,6 +21,7 @@ import StatusBadge from "./StatusBadge";
 
 const STATUS_OPTIONS: InvoiceStatus[] = ["borrador", "enviada", "pagada", "vencida"];
 
+/** Renders the invoices table, pending-total summary, and the "new invoice" form. */
 export default function InvoicesSection({
   invoices,
   clients,
@@ -113,6 +120,11 @@ export default function InvoicesSection({
   );
 }
 
+/**
+ * Inline form for `createInvoiceAction`; calls `onDone` on success to
+ * collapse itself. The project dropdown is scoped to whichever client is
+ * currently selected.
+ */
 function NewInvoiceForm({
   clients,
   projects,

@@ -1,3 +1,10 @@
+/**
+ * Server entry point for the blog dashboard at `/blog/dashboard`. Redirects
+ * unauthenticated visitors to the blog login, then loads the signed-in
+ * user's profile to decide whether they see the admin or redactor view and
+ * fetches the initial articles (and, for admins, the blog team's user list)
+ * before handing off to the client-side `DashboardClient`.
+ */
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
@@ -10,6 +17,10 @@ export const metadata: Metadata = {
   title: "Dashboard | Portal de Redacción",
 };
 
+/**
+ * Resolves the current user's role and preloads dashboard data server-side,
+ * then renders `DashboardClient` with that initial state.
+ */
 export default async function BlogDashboardPage() {
   const supabase = await createClient();
   const {

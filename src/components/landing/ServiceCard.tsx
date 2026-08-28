@@ -10,6 +10,11 @@ type ServiceCardProps = {
   linkLabel: string;
 };
 
+/**
+ * A single glassmorphic card in the "Servicios" grid, presenting one
+ * TechPlace offering with an icon, title, description, and call-to-action
+ * link. Tilts toward the cursor on mouse move for a subtle 3D hover effect.
+ */
 export default function ServiceCard({
   icon,
   title,
@@ -19,6 +24,7 @@ export default function ServiceCard({
 }: ServiceCardProps) {
   const cardRef = useRef<HTMLDivElement>(null);
 
+  // Tilts the card on its X/Y axes proportionally to cursor distance from center.
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     const card = cardRef.current;
     if (!card) return;

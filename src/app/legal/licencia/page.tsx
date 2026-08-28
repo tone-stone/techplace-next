@@ -1,3 +1,9 @@
+/**
+ * `/legal/licencia`: Software License Agreement template used as a starting
+ * point when licensing TechPlace-built software to clients. Static content
+ * rendered through `LegalDocument`, with `Fill` marking per-project values
+ * still pending completion.
+ */
 import type { Metadata } from "next";
 import LegalDocument from "@/components/legal/LegalDocument";
 import Fill from "@/components/legal/Fill";

@@ -1,5 +1,12 @@
 "use client";
 
+/**
+ * Full-screen modal (via `ModalPortal`) for creating a new quote: client
+ * picker (existing CRM client or a hand-entered prospect), a dynamic list of
+ * line items, and a live subtotal/tax/total preview computed client-side
+ * before the server recomputes it authoritatively in `createQuoteAction`.
+ */
+
 import { useActionState, useMemo, useState } from "react";
 import { Plus, X } from "lucide-react";
 import { createQuoteAction } from "@/lib/crm/quotes";
@@ -11,6 +18,7 @@ type DraftItem = { concept: string; quantity: string; unitPrice: string };
 
 const EMPTY_ITEM: DraftItem = { concept: "", quantity: "1", unitPrice: "" };
 
+/** Portaled modal form for `createQuoteAction`, with client-side line-item and total management. */
 export default function QuoteFormModal({
   clients,
   onClose,
@@ -31,6 +39,8 @@ export default function QuoteFormModal({
     return result;
   }, null);
 
+  // Autofills contact fields from an existing client but leaves them
+  // editable, since a quote can go out under different contact details.
   const handleSelectClient = (id: string) => {
     setClientId(id);
     const client = clients.find((c) => c.id === id);

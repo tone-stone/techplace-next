@@ -1,3 +1,10 @@
+/**
+ * Renders a colored pill for any CRM status value — client, project,
+ * invoice, quote, or task status all share this one component. Styles and
+ * Spanish labels are looked up by raw status string, so it works across
+ * every entity's status enum without per-type variants.
+ */
+
 const STYLES: Record<string, string> = {
   // clientes
   lead: "border-sky-400/30 bg-sky-500/10 text-sky-300",
@@ -41,6 +48,11 @@ const LABELS: Record<string, string> = {
   terminado: "Terminado",
 };
 
+/**
+ * @param status - Any raw status value from a CRM entity (client, project,
+ * invoice, quote, or task). Unrecognized values fall back to a neutral style
+ * and the raw string as the label.
+ */
 export default function StatusBadge({ status }: { status: string }) {
   return (
     <span

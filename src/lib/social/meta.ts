@@ -1,3 +1,12 @@
+/**
+ * Server-side client for the Meta (Facebook) Graph API, powering the
+ * "Síguenos en redes" section with recent Facebook Page posts and Instagram
+ * Business media, normalized into a single `SocialPost` shape and sorted by
+ * recency. Entirely optional: without `META_PAGE_ID`, `META_IG_BUSINESS_ID`,
+ * and `META_PAGE_ACCESS_TOKEN` configured (or on any fetch/API failure),
+ * every function here resolves to an empty list instead of throwing, so the
+ * site works fine with the section simply not rendering.
+ */
 export type SocialPost = {
   id: string;
   platform: "facebook" | "instagram";
@@ -34,6 +43,11 @@ const REVALIDATE_SECONDS = 3600;
 // account set up outside this codebase (see .env.example). Until those are
 // configured, every function here returns an empty list instead of
 // throwing, so the site works normally with the section just not rendering.
+/**
+ * Fetches recent posts from the configured Facebook Page via the Graph API.
+ * @param limit Maximum number of posts to request.
+ * @returns Normalized posts, or `[]` if Meta credentials are missing or the request fails.
+ */
 export async function getFacebookPosts(limit = 6): Promise<SocialPost[]> {
   const pageId = process.env.META_PAGE_ID;
   const token = process.env.META_PAGE_ACCESS_TOKEN;
@@ -62,6 +76,11 @@ export async function getFacebookPosts(limit = 6): Promise<SocialPost[]> {
   }
 }
 
+/**
+ * Fetches recent media from the configured Instagram Business account via the Graph API.
+ * @param limit Maximum number of media items to request.
+ * @returns Normalized posts (video items without a thumbnail are dropped), or `[]` if Meta credentials are missing or the request fails.
+ */
 export async function getInstagramPosts(limit = 6): Promise<SocialPost[]> {
   const igBusinessId = process.env.META_IG_BUSINESS_ID;
   const token = process.env.META_PAGE_ACCESS_TOKEN;
@@ -95,6 +114,10 @@ export async function getInstagramPosts(limit = 6): Promise<SocialPost[]> {
   }
 }
 
+/**
+ * Fetches Facebook and Instagram posts in parallel and merges them into one feed, newest first.
+ * @param limitPerPlatform Maximum number of posts to request from each platform.
+ */
 export async function getSocialPosts(limitPerPlatform = 6): Promise<SocialPost[]> {
   const [facebook, instagram] = await Promise.all([
     getFacebookPosts(limitPerPlatform),

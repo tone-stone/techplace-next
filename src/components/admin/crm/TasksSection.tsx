@@ -1,5 +1,11 @@
 "use client";
 
+/**
+ * "Tareas" tab: a per-project kanban board (Por hacer / En progreso /
+ * Terminado) with left/right column-move buttons instead of drag-and-drop,
+ * plus an inline "Nueva tarea" form.
+ */
+
 import { useActionState, useMemo, useState } from "react";
 import { Calendar, ChevronLeft, ChevronRight, Plus, User } from "lucide-react";
 import {
@@ -25,6 +31,11 @@ function urgencyBadgeClass(urgency: ReturnType<typeof getDueDateUrgency>) {
   return "border-emerald-400/30 bg-emerald-500/10 text-emerald-300";
 }
 
+/**
+ * Kanban board for tasks, scoped to one project at a time via a dropdown.
+ * Moving a task optimistically updates local state before the server action
+ * resolves.
+ */
 export default function TasksSection({
   tasks: initialTasks,
   projects,
@@ -122,6 +133,7 @@ export default function TasksSection({
   );
 }
 
+/** One kanban card: title, assignee, due-date urgency badge, and column-move buttons. */
 function TaskCard({
   task,
   canMoveLeft,
@@ -175,6 +187,7 @@ function TaskCard({
   );
 }
 
+/** Inline form for `createTaskAction`; refetches the task list and collapses itself on success. */
 function NewTaskForm({
   projectId,
   onCreated,

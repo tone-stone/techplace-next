@@ -1,5 +1,13 @@
 "use client";
 
+/**
+ * Thin client-only wrapper that lazy-loads `RedesCarouselSwiper` for the
+ * "Síguenos en redes" section, so Swiper's JS/CSS is excluded from the
+ * homepage's initial bundle (same code-splitting pattern as
+ * `PortafolioCarousel`). Renders skeleton placeholders while that chunk
+ * loads.
+ */
+
 import dynamic from "next/dynamic";
 import type { SocialPost } from "@/lib/social/meta";
 
@@ -19,6 +27,7 @@ const RedesCarouselSwiper = dynamic(() => import("./RedesCarouselSwiper"), {
   ),
 });
 
+/** @param posts - Facebook posts to hand off to the Swiper carousel. */
 export default function RedesCarousel({ posts }: { posts: SocialPost[] }) {
   return <RedesCarouselSwiper posts={posts} />;
 }

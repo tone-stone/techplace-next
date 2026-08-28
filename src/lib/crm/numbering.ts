@@ -1,5 +1,12 @@
 import type { createClient } from "@/lib/supabase/server";
 
+/**
+ * Shared sequential-folio generator for invoices and quotes (e.g.
+ * `TP-2026-014` / `COT-2026-014`). Used by `createInvoiceAction` and
+ * `createQuoteAction` so both document types get the same numbering scheme
+ * and race-retry behavior.
+ */
+
 // Not a "use server" file — see auth.ts for why: only called from within other
 // server action files (createInvoiceAction, createQuoteAction).
 
@@ -9,6 +16,15 @@ import type { createClient } from "@/lib/supabase/server";
 // the count and the insert could compute the same number. The `number` column's
 // unique constraint plus this retry loop is the safety net, not a full fix — if
 // concurrent admin usage ever becomes real, upgrade to a Postgres sequence instead.
+/**
+ * Inserts a row into `table` with an auto-generated `"{prefix}-{year}-{seq}"`
+ * folio, retrying up to 3 times on a unique-constraint collision (see the
+ * file banner above for why collisions are possible).
+ *
+ * @param row - Row fields to insert; `number` is computed and added here.
+ * @returns The inserted row's id and generated number, or an error message
+ * (including the case where every retry attempt still collided).
+ */
 export async function insertWithSequentialNumber<T extends Record<string, unknown>>(
   supabase: Awaited<ReturnType<typeof createClient>>,
   table: "crm_invoices" | "crm_quotes",

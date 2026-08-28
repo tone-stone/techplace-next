@@ -1,11 +1,18 @@
+/**
+ * Registry of the site's static legal documents. Each entry maps a
+ * `/legal/[slug]` page to the title and blurb shown for it on the `/legal`
+ * index and in the Footer's "Legal" link list.
+ */
 export type LegalDoc = {
   slug: string;
   title: string;
   description: string;
 };
 
-// Shared between the /legal index page and the Footer's "Legal" link list,
-// so adding or renaming a document only happens in one place.
+/**
+ * Shared between the /legal index page and the Footer's "Legal" link list,
+ * so adding or renaming a document only happens in one place.
+ */
 export const LEGAL_DOCS: LegalDoc[] = [
   {
     slug: "terminos",

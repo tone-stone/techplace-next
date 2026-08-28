@@ -1,3 +1,9 @@
+/**
+ * Public blog index at `/blog` — lists every published article as cards,
+ * with client-side category filtering handled by `BlogListClient`. Also
+ * defines this route's SEO metadata (OpenGraph/Twitter cards) and revalidates
+ * on a timer instead of rendering fully dynamically.
+ */
 import type { Metadata } from "next";
 import Aurora from "@/components/landing/Aurora";
 import Navbar from "@/components/landing/Navbar";
@@ -36,6 +42,10 @@ export const metadata: Metadata = {
   },
 };
 
+/**
+ * Fetches all published articles and hands them, pre-rendered as
+ * `BlogPostCard` nodes, to `BlogListClient` for interactive filtering.
+ */
 export default async function BlogPage() {
   const articles = await getPublishedArticles();
   const categories = Array.from(new Set(articles.map((post) => post.category)));
