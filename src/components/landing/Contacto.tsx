@@ -153,7 +153,8 @@ export default function Contacto() {
               alt="TechPlace — desarrollo web, apps y ciberseguridad en Tijuana"
               width={480}
               height={480}
-              loading="eager"
+              loading="lazy"
+              sizes="480px"
               className="w-3/4 md:w-full max-w-xl mx-auto rounded-2xl"
             />
           </Reveal>
