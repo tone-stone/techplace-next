@@ -11,6 +11,45 @@ type RevealProps = {
 };
 
 /**
+ * One shared scroll/resize listener for every mounted Reveal, instead of one
+ * pair per instance. The homepage renders ~30 Reveals; a listener each meant
+ * ~30 `getBoundingClientRect()` calls per scroll frame during load (layout
+ * thrash). Now a single listener schedules a single rAF that runs every
+ * subscriber's check in one batch.
+ */
+const subscribers = new Set<() => void>();
+let rafId: number | null = null;
+
+function flush() {
+  rafId = null;
+  for (const check of [...subscribers]) check();
+}
+
+function schedule() {
+  if (rafId === null) rafId = requestAnimationFrame(flush);
+}
+
+function subscribe(check: () => void) {
+  if (subscribers.size === 0) {
+    window.addEventListener("scroll", schedule, { passive: true });
+    window.addEventListener("resize", schedule);
+  }
+  subscribers.add(check);
+}
+
+function unsubscribe(check: () => void) {
+  subscribers.delete(check);
+  if (subscribers.size === 0) {
+    window.removeEventListener("scroll", schedule);
+    window.removeEventListener("resize", schedule);
+    if (rafId !== null) {
+      cancelAnimationFrame(rafId);
+      rafId = null;
+    }
+  }
+}
+
+/**
  * Plain CSS + IntersectionObserver fade-in — used to render scroll-triggered
  * motion.div all over the site (up to a dozen times on the blog list alone),
  * which pulled the whole Framer Motion library into every page's JS bundle
@@ -58,31 +97,23 @@ export default function Reveal({ children, className, delay = 0, y = 28, once = 
     // "not visible" before and after, with nothing in between. Without this,
     // that content stays at opacity:0 forever. `once` elements stop
     // rechecking as soon as they're first revealed.
-    let rafId: number | null = null;
-    const scheduleCheck = () => {
-      if (rafId !== null) return;
-      rafId = requestAnimationFrame(() => {
-        rafId = null;
-        if (isNearViewport()) {
-          setVisible(true);
-          if (once) cleanup();
-        } else if (!once) {
-          setVisible(false);
-        }
-      });
+    const check = () => {
+      if (isNearViewport()) {
+        setVisible(true);
+        if (once) cleanup();
+      } else if (!once) {
+        setVisible(false);
+      }
     };
 
     function cleanup() {
       observer.disconnect();
-      window.removeEventListener("scroll", scheduleCheck);
-      window.removeEventListener("resize", scheduleCheck);
-      if (rafId !== null) cancelAnimationFrame(rafId);
+      unsubscribe(check);
     }
 
     observer.observe(el);
-    window.addEventListener("scroll", scheduleCheck, { passive: true });
-    window.addEventListener("resize", scheduleCheck);
-    scheduleCheck();
+    subscribe(check);
+    schedule();
 
     return cleanup;
   }, [once]);
