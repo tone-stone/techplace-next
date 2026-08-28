@@ -10,7 +10,7 @@ export default function robots(): MetadataRoute.Robots {
     rules: {
       userAgent: "*",
       allow: "/",
-      disallow: ["/blog/dashboard", "/blog/login", "/admin", "/login"],
+      disallow: ["/api/", "/blog/dashboard", "/blog/login", "/admin", "/login"],
     },
     sitemap: "https://techplacetj.com/sitemap.xml",
   };

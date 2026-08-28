@@ -12,9 +12,13 @@ const BASE_URL = "https://techplacetj.com";
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const articles = await getPublishedArticles();
 
+  // Newest published article, so `/blog` reports a real last-modified date
+  // instead of none (articles come back newest-first).
+  const blogLastModified = articles[0] ? new Date(articles[0].date) : new Date();
+
   const staticRoutes: MetadataRoute.Sitemap = [
-    { url: BASE_URL, changeFrequency: "weekly", priority: 1 },
-    { url: `${BASE_URL}/blog`, changeFrequency: "daily", priority: 0.8 },
+    { url: BASE_URL, lastModified: new Date(), changeFrequency: "weekly", priority: 1 },
+    { url: `${BASE_URL}/blog`, lastModified: blogLastModified, changeFrequency: "daily", priority: 0.8 },
     { url: `${BASE_URL}/legal`, changeFrequency: "yearly", priority: 0.3 },
     ...LEGAL_DOCS.map((doc) => ({
       url: `${BASE_URL}/legal/${doc.slug}`,
