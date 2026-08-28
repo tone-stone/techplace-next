@@ -93,7 +93,10 @@ export default function TechStack() {
               className="tp-marquee-item"
               aria-hidden={i >= TECHS.length}
             >
-              <tech.Icon className="h-7 w-7 sm:h-8 sm:w-8 shrink-0" />
+              {/* Decorative: the name is right there as text, so keep the
+                  icon out of the accessibility tree (it's react-icons, which
+                  renders <svg role="img"> and would otherwise need a label). */}
+              <tech.Icon className="h-7 w-7 sm:h-8 sm:w-8 shrink-0" aria-hidden focusable="false" />
               <span className="text-sm font-medium whitespace-nowrap">{tech.name}</span>
             </li>
           ))}
