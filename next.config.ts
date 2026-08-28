@@ -9,6 +9,11 @@ const nextConfig: NextConfig = {
   // Don't advertise the framework in a response header.
   poweredByHeader: false,
   experimental: {
+    // Ship route CSS as inline <style> instead of a render-blocking
+    // <link>. The CSS is Tailwind (atomic, ~20 KiB) and this is a
+    // landing site where first-load LCP/FCP matter more than letting
+    // repeat visitors reuse a cached stylesheet.
+    inlineCss: true,
     serverActions: {
       // Covers the worst case for one article submission: a 500MB video,
       // a 50MB cover image, and up to 6 gallery images at 50MB each.
