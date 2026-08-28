@@ -58,7 +58,7 @@ export const metadata: Metadata = {
     title: "TechPlace | Desarrollo web, apps y ciberseguridad en Tijuana",
     description:
       "Desarrollo web, aplicaciones móviles, inteligencia artificial y ciberseguridad para empresas. Tijuana, Baja California y toda la República.",
-    images: ["/img/logos/techplace-brand.webp"],
+    // og:image is supplied by src/app/opengraph-image.tsx (generated 1200×630 card).
     url: "https://techplacetj.com",
     type: "website",
   },
@@ -67,7 +67,7 @@ export const metadata: Metadata = {
     title: "TechPlace | Desarrollo web, apps y ciberseguridad en Tijuana",
     description:
       "Desarrollo web, aplicaciones móviles, inteligencia artificial y ciberseguridad para empresas. Tijuana, Baja California y toda la República.",
-    images: ["/img/logos/techplace-brand.webp"],
+    // twitter:image is supplied by src/app/twitter-image.tsx.
   },
 };
 

@@ -6,6 +6,8 @@ const supabaseHostname = process.env.NEXT_PUBLIC_SUPABASE_URL
 const cloudinaryCloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
 
 const nextConfig: NextConfig = {
+  // Don't advertise the framework in a response header.
+  poweredByHeader: false,
   experimental: {
     serverActions: {
       // Covers the worst case for one article submission: a 500MB video,
