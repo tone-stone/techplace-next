@@ -1,4 +1,5 @@
 import { ShieldCheck } from "lucide-react";
+import HeroBackground from "./HeroBackground";
 
 const SLIDES = [
   "Ingeniería digital para empresas en crecimiento",
@@ -18,17 +19,7 @@ export default function Hero() {
       id="home"
       className="relative flex items-center justify-center min-h-screen pt-24 pb-10 overflow-hidden"
     >
-      <video
-        autoPlay
-        muted
-        loop
-        playsInline
-        className="tp-video-bg"
-        poster="/img/backup-dark-bg.webp"
-      >
-        <source src="/video/bg.mp4" type="video/mp4" />
-        Tu navegador no soporta videos en HTML5.
-      </video>
+      <HeroBackground />
       <div className="tp-hero-overlay" />
       <div
         aria-hidden

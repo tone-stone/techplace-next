@@ -82,7 +82,8 @@ export default function PortafolioCarousel({
               alt={proyecto.title}
               width={200}
               height={128}
-              loading="eager"
+              quality={70}
+              sizes="(max-width: 640px) 70vw, 260px"
               className="rounded-lg mb-4 shadow-lg h-32 object-contain"
             />
             <h3 className="text-xl text-white font-bold mb-1">{proyecto.title}</h3>

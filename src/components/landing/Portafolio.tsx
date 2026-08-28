@@ -228,6 +228,8 @@ export default function Portafolio() {
                   alt={proyectoActivo.title}
                   width={480}
                   height={320}
+                  quality={75}
+                  sizes="(max-width: 768px) 90vw, 480px"
                   className="rounded-xl w-full h-56 md:h-72 object-contain drop-shadow-[0_0_30px_rgba(126,34,206,0.35)]"
                 />
               </div>
