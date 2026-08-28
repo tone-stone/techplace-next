@@ -71,6 +71,87 @@ export const metadata: Metadata = {
   },
 };
 
+const SITE_URL = "https://techplacetj.com";
+
+/**
+ * Site-wide structured data: a single linked graph (Organization + WebSite +
+ * ProfessionalService) so search engines resolve one business entity across
+ * every route. Per-page schema (BlogPosting, etc.) references `#organization`.
+ */
+const siteJsonLd = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": `${SITE_URL}/#organization`,
+      name: "TechPlace",
+      url: SITE_URL,
+      logo: {
+        "@type": "ImageObject",
+        url: `${SITE_URL}/img/logos/techplace-icon.webp`,
+      },
+      image: `${SITE_URL}/img/logos/techplace-brand.webp`,
+      email: "info@techplacetj.com",
+      telephone: "+526643425615",
+      sameAs: [
+        "https://facebook.com/techplacetijuana",
+        "https://www.linkedin.com/company/techplacetj",
+        "https://github.com/tone-stone",
+      ],
+    },
+    {
+      "@type": "WebSite",
+      "@id": `${SITE_URL}/#website`,
+      url: SITE_URL,
+      name: "TechPlace",
+      inLanguage: "es-MX",
+      publisher: { "@id": `${SITE_URL}/#organization` },
+    },
+    {
+      "@type": "ProfessionalService",
+      "@id": `${SITE_URL}/#localbusiness`,
+      name: "TechPlace",
+      url: SITE_URL,
+      image: `${SITE_URL}/img/logos/techplace-brand.webp`,
+      email: "info@techplacetj.com",
+      telephone: "+526643425615",
+      priceRange: "$$",
+      parentOrganization: { "@id": `${SITE_URL}/#organization` },
+      address: {
+        "@type": "PostalAddress",
+        addressLocality: "Tijuana",
+        addressRegion: "Baja California",
+        addressCountry: "MX",
+      },
+      geo: {
+        "@type": "GeoCoordinates",
+        latitude: 32.511,
+        longitude: -117.041,
+      },
+      areaServed: [
+        { "@type": "AdministrativeArea", name: "Baja California" },
+        { "@type": "Country", name: "México" },
+      ],
+      openingHoursSpecification: [
+        {
+          "@type": "OpeningHoursSpecification",
+          dayOfWeek: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
+          opens: "10:00",
+          closes: "16:00",
+        },
+      ],
+      knowsAbout: [
+        "Desarrollo web",
+        "Aplicaciones móviles",
+        "Inteligencia artificial",
+        "Ciberseguridad",
+        "Pentesting",
+        "Consultoría IT",
+      ],
+    },
+  ],
+};
+
 /** Wraps every page with the shared `<html>`/`<body>` shell, site fonts, and the monitoring client. */
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
@@ -80,6 +161,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${geistSans.variable} ${geistMono.variable} ${orbitron.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(siteJsonLd) }}
+        />
         <MonitoringClient />
         {children}
       </body>
