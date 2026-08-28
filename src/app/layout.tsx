@@ -28,6 +28,7 @@ const orbitron = Orbitron({
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://techplacetj.com"),
+  alternates: { canonical: "/" },
   title: "TechPlace | Desarrollo web, apps y ciberseguridad en Tijuana",
   description:
     "Desarrollo de software, aplicaciones móviles, inteligencia artificial y ciberseguridad para empresas. Construimos productos digitales escalables con IA integrada en todo el proceso, desde Tijuana, Baja California, con cobertura remota en toda la República.",
@@ -58,7 +59,7 @@ export const metadata: Metadata = {
     description:
       "Desarrollo web, aplicaciones móviles, inteligencia artificial y ciberseguridad para empresas. Tijuana, Baja California y toda la República.",
     images: ["/img/logos/techplace-brand.webp"],
-    url: "https://techplacetj.com/",
+    url: "https://techplacetj.com",
     type: "website",
   },
   twitter: {
