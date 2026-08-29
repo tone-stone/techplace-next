@@ -19,11 +19,13 @@ import {
   Phone,
   Plus,
   Receipt,
+  Trash2,
   X,
 } from "lucide-react";
 import {
   addHistoryEntryAction,
   createPlanAction,
+  deleteClientAction,
   getClientDetail,
   markPaymentPaidAction,
   recordPaymentAction,
@@ -32,6 +34,7 @@ import {
 } from "@/lib/crm/clients";
 import { formatCurrencyMXN } from "@/lib/crm/format";
 import { getDueDateUrgency } from "@/lib/crm/plan-status";
+import ConfirmDialog from "@/components/admin/ConfirmDialog";
 import StatusBadge from "./StatusBadge";
 import ModalPortal from "./ModalPortal";
 
@@ -64,6 +67,7 @@ function urgencyLabel(urgency: ReturnType<typeof getDueDateUrgency>) {
 export default function ClientDetailModal({ clientId, onClose }: { clientId: string; onClose: () => void }) {
   const [detail, setDetail] = useState<ClientDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const refresh = async () => {
     const data = await getClientDetail(clientId);
@@ -97,14 +101,26 @@ export default function ClientDetailModal({ clientId, onClose }: { clientId: str
         className="tp-dark-card-crm relative my-auto max-h-[90dvh] w-full max-w-2xl overflow-y-auto rounded-3xl p-6 sm:p-8"
         onClick={(e) => e.stopPropagation()}
       >
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Cerrar"
-          className="absolute right-5 top-5 -m-2 cursor-pointer rounded-full p-2 text-gray-400 hover:text-white"
-        >
-          <X className="h-5 w-5" />
-        </button>
+        <div className="absolute right-4 top-4 flex items-center gap-1">
+          {detail && (
+            <button
+              type="button"
+              onClick={() => setConfirmDelete(true)}
+              aria-label="Eliminar cliente"
+              className="-m-1 cursor-pointer rounded-full p-2 text-gray-500 transition-colors hover:bg-red-500/10 hover:text-red-400"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Cerrar"
+            className="-m-1 cursor-pointer rounded-full p-2 text-gray-400 hover:text-white"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
 
         {loading || !detail ? (
           <div className="flex items-center justify-center gap-2 py-16 text-gray-400">
@@ -114,6 +130,17 @@ export default function ClientDetailModal({ clientId, onClose }: { clientId: str
           <ClientDetailContent detail={detail} onChanged={refresh} />
         )}
       </div>
+
+      <ConfirmDialog
+        open={confirmDelete}
+        title="Eliminar cliente"
+        body={detail ? `Se eliminará ${detail.client.company}.` : undefined}
+        onConfirm={async () => {
+          await deleteClientAction(clientId);
+          onClose();
+        }}
+        onClose={() => setConfirmDelete(false)}
+      />
     </div>
     </ModalPortal>
   );

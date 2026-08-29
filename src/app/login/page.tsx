@@ -4,14 +4,14 @@ import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { ArrowLeft, Briefcase, Home, LayoutDashboard, Receipt, Sparkles, Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
-import { canAccessCrm, type ProfileRole } from "@/lib/auth/roles";
+import { canOpenDashboard, type ProfileRole } from "@/lib/auth/roles";
 import LoginFooter from "@/components/auth/LoginFooter";
 import LoginForm from "./LoginForm";
 
 /**
- * CRM login page (`/login`). Redirects an already-authenticated user
- * straight to their correct portal rather than showing the login form, and
- * renders the `?expired=1` notice from the inactivity-timeout flow.
+ * The single login page (`/login`). Sends an already-authenticated user with
+ * a valid dashboard role straight to `/admin`, and renders the `?expired=1`
+ * notice from the inactivity-timeout flow.
  */
 
 export const metadata: Metadata = {
@@ -42,11 +42,11 @@ export default async function LoginPage({
   } = await supabase.auth.getUser();
 
   if (user) {
-    // Already signed in with an account that isn't CRM — send them to their
-    // actual portal instead of dropping them into /admin (proxy.ts would
-    // just bounce them out again).
-    const { data: profile } = await supabase.from("profiles").select("team, role").eq("id", user.id).single();
-    redirect(profile && canAccessCrm(profile as ProfileRole) ? "/admin" : "/blog/dashboard");
+    // Already signed in with a valid dashboard role — skip the form.
+    const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).is("deleted_at", null).single();
+    if (profile && canOpenDashboard(profile as ProfileRole)) redirect("/admin");
+    // Signed in but no usable role: drop the session and show the form.
+    await supabase.auth.signOut();
   }
 
   return (
@@ -150,9 +150,9 @@ export default async function LoginPage({
             </p>
           )}
 
-          <LoginForm portal="crm" />
+          <LoginForm />
 
-          <LoginFooter accent="blue" switchHref="/blog/login" switchLabel="Ir al portal de redacción" />
+          <LoginFooter accent="blue" />
         </div>
       </div>
     </div>

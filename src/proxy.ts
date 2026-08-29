@@ -2,44 +2,35 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, after, type NextRequest } from 'next/server'
 import { ACTIVITY_COOKIE, IDLE_TIMEOUT_MS } from '@/lib/auth/session'
 import { logSlowOperation } from '@/lib/monitoring/server'
-import { canAccessBlog, canAccessCrm, type ProfileRole } from '@/lib/auth/roles'
+import { canOpenDashboard, type ProfileRole } from '@/lib/auth/roles'
 
 /**
  * Next.js middleware (Edge runtime), run on every request matched by
- * `config.matcher` below — i.e. everything except static assets. Only
- * `/admin` and `/blog/dashboard` actually gate on auth; every other request
+ * `config.matcher` below. Only `/admin*` gates on auth; every other request
  * short-circuits before the Supabase round trip so this stays cheap on the
  * common path.
  *
- * For a gated route it enforces two things, in order:
- *  1. Team-aware access: not just "is logged in", but "does this account's
- *     team (crm | blog) match the portal being requested". A CRM account
- *     hitting /blog/dashboard (or vice versa) is redirected to the portal
- *     it *does* have access to, rather than shown a broken/empty dashboard
- *     RLS would block the data from anyway. The general CRM admin passes
- *     both checks (see roles.ts).
+ * For `/admin*` it enforces, in order:
+ *  1. A signed-in account with a valid dashboard role (`canOpenDashboard`).
+ *     Which modules that role actually sees is decided by the RSC page and
+ *     the per-action gates, not here.
  *  2. A 30-minute inactivity timeout, tracked via a rolling `ACTIVITY_COOKIE`
  *     timestamp: if it's stale the auth cookies are wiped and the user is
- *     bounced to login with `?expired=1`; otherwise the timestamp slides
- *     forward. This is the server-side backstop for the same window
- *     IdleTimeout.tsx enforces client-side and each server action's
- *     requireAdmin() enforces per-mutation (see session.ts).
+ *     bounced to `/login?expired=1`; otherwise the timestamp slides forward.
  *
- * Auth-check duration is measured and reported via `logSlowOperation` when
- * it exceeds `SLOW_AUTH_CHECK_MS`, since this runs on every gated page load
- * and a slow Supabase round trip here directly delays navigation.
+ * Auth-check duration is measured and reported via `logSlowOperation` when it
+ * exceeds `SLOW_AUTH_CHECK_MS`, since this runs on every gated page load.
  */
 
 const SLOW_AUTH_CHECK_MS = 300
+const LOGIN_PATH = '/login'
 
 export async function proxy(request: NextRequest) {
   const isUnderPath = (base: string) =>
     request.nextUrl.pathname === base || request.nextUrl.pathname.startsWith(`${base}/`)
 
-  // Only /admin and /blog/dashboard gate on auth — skip the Supabase round trip
-  // (a network call) on every other route so normal pages aren't slowed down by it.
-  const needsAuthCheck = isUnderPath('/admin') || isUnderPath('/blog/dashboard')
-  if (!needsAuthCheck) {
+  // Only /admin gates on auth — skip the Supabase round trip on every other route.
+  if (!isUnderPath('/admin')) {
     return NextResponse.next({ request })
   }
 
@@ -73,7 +64,7 @@ export async function proxy(request: NextRequest) {
 
   let profile: ProfileRole | null = null
   if (user) {
-    const { data } = await supabase.from('profiles').select('team, role').eq('id', user.id).single()
+    const { data } = await supabase.from('profiles').select('role').eq('id', user.id).is('deleted_at', null).single()
     profile = data as ProfileRole | null
   }
 
@@ -88,38 +79,27 @@ export async function proxy(request: NextRequest) {
     )
   }
 
-  const onCrmPath = isUnderPath('/admin')
-  const loginPath = onCrmPath ? '/login' : '/blog/login'
-
   if (!user) {
     const url = request.nextUrl.clone()
-    url.pathname = loginPath
+    url.pathname = LOGIN_PATH
     return NextResponse.redirect(url)
   }
 
-  // Wrong portal for this account's team: send them to the one they
-  // actually belong to instead of rendering an empty/broken dashboard (RLS
-  // would block the data either way, but this avoids the confusing blank
-  // shell). CRM admin reaches both portals — it's the app's general admin.
-  const hasAccess = onCrmPath ? canAccessCrm : canAccessBlog
-  if (!profile || !hasAccess(profile)) {
+  // No profile or a role that can't open the dashboard: bounce to login.
+  if (!profile || !canOpenDashboard(profile)) {
     const url = request.nextUrl.clone()
-    if (profile && (onCrmPath ? canAccessBlog(profile) : canAccessCrm(profile))) {
-      url.pathname = onCrmPath ? '/blog/dashboard' : '/admin'
-    } else {
-      url.pathname = loginPath
-    }
+    url.pathname = LOGIN_PATH
     return NextResponse.redirect(url)
   }
 
   // Inactivity timeout: if the rolling "last seen" stamp is older than the
-  // window, drop the session (wipe the Supabase auth cookies) and bounce to
-  // the login screen with ?expired=1. Otherwise slide the window forward.
+  // window, drop the session and bounce to /login?expired=1. Otherwise slide
+  // the window forward.
   const now = Date.now()
   const seen = Number(request.cookies.get(ACTIVITY_COOKIE)?.value)
   if (Number.isFinite(seen) && now - seen > IDLE_TIMEOUT_MS) {
     const url = request.nextUrl.clone()
-    url.pathname = loginPath
+    url.pathname = LOGIN_PATH
     url.search = '?expired=1'
     const expiredRes = NextResponse.redirect(url)
     for (const c of request.cookies.getAll()) {

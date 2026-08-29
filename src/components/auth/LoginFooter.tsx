@@ -6,29 +6,24 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 
 /**
- * Footer shared by both login pages: a back button, a "forgot password"
- * dialog (contact IT — there's no self-service reset flow), and a link to
- * switch to the other portal's login. Purely presentational/client-side; it
- * doesn't call any auth APIs itself.
+ * Login-page footer: a back button and a "forgot password" dialog (contact
+ * IT — there's no self-service reset flow). Optionally a link to another
+ * page via `switchHref`/`switchLabel`. Purely presentational/client-side.
  */
 
 /**
- * Renders the login footer's back/forgot-password/switch-portal controls.
- * @param accent Color theme matching the portal: `blue` for CRM, `indigo` for blog.
- * @param switchHref Login URL of the other portal.
- * @param switchLabel Link text for switching to the other portal.
+ * @param accent Color theme: `blue` or `indigo`.
+ * @param switchHref Optional secondary link URL.
+ * @param switchLabel Optional secondary link text.
  */
-// Shared footer for both login screens so they behave identically. They differ
-// only by `accent` (blue = administración / CRM, indigo = redacción) and the
-// wording passed in `switchLabel`.
 export default function LoginFooter({
   accent,
   switchHref,
   switchLabel,
 }: {
   accent: "blue" | "indigo";
-  switchHref: string;
-  switchLabel: string;
+  switchHref?: string;
+  switchLabel?: string;
 }) {
   const [showHelp, setShowHelp] = useState(false);
   const router = useRouter();
@@ -66,11 +61,13 @@ export default function LoginFooter({
         </button>
       </div>
 
-      <div className="mt-3 text-center text-xs text-gray-500">
-        <Link href={switchHref} className={`transition hover:underline ${hover}`}>
-          {switchLabel} →
-        </Link>
-      </div>
+      {switchHref && switchLabel && (
+        <div className="mt-3 text-center text-xs text-gray-500">
+          <Link href={switchHref} className={`transition hover:underline ${hover}`}>
+            {switchLabel} →
+          </Link>
+        </div>
+      )}
 
       {showHelp && (
         <div

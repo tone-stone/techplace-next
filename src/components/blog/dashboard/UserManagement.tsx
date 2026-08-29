@@ -1,19 +1,20 @@
 "use client";
 
 /**
- * Account management panel shared between the CRM portal (`/admin`, full
- * `scope="all"`, team/role both editable) and this blog dashboard (always
- * `scope="blog"`, hard-locked to blog-team accounts — the team select is
- * hidden and a hidden `team=blog` field is submitted instead). Handles
- * listing, creating, editing, and deleting accounts via the
- * `createUserAction`/`updateUserAction`/`deleteUserAction`/`listUsers`
- * server actions, all of which respect the `blogOnly` scoping.
+ * Account management panel. Used in two places, both inside `/admin`:
+ *  - CRM "Usuarios" tab — `scope="all"`, every account, `assignableRoles`
+ *    is whatever the signed-in dios/admin may grant.
+ *  - Blog module "Usuarios del blog" sub-panel — `scope="blog"`, submits a
+ *    hidden `panel=blog` so the server actions restrict to blog/redactor.
+ * Backed by `createUserAction` / `updateUserAction` / `deleteUserAction` /
+ * `listUsers`.
  */
 
 import { useState, useTransition, type FormEvent } from "react";
 import { Pencil, ShieldCheck, Trash2, User as UserIcon, UserPlus, X } from "lucide-react";
 import { createUserAction, deleteUserAction, listUsers, updateUserAction, type ManagedUser } from "@/lib/auth/users";
-import type { Role, Team } from "@/lib/auth/roles";
+import type { Role } from "@/lib/auth/roles";
+import ConfirmDialog from "@/components/admin/ConfirmDialog";
 
 // Formats a user's initials (up to two) for their avatar badge.
 function initials(name: string): string {
@@ -25,23 +26,16 @@ function initials(name: string): string {
     .toUpperCase();
 }
 
-const TEAM_ROLE_OPTIONS: Record<Team, { value: Role; label: string }[]> = {
-  crm: [
-    { value: "operativo", label: "Operativo" },
-    { value: "admin", label: "Administrador" },
-  ],
-  blog: [
-    { value: "redactor", label: "Redactor" },
-    { value: "admin", label: "Administrador" },
-  ],
+const ROLE_LABELS: Record<Role, string> = {
+  dios: "Modo Dios",
+  admin: "Administrador",
+  ejecutivo: "Ejecutivo",
+  blog: "Blog",
+  redactor: "Redactor",
 };
 
-// Formats a role for display, optionally prefixed with its team (CRM/Blog)
-// when both teams are shown together.
-function roleLabel(team: Team, role: Role, showTeam: boolean): string {
-  const nivel = TEAM_ROLE_OPTIONS[team].find((o) => o.value === role)?.label ?? role;
-  return showTeam ? `${team === "crm" ? "CRM" : "Blog"} · ${nivel}` : nivel;
-}
+/** Roles that read as "elevated" — get the accent badge + shield icon. */
+const ELEVATED: Role[] = ["dios", "admin"];
 
 const ACCENTS = {
   sky: {
@@ -67,38 +61,37 @@ const ACCENTS = {
 } as const;
 
 /**
- * Renders the user list plus an inline create/edit form, scoped to either
- * every account (CRM) or just the blog team (this blog dashboard).
- *
- * @param accent - Color theme: "sky" for the CRM panel, "purple" for the
- * blog dashboard's admin panel.
+ * @param assignableRoles - Roles the signed-in manager may grant; also the
+ * options shown in the form's Rol select.
+ * @param accent - "sky" for the CRM Usuarios tab, "purple" for the Blog module.
  */
 export default function UserManagement({
   currentUserId,
   initialUsers,
+  assignableRoles,
   scope = "all",
   accent = "sky",
 }: {
   currentUserId: string;
   initialUsers: ManagedUser[];
-  /** "blog" restricts this instance to blog-team accounts only — used when a
-   * blog admin (not the CRM general admin) is the one managing users. */
+  assignableRoles: Role[];
   scope?: "all" | "blog";
   accent?: "sky" | "purple";
 }) {
   const a = ACCENTS[accent];
   const fieldClasses = `tp-glass-input w-full px-3 py-2 rounded-lg text-white placeholder-gray-500 outline-none transition ${a.field}`;
-  const defaultTeam: Team = "blog";
+  const defaultRole: Role = assignableRoles[0] ?? "redactor";
+
   const [users, setUsers] = useState<ManagedUser[]>(initialUsers);
   const [formOpen, setFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [team, setTeam] = useState<Team>(defaultTeam);
-  const [role, setRole] = useState<Role>("redactor");
+  const [role, setRole] = useState<Role>(defaultRole);
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [toDelete, setToDelete] = useState<ManagedUser | null>(null);
   const [pending, startTransition] = useTransition();
 
   const isSelf = editingId === currentUserId;
@@ -112,8 +105,7 @@ export default function UserManagement({
     setName("");
     setEmail("");
     setPassword("");
-    setTeam(defaultTeam);
-    setRole("redactor");
+    setRole(defaultRole);
     setEditingId(null);
     setFormOpen(false);
     setError(null);
@@ -124,8 +116,7 @@ export default function UserManagement({
     setName("");
     setEmail("");
     setPassword("");
-    setTeam(defaultTeam);
-    setRole("redactor");
+    setRole(defaultRole);
     setError(null);
     setFormOpen(true);
   };
@@ -134,16 +125,10 @@ export default function UserManagement({
     setEditingId(user.id);
     setName(user.name);
     setEmail(user.email);
-    setTeam(user.team);
-    setRole(user.role);
+    setRole(assignableRoles.includes(user.role) ? user.role : defaultRole);
     setPassword("");
     setError(null);
     setFormOpen(true);
-  };
-
-  const changeTeam = (next: Team) => {
-    setTeam(next);
-    setRole(TEAM_ROLE_OPTIONS[next][0].value);
   };
 
   const removeUser = (id: string) => {
@@ -181,9 +166,7 @@ export default function UserManagement({
     });
   };
 
-  const admins = users.filter((u) => u.role === "admin").length;
-  const crmCount = users.filter((u) => u.team === "crm").length;
-  const blogCount = users.filter((u) => u.team === "blog").length;
+  const elevated = users.filter((u) => ELEVATED.includes(u.role)).length;
 
   return (
     <div className="space-y-6">
@@ -192,29 +175,14 @@ export default function UserManagement({
           <p className="text-2xl font-bold">{users.length}</p>
           <p className="text-xs text-gray-400">Usuarios totales</p>
         </div>
-        {scope === "all" ? (
-          <>
-            <div className={`${a.card} rounded-2xl p-5`}>
-              <p className="text-2xl font-bold">{crmCount}</p>
-              <p className="text-xs text-gray-400">Equipo CRM</p>
-            </div>
-            <div className={`${a.card} rounded-2xl p-5`}>
-              <p className="text-2xl font-bold">{blogCount}</p>
-              <p className="text-xs text-gray-400">Equipo Blog</p>
-            </div>
-          </>
-        ) : (
-          <>
-            <div className={`${a.card} rounded-2xl p-5`}>
-              <p className="text-2xl font-bold">{admins}</p>
-              <p className="text-xs text-gray-400">Administradores</p>
-            </div>
-            <div className={`${a.card} rounded-2xl p-5`}>
-              <p className="text-2xl font-bold">{users.length - admins}</p>
-              <p className="text-xs text-gray-400">Redactores</p>
-            </div>
-          </>
-        )}
+        <div className={`${a.card} rounded-2xl p-5`}>
+          <p className="text-2xl font-bold">{elevated}</p>
+          <p className="text-xs text-gray-400">Dios / Admin</p>
+        </div>
+        <div className={`${a.card} rounded-2xl p-5`}>
+          <p className="text-2xl font-bold">{users.length - elevated}</p>
+          <p className="text-xs text-gray-400">Resto</p>
+        </div>
       </div>
 
       <div className={`${a.card} rounded-3xl p-6 sm:p-8`}>
@@ -232,17 +200,9 @@ export default function UserManagement({
         </div>
 
         {formOpen && (
-          <form
-            onSubmit={handleSubmit}
-            className={`mb-5 space-y-3 rounded-2xl border p-4 ${a.formBox}`}
-          >
+          <form onSubmit={handleSubmit} className={`mb-5 space-y-3 rounded-2xl border p-4 ${a.formBox}`}>
             {editingId && <input type="hidden" name="id" value={editingId} />}
-            {scope === "blog" && (
-              <>
-                <input type="hidden" name="team" value="blog" />
-                <input type="hidden" name="panel" value="blog" />
-              </>
-            )}
+            {scope === "blog" && <input type="hidden" name="panel" value="blog" />}
 
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-semibold text-white">
@@ -295,42 +255,21 @@ export default function UserManagement({
                   className={fieldClasses}
                 />
               </div>
-              <div className={scope === "all" ? "grid grid-cols-2 gap-3" : ""}>
-                {scope === "all" && (
-                  <div>
-                    <label className="block text-xs text-gray-400 mb-1">Equipo</label>
-                    <select
-                      name="team"
-                      value={team}
-                      onChange={(e) => changeTeam(e.target.value as Team)}
-                      disabled={isSelf}
-                      className={`${fieldClasses} disabled:opacity-60`}
-                    >
-                      <option value="blog" className="bg-[#0d0c16]">
-                        Blog
-                      </option>
-                      <option value="crm" className="bg-[#0d0c16]">
-                        CRM
-                      </option>
-                    </select>
-                  </div>
-                )}
-                <div>
-                  <label className="block text-xs text-gray-400 mb-1">Rol</label>
-                  <select
-                    name="role"
-                    value={role}
-                    onChange={(e) => setRole(e.target.value as Role)}
-                    disabled={isSelf}
-                    className={`${fieldClasses} disabled:opacity-60`}
-                  >
-                    {TEAM_ROLE_OPTIONS[team].map((o) => (
-                      <option key={o.value} value={o.value} className="bg-[#0d0c16]">
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Rol</label>
+                <select
+                  name="role"
+                  value={role}
+                  onChange={(e) => setRole(e.target.value as Role)}
+                  disabled={isSelf}
+                  className={`${fieldClasses} disabled:opacity-60`}
+                >
+                  {assignableRoles.map((r) => (
+                    <option key={r} value={r} className="bg-[#0d0c16]">
+                      {ROLE_LABELS[r]}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
 
@@ -369,17 +308,17 @@ export default function UserManagement({
 
               <span
                 className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium ${
-                  user.role === "admin"
+                  ELEVATED.includes(user.role)
                     ? a.badge
                     : "border-indigo-400/30 bg-indigo-500/15 text-indigo-300"
                 }`}
               >
-                {user.role === "admin" ? (
+                {ELEVATED.includes(user.role) ? (
                   <ShieldCheck className="h-3.5 w-3.5" />
                 ) : (
                   <UserIcon className="h-3.5 w-3.5" />
                 )}
-                {roleLabel(user.team, user.role, scope === "all")}
+                {ROLE_LABELS[user.role]}
               </span>
 
               <button
@@ -393,7 +332,7 @@ export default function UserManagement({
 
               <button
                 type="button"
-                onClick={() => removeUser(user.id)}
+                onClick={() => setToDelete(user)}
                 disabled={user.id === currentUserId || (pending && deletingId === user.id)}
                 aria-label="Eliminar usuario"
                 className="shrink-0 rounded-full p-2 text-gray-500 transition-colors enabled:hover:bg-red-500/10 enabled:hover:text-red-400 disabled:opacity-30"
@@ -408,6 +347,21 @@ export default function UserManagement({
           )}
         </div>
       </div>
+
+      <ConfirmDialog
+        open={toDelete !== null}
+        title="Eliminar cuenta"
+        confirmLabel="Desactivar"
+        body={
+          toDelete
+            ? `Se desactivará la cuenta de ${toDelete.name} (${toDelete.email}); no podrá iniciar sesión.`
+            : undefined
+        }
+        onConfirm={() => {
+          if (toDelete) removeUser(toDelete.id);
+        }}
+        onClose={() => setToDelete(null)}
+      />
     </div>
   );
 }

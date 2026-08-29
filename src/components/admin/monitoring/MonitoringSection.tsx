@@ -33,6 +33,7 @@ import type {
 import type { WebVitalName, WebVitalRating } from "@/lib/monitoring/types";
 import PageSpeedSection from "./PageSpeedSection";
 import EngagementSection from "./EngagementSection";
+import DeletionsSection from "./DeletionsSection";
 
 /* ------------------------------------------------------------------ */
 /*  KPI tiles                                                          */
@@ -464,6 +465,8 @@ export default function MonitoringSection({
       <PageSpeedSection />
 
       <EngagementSection />
+
+      <DeletionsSection />
 
       <div className="tp-dark-card-crm rounded-2xl p-5 sm:p-6">
         <div className="mb-4 flex items-center gap-2">

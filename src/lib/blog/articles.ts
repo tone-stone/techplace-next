@@ -6,8 +6,7 @@
  * pages, and staff-gated reads/writes (via the authenticated Supabase
  * client) for the dashboard, including cover/video/gallery uploads to
  * Cloudinary. Staff access is gated by `requireStaff()`, which in turn
- * checks `canAccessBlog()` — so this covers blog admins/redactors and the
- * CRM general admin, not just "any authenticated staff".
+ * checks `canUseBlogModule()` — dios, admin, blog, and redactor.
  */
 
 import { revalidatePath } from "next/cache";
@@ -15,7 +14,8 @@ import { createClient } from "@/lib/supabase/server";
 import { createPublicClient } from "@/lib/supabase/public";
 import cloudinary from "@/lib/cloudinary";
 import { MAX_IMAGE_BYTES, MAX_VIDEO_BYTES, formatBytes } from "@/lib/blog/media-limits";
-import { canAccessBlog, canDeleteArticles, type ProfileRole } from "@/lib/auth/roles";
+import { canUseBlogModule, canDeleteArticles, type ProfileRole } from "@/lib/auth/roles";
+import { softDelete } from "@/lib/crm/soft-delete";
 
 export type ManagedArticle = {
   id: string;
@@ -48,8 +48,8 @@ function slugify(title: string): string {
 
 /**
  * Auth/authorization gate for every dashboard-only action below: requires a
- * signed-in user whose profile passes `canAccessBlog()` (blog admin, blog
- * redactor, or the CRM general admin — not just "any authenticated staff").
+ * signed-in user whose role passes `canUseBlogModule()` (dios, admin, blog,
+ * redactor).
  *
  * @returns The failure reason on rejection, or the user's id and profile on
  * success.
@@ -62,12 +62,12 @@ async function requireStaff() {
 
   if (!user) return { ok: false as const, error: "No autenticado" };
 
-  const { data: profile } = await supabase.from("profiles").select("team, role").eq("id", user.id).single();
-  if (!profile || !canAccessBlog(profile as ProfileRole)) {
-    return { ok: false as const, error: "No tienes un perfil de equipo asociado" };
+  const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).is("deleted_at", null).single();
+  if (!profile || !canUseBlogModule(profile as ProfileRole)) {
+    return { ok: false as const, error: "No tienes permisos para el módulo de blog" };
   }
 
-  return { ok: true as const, userId: user.id, profile: profile as ProfileRole };
+  return { ok: true as const, userId: user.id, email: user.email ?? null, profile: profile as ProfileRole };
 }
 
 // Converts a raw `articles` table row (snake_case) into the camelCase
@@ -124,6 +124,7 @@ export async function getPublishedArticles(): Promise<ManagedArticle[]> {
     .from("articles")
     .select("*")
     .eq("status", "published")
+    .is("deleted_at", null)
     .order("created_at", { ascending: false });
 
   return (data ?? []).map(mapRow);
@@ -149,6 +150,7 @@ export async function getPublishedArticleBySlug(slug: string): Promise<ManagedAr
     .select("*")
     .eq("status", "published")
     .eq("slug", slug)
+    .is("deleted_at", null)
     .single();
 
   return data ? mapRow(data) : null;
@@ -163,7 +165,11 @@ export async function listArticles(): Promise<{ articles: ManagedArticle[] } | {
   if (!check.ok) return { error: check.error };
 
   const supabase = await createClient();
-  const { data, error } = await supabase.from("articles").select("*").order("created_at", { ascending: false });
+  const { data, error } = await supabase
+    .from("articles")
+    .select("*")
+    .is("deleted_at", null)
+    .order("created_at", { ascending: false });
 
   if (error) return { error: error.message };
   return { articles: (data ?? []).map(mapRow) };
@@ -333,20 +339,24 @@ export async function updateArticleAction(
 }
 
 /**
- * Server action backing article deletion. Staff-gated via `requireStaff()`
- * and further restricted to admins via `canDeleteArticles()` — a redactor
- * passes the staff check but is rejected here.
+ * Server action backing article deletion. Gated via `requireStaff()`
+ * (`canUseBlogModule`); `canDeleteArticles` is the same set today, kept as an
+ * explicit hook for when article deletion needs a tighter rule.
  */
 export async function deleteArticleAction(id: string): Promise<ArticleActionState> {
   const check = await requireStaff();
   if (!check.ok) return { error: check.error };
-  if (!canDeleteArticles(check.profile)) return { error: "Solo un administrador puede eliminar artículos" };
+  if (!canDeleteArticles(check.profile)) return { error: "No tienes permiso para eliminar artículos" };
 
-  const supabase = await createClient();
-  const { error } = await supabase.from("articles").delete().eq("id", id);
-
-  if (error) return { error: error.message };
+  const result = await softDelete({
+    table: "articles",
+    id,
+    actorId: check.userId,
+    actorEmail: check.email ?? null,
+  });
+  if (!result.ok) return { error: result.error };
 
   revalidatePath("/blog");
+  revalidatePath("/admin");
   return { success: true };
 }

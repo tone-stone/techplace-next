@@ -4,13 +4,14 @@
  * CRM tasks: data fetching plus server actions for creating tasks and
  * moving them across the kanban-style status columns in `TasksSection`.
  * Tasks belong to a project and are not logged to client history. Every
- * mutation requires `requireCrmAccess()`.
+ * mutation requires `requireDashboard()` (any signed-in role).
  */
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { withTiming } from "@/lib/monitoring/timing";
-import { requireCrmAccess } from "./auth";
+import { requireDashboard } from "./auth";
+import { softDelete } from "./soft-delete";
 import type { CrmActionState } from "./clients";
 
 export type TaskStatus = "por_hacer" | "en_progreso" | "terminado";
@@ -60,7 +61,7 @@ function mapTask(row: {
 export async function getAllTasks(): Promise<CrmTask[]> {
   return withTiming("crm.getAllTasks", async () => {
     const supabase = await createClient();
-    const { data } = await supabase.from("crm_tasks").select("*").order("created_at", { ascending: true });
+    const { data } = await supabase.from("crm_tasks").select("*").is("deleted_at", null).order("created_at", { ascending: true });
     return (data ?? []).map(mapTask);
   });
 }
@@ -70,7 +71,7 @@ export async function createTaskAction(
   _prevState: CrmActionState,
   formData: FormData
 ): Promise<CrmActionState> {
-  const check = await requireCrmAccess();
+  const check = await requireDashboard();
   if (!check.ok) return { error: check.error };
 
   const projectId = String(formData.get("projectId") ?? "");
@@ -110,7 +111,7 @@ export async function createTaskAction(
 
 /** Moves a task to a new kanban column (status). */
 export async function updateTaskStatusAction(taskId: string, status: TaskStatus): Promise<CrmActionState> {
-  const check = await requireCrmAccess();
+  const check = await requireDashboard();
   if (!check.ok) return { error: check.error };
 
   const supabase = await createClient();
@@ -130,7 +131,7 @@ export async function updateTaskAssigneeAction(
   taskId: string,
   assigneeId: string | null
 ): Promise<CrmActionState> {
-  const check = await requireCrmAccess();
+  const check = await requireDashboard();
   if (!check.ok) return { error: check.error };
 
   const supabase = await createClient();
@@ -139,6 +140,26 @@ export async function updateTaskAssigneeAction(
     .update({ assignee_id: assigneeId, assignee: null })
     .eq("id", taskId);
   if (error) return { error: error.message };
+
+  revalidatePath("/admin");
+  return { success: true };
+}
+
+/**
+ * Soft-deletes a task (recoverable; logged to `deletion_log`). RLS further
+ * limits this to dios/admin/blog or the task's creator.
+ */
+export async function deleteTaskAction(taskId: string): Promise<CrmActionState> {
+  const check = await requireDashboard();
+  if (!check.ok) return { error: check.error };
+
+  const result = await softDelete({
+    table: "crm_tasks",
+    id: taskId,
+    actorId: check.userId,
+    actorEmail: check.email,
+  });
+  if (!result.ok) return { error: result.error };
 
   revalidatePath("/admin");
   return { success: true };

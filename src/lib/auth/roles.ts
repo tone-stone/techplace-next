@@ -1,38 +1,75 @@
 /**
- * Single source of truth for the team/role permission model. Every account
- * belongs to exactly one team (`crm` | `blog`) and holds exactly one role
- * within that team, giving four valid (team, role) combos in total:
- * `(crm,admin)`, `(crm,operativo)`, `(blog,admin)`, `(blog,redactor)`. All
- * permission checks elsewhere in the app (proxy.ts, server actions, CRM
- * helpers) call into the predicate functions here instead of re-deriving
- * this logic. Kept dependency-free (no next/headers, no JSX) so it's safe
- * to import from both Node server code and src/proxy.ts (Edge runtime).
+ * Single source of truth for the permission model. Every account holds
+ * exactly one flat role. All permission checks elsewhere (proxy.ts, server
+ * actions, CRM helpers, dashboard nav) call into the predicates here instead
+ * of re-deriving the logic. Kept dependency-free (no next/headers, no JSX)
+ * so it's safe to import from both Node server code and src/proxy.ts (Edge).
+ *
+ *  - dios      full access, no restriction; only another dios may change or
+ *              deactivate a dios account
+ *  - admin     runs the whole CRM, assigns users/roles; cannot touch a dios
+ *  - ejecutivo Clientes/Proyectos/Cotizaciones/Tareas full; Facturación
+ *              read-only; no Monitoreo, no Usuarios
+ *  - blog      Blog module (articles + blog-team accounts) and Tareas
+ *  - redactor  Blog articles and Tareas only
  */
 
-export type Team = "crm" | "blog";
-export type Role = "admin" | "operativo" | "redactor";
-export type ProfileRole = { team: Team; role: Role };
+export const ROLES = ["dios", "admin", "ejecutivo", "blog", "redactor"] as const;
+export type Role = (typeof ROLES)[number];
 
-/** True for the `(crm,admin)` combo — the app's general admin. */
-export const isCrmAdmin = (p: ProfileRole) => p.team === "crm" && p.role === "admin";
-/** True for the `(crm,operativo)` combo. */
-export const isCrmOperativo = (p: ProfileRole) => p.team === "crm" && p.role === "operativo";
-/** True for the `(blog,admin)` combo. */
-export const isBlogAdmin = (p: ProfileRole) => p.team === "blog" && p.role === "admin";
-/** True for the `(blog,redactor)` combo. */
-export const isBlogRedactor = (p: ProfileRole) => p.team === "blog" && p.role === "redactor";
+/** Shape of the `profiles` row as read for permission checks. */
+export type ProfileRole = { role: Role };
 
-// CRM admin is the app's general admin — full access everywhere, including
-// the blog, on top of running the CRM itself and assigning every account.
-/** Gate for the CRM portal: crm/admin and crm/operativo, plus the general admin. */
-export const canAccessCrm = (p: ProfileRole) => isCrmAdmin(p) || isCrmOperativo(p);
-/** Gate for the blog portal: blog/admin and blog/redactor, plus the general admin. */
-export const canAccessBlog = (p: ProfileRole) => isCrmAdmin(p) || isBlogAdmin(p) || isBlogRedactor(p);
-/** Gate for the CRM's user management panel (create/edit/delete accounts). */
-export const canManageUsers = (p: ProfileRole) => isCrmAdmin(p);
-/** Gate for destructive CRM data operations. */
-export const canDeleteCrmData = (p: ProfileRole) => isCrmAdmin(p);
-/** Gate for deleting blog articles: CRM admin or blog admin, not redactor. */
-export const canDeleteArticles = (p: ProfileRole) => isCrmAdmin(p) || isBlogAdmin(p);
-/** Gate for rendering blog-admin-only UI (visible to the general admin too). */
-export const showsBlogAdminView = (p: ProfileRole) => isCrmAdmin(p) || isBlogAdmin(p);
+const roleOf = (p: ProfileRole | Role): Role => (typeof p === "string" ? p : p.role);
+const isOneOf =
+  (...allowed: Role[]) =>
+  (p: ProfileRole | Role) =>
+    allowed.includes(roleOf(p));
+
+/* --- Individual roles --- */
+export const isDios = isOneOf("dios");
+export const isAdmin = isOneOf("admin");
+export const isEjecutivo = isOneOf("ejecutivo");
+export const isBlog = isOneOf("blog");
+export const isRedactor = isOneOf("redactor");
+
+/* --- Capability sets --- */
+
+/** Anyone with a valid role may open the `/admin` dashboard. */
+export const canOpenDashboard = isOneOf(...ROLES);
+/** Clientes, Proyectos, Cotizaciones (full CRUD). */
+export const canUseCrmCore = isOneOf("dios", "admin", "ejecutivo");
+/** See the Facturación module. */
+export const canReadBilling = isOneOf("dios", "admin", "ejecutivo");
+/** Create/edit/delete in Facturación (ejecutivo is read-only). */
+export const canWriteBilling = isOneOf("dios", "admin");
+/** Monitoreo module. */
+export const canSeeMonitoring = isOneOf("dios", "admin");
+/** Full account management (every role, every account except a dios for admin). */
+export const canManageAllUsers = isOneOf("dios", "admin");
+/** Blog-team account management (only blog/redactor accounts). */
+export const canManageBlogUsers = isOneOf("dios", "admin", "blog");
+/** See and edit blog articles. */
+export const canUseBlogModule = isOneOf("dios", "admin", "blog", "redactor");
+/** Delete a blog article — same set as editing them now. */
+export const canDeleteArticles = isOneOf("dios", "admin", "blog", "redactor");
+/** Tareas module — available to every role. */
+export const canUseTasks = isOneOf(...ROLES);
+
+/* --- Account-on-account rules --- */
+
+/** Can `actor` create/edit/delete an account that has role `target`? */
+export function canActOnAccount(actor: Role, target: Role): boolean {
+  if (actor === "dios") return true;
+  if (actor === "admin") return target !== "dios";
+  if (actor === "blog") return target === "blog" || target === "redactor";
+  return false;
+}
+
+/** Which roles may `actor` assign to an account. */
+export function assignableRoles(actor: Role): Role[] {
+  if (actor === "dios") return [...ROLES];
+  if (actor === "admin") return ROLES.filter((r) => r !== "dios");
+  if (actor === "blog") return ["blog", "redactor"];
+  return [];
+}

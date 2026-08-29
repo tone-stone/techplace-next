@@ -3,9 +3,8 @@
 /**
  * Client-side shell for the CRM at `/admin`: renders the sidebar/mobile nav,
  * tracks which section is active, and mounts the corresponding section
- * component with the data `AdminPage` fetched server-side. Also gates the
- * "Usuarios" nav item and section to CRM admins (`currentUserIsAdmin`),
- * since only the general admin manages accounts.
+ * component with the data `AdminPage` fetched server-side. Which nav items
+ * and sections appear is decided per `role` (see `visibleSections`).
  */
 
 import { useState } from "react";
@@ -19,16 +18,28 @@ import {
   LayoutDashboard,
   LogOut,
   Menu,
+  Newspaper,
   Receipt,
   UserCog,
   Users,
   X,
 } from "lucide-react";
 import { logout } from "@/lib/auth/actions";
+import {
+  assignableRoles,
+  canManageAllUsers,
+  canReadBilling,
+  canSeeMonitoring,
+  canUseBlogModule,
+  canUseCrmCore,
+  canWriteBilling,
+  type Role,
+} from "@/lib/auth/roles";
 import IdleTimeout from "@/components/auth/IdleTimeout";
 import DashboardUserCard from "@/components/dashboard/DashboardUserCard";
 import UserManagement from "@/components/blog/dashboard/UserManagement";
-import type { ManagedUser } from "@/lib/auth/users";
+import type { AssignableUser, ManagedUser } from "@/lib/auth/users";
+import type { ManagedArticle } from "@/lib/blog/articles";
 import type { ClientPayment, CrmClient } from "@/lib/crm/clients";
 import type { CrmProject } from "@/lib/crm/projects";
 import type { CrmInvoice } from "@/lib/crm/invoices";
@@ -48,6 +59,7 @@ import ProjectsSection from "./crm/ProjectsSection";
 import InvoicesSection from "./crm/InvoicesSection";
 import QuotesSection from "./crm/QuotesSection";
 import TasksSection from "./crm/TasksSection";
+import BlogSection from "./crm/BlogSection";
 import MonitoringSection from "./monitoring/MonitoringSection";
 
 type Section =
@@ -57,6 +69,7 @@ type Section =
   | "facturacion"
   | "cotizaciones"
   | "tareas"
+  | "blog"
   | "usuarios"
   | "monitoreo";
 
@@ -67,29 +80,44 @@ const NAV_ITEMS: { id: Section; label: string; icon: typeof Users }[] = [
   { id: "facturacion", label: "Facturación", icon: Receipt },
   { id: "cotizaciones", label: "Cotizaciones", icon: FileText },
   { id: "tareas", label: "Tareas", icon: Kanban },
+  { id: "blog", label: "Blog", icon: Newspaper },
   { id: "usuarios", label: "Usuarios", icon: UserCog },
   { id: "monitoreo", label: "Monitoreo", icon: Activity },
 ];
 
+/** Which nav sections a role sees, in nav order. */
+function visibleSections(role: Role): Section[] {
+  const out: Section[] = [];
+  if (canUseCrmCore(role)) out.push("resumen", "clientes", "proyectos");
+  if (canReadBilling(role)) out.push("facturacion");
+  if (canUseCrmCore(role)) out.push("cotizaciones");
+  out.push("tareas");
+  if (canUseBlogModule(role)) out.push("blog");
+  if (canManageAllUsers(role)) out.push("usuarios");
+  if (canSeeMonitoring(role)) out.push("monitoreo");
+  return out;
+}
+
 /**
  * CRM dashboard shell: sidebar navigation, mobile header/quick-nav, and the
- * active section's content area.
- *
- * @param currentUserIsAdmin - Whether the signed-in user is a CRM admin;
- * controls visibility of the "Usuarios" section (user management is
- * admin-only, not available to operativo).
+ * active section's content area. `role` decides which of the nine modules
+ * appear (see `visibleSections`) and whether Facturación is read-only.
  */
 export default function CrmDashboard({
   email,
   userName = "",
   userId = "",
+  role,
   users = [],
-  currentUserIsAdmin = false,
-  clients,
-  payments,
-  projects,
-  invoices,
-  quotes,
+  blogUsers = [],
+  assignees = [],
+  blogArticles = [],
+  projectOptions = [],
+  clients = [],
+  payments = [],
+  projects = [],
+  invoices = [],
+  quotes = [],
   tasks,
   recentErrors = [],
   errorStats = { daily: [], last24h: 0, last7d: 0 },
@@ -101,13 +129,17 @@ export default function CrmDashboard({
   email: string;
   userName?: string;
   userId?: string;
+  role: Role;
   users?: ManagedUser[];
-  currentUserIsAdmin?: boolean;
-  clients: CrmClient[];
-  payments: ClientPayment[];
-  projects: CrmProject[];
-  invoices: CrmInvoice[];
-  quotes: CrmQuote[];
+  blogUsers?: ManagedUser[];
+  assignees?: AssignableUser[];
+  blogArticles?: ManagedArticle[];
+  projectOptions?: { id: string; name: string }[];
+  clients?: CrmClient[];
+  payments?: ClientPayment[];
+  projects?: CrmProject[];
+  invoices?: CrmInvoice[];
+  quotes?: CrmQuote[];
   tasks: CrmTask[];
   recentErrors?: MonitoringErrorEvent[];
   errorStats?: ErrorStats;
@@ -116,13 +148,12 @@ export default function CrmDashboard({
   slowPages?: SlowPage[];
   failedLogins?: FailedLoginStats;
 }) {
-  const [section, setSection] = useState<Section>("resumen");
+  const allowed = visibleSections(role);
+  const navItems = NAV_ITEMS.filter((n) => allowed.includes(n.id));
+  const [section, setSection] = useState<Section>(navItems[0]?.id ?? "tareas");
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  // "Usuarios" is CRM-admin-only — the CRM admin is the app's general admin
-  // and assigns accounts for both the CRM and blog teams.
-  const navItems = currentUserIsAdmin ? NAV_ITEMS : NAV_ITEMS.filter((n) => n.id !== "usuarios");
-  const currentLabel = navItems.find((n) => n.id === section)?.label ?? "Resumen";
+  const currentLabel = navItems.find((n) => n.id === section)?.label ?? navItems[0]?.label ?? "Panel";
 
   const navButtonClass = (active: boolean) =>
     `flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${
@@ -266,27 +297,53 @@ export default function CrmDashboard({
             </h1>
           </div>
 
-          {section === "resumen" && (
+          {section === "resumen" && allowed.includes("resumen") && (
             <OverviewSection clients={clients} projects={projects} payments={payments} />
           )}
-          {section === "clientes" && <ClientsSection clients={clients} />}
-          {section === "proyectos" && <ProjectsSection projects={projects} clients={clients} />}
-          {section === "facturacion" && (
-            <InvoicesSection invoices={invoices} clients={clients} projects={projects} />
+          {section === "clientes" && allowed.includes("clientes") && (
+            <ClientsSection clients={clients} />
           )}
-          {section === "cotizaciones" && <QuotesSection quotes={quotes} clients={clients} />}
+          {section === "proyectos" && allowed.includes("proyectos") && (
+            <ProjectsSection projects={projects} clients={clients} />
+          )}
+          {section === "facturacion" && allowed.includes("facturacion") && (
+            <InvoicesSection
+              invoices={invoices}
+              clients={clients}
+              projects={projects}
+              readOnly={!canWriteBilling(role)}
+            />
+          )}
+          {section === "cotizaciones" && allowed.includes("cotizaciones") && (
+            <QuotesSection quotes={quotes} clients={clients} />
+          )}
           {section === "tareas" && (
             <TasksSection
               tasks={tasks}
-              projects={projects}
-              users={users}
+              projects={projectOptions}
+              assignees={assignees}
+              currentUserId={userId}
+              defaultView={canUseCrmCore(role) ? "proyecto" : "mias"}
+              canPickAnyProject={canUseCrmCore(role)}
+            />
+          )}
+          {section === "blog" && allowed.includes("blog") && (
+            <BlogSection
+              role={role}
+              articles={blogArticles}
+              users={blogUsers}
+              authorEmail={email}
               currentUserId={userId}
             />
           )}
-          {section === "usuarios" && currentUserIsAdmin && (
-            <UserManagement currentUserId={userId} initialUsers={users} />
+          {section === "usuarios" && allowed.includes("usuarios") && (
+            <UserManagement
+              currentUserId={userId}
+              initialUsers={users}
+              assignableRoles={assignableRoles(role)}
+            />
           )}
-          {section === "monitoreo" && (
+          {section === "monitoreo" && allowed.includes("monitoreo") && (
             <MonitoringSection
               recentErrors={recentErrors}
               errorStats={errorStats}

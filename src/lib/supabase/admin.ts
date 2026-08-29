@@ -7,7 +7,7 @@ import { createClient as createSupabaseClient } from "@supabase/supabase-js";
  * others. This one wraps the service-role key, which bypasses Row Level
  * Security entirely, so it must only ever run in trusted server code that
  * has already authorized the caller itself (e.g. user management actions
- * gated by `canManageUsers`) — it performs no auth/RLS checks of its own.
+ * gated by `requireUserManager`) — it performs no auth/RLS checks of its own.
  */
 
 /**

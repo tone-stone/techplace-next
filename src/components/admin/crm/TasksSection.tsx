@@ -16,18 +16,19 @@
  */
 
 import { useActionState, useEffect, useRef, useState } from "react";
-import { Calendar, ChevronLeft, ChevronRight, Plus, X } from "lucide-react";
+import { Calendar, ChevronLeft, ChevronRight, Plus, Trash2, X } from "lucide-react";
+import ConfirmDialog from "@/components/admin/ConfirmDialog";
 import {
   createTaskAction,
   getAllTasks,
+  deleteTaskAction,
   updateTaskAssigneeAction,
   updateTaskStatusAction,
   type CrmTask,
   type TaskStatus,
 } from "@/lib/crm/tasks";
 import type { CrmActionState } from "@/lib/crm/clients";
-import type { CrmProject } from "@/lib/crm/projects";
-import type { ManagedUser } from "@/lib/auth/users";
+import type { AssignableUser } from "@/lib/auth/users";
 import { getDueDateUrgency } from "@/lib/crm/plan-status";
 
 const COLUMNS: { status: TaskStatus; label: string; dot: string }[] = [
@@ -53,25 +54,30 @@ function initials(name: string): string {
 export default function TasksSection({
   tasks: initialTasks,
   projects,
-  users = [],
+  assignees = [],
   currentUserId = "",
+  defaultView = "proyecto",
+  canPickAnyProject = true,
 }: {
   tasks: CrmTask[];
-  projects: CrmProject[];
-  users?: ManagedUser[];
+  projects: { id: string; name: string }[];
+  assignees?: AssignableUser[];
   currentUserId?: string;
+  /** "mias" for roles that mostly work their own assigned tasks (blog, redactor). */
+  defaultView?: "proyecto" | "mias";
+  /** When false, hide the per-column quick-add (blog/redactor pick from the detail form). */
+  canPickAnyProject?: boolean;
 }) {
   const [tasks, setTasks] = useState(initialTasks);
   const [projectId, setProjectId] = useState(projects[0]?.id ?? "");
-  const [view, setView] = useState<"proyecto" | "mias">("proyecto");
+  const [view, setView] = useState<"proyecto" | "mias">(defaultView);
   const [showDetailForm, setShowDetailForm] = useState(false);
   const [quickAddCol, setQuickAddCol] = useState<TaskStatus | null>(null);
   const [dragTaskId, setDragTaskId] = useState<string | null>(null);
   const [dragOverCol, setDragOverCol] = useState<TaskStatus | null>(null);
 
-  const crmUsers = users.filter((u) => u.team === "crm");
   const resolveName = (id: string | null) =>
-    id ? (crmUsers.find((u) => u.id === id)?.name ?? null) : null;
+    id ? (assignees.find((u) => u.id === id)?.name ?? null) : null;
   const projectNameOf = (id: string) => projects.find((p) => p.id === id)?.name ?? "—";
 
   const boardTasks =
@@ -101,6 +107,12 @@ export default function TasksSection({
       prev.map((t) => (t.id === taskId ? { ...t, assigneeId, assignee: null } : t))
     );
     await updateTaskAssigneeAction(taskId, assigneeId);
+  };
+
+  const [taskToDelete, setTaskToDelete] = useState<CrmTask | null>(null);
+  const removeTask = async (taskId: string) => {
+    setTasks((prev) => prev.filter((t) => t.id !== taskId));
+    await deleteTaskAction(taskId);
   };
 
   if (projects.length === 0) {
@@ -172,7 +184,7 @@ export default function TasksSection({
         <NewTaskForm
           projects={projects}
           defaultProjectId={projectId}
-          crmUsers={crmUsers}
+          assignees={assignees}
           currentUserId={currentUserId}
           onCreated={refresh}
           onDone={() => setShowDetailForm(false)}
@@ -232,7 +244,7 @@ export default function TasksSection({
                         columnIndex={columnIndex}
                         dragging={dragTaskId === task.id}
                         assigneeName={resolveName(task.assigneeId) ?? task.assignee}
-                        crmUsers={crmUsers}
+                        assignees={assignees}
                         currentUserId={currentUserId}
                         projectLabel={view === "mias" ? projectNameOf(task.projectId) : null}
                         onDragStart={(e) => {
@@ -246,6 +258,7 @@ export default function TasksSection({
                         }}
                         onMove={(direction) => handleMoveByButton(task, direction)}
                         onAssign={(id) => void assignTask(task.id, id)}
+                        onDelete={() => setTaskToDelete(task)}
                       />
                     ))}
                     {colTasks.length === 0 && quickAddCol !== column.status && (
@@ -256,6 +269,7 @@ export default function TasksSection({
                   </div>
 
                   {view === "proyecto" &&
+                    canPickAnyProject &&
                     (quickAddCol === column.status ? (
                       <QuickAdd
                         projectId={projectId}
@@ -278,35 +292,47 @@ export default function TasksSection({
           </div>
         </>
       )}
+
+      <ConfirmDialog
+        open={taskToDelete !== null}
+        title="Eliminar tarea"
+        body={taskToDelete ? `Se eliminará "${taskToDelete.title}".` : undefined}
+        onConfirm={() => {
+          if (taskToDelete) void removeTask(taskToDelete.id);
+        }}
+        onClose={() => setTaskToDelete(null)}
+      />
     </div>
   );
 }
 
-/** One board card: project tag (in "Mis tareas"), due-date label, title, description, assignee, move buttons. */
+/** One board card: project tag (in "Mis tareas"), due-date label, title, description, assignee, move + delete. */
 function TaskCard({
   task,
   columnIndex,
   dragging,
   assigneeName,
-  crmUsers,
+  assignees,
   currentUserId,
   projectLabel,
   onDragStart,
   onDragEnd,
   onMove,
   onAssign,
+  onDelete,
 }: {
   task: CrmTask;
   columnIndex: number;
   dragging: boolean;
   assigneeName: string | null;
-  crmUsers: ManagedUser[];
+  assignees: AssignableUser[];
   currentUserId: string;
   projectLabel: string | null;
   onDragStart: (e: React.DragEvent<HTMLDivElement>) => void;
   onDragEnd: () => void;
   onMove: (direction: -1 | 1) => void;
   onAssign: (assigneeId: string | null) => void;
+  onDelete: () => void;
 }) {
   const urgency = task.dueDate ? getDueDateUrgency(task.dueDate) : null;
   const mineAssigned = task.assigneeId === currentUserId && !!currentUserId;
@@ -352,7 +378,7 @@ function TaskCard({
               {initials(assigneeName)}
             </span>
           )}
-          {crmUsers.length > 0 ? (
+          {assignees.length > 0 ? (
             <select
               value={task.assigneeId ?? ""}
               onChange={(e) => onAssign(e.target.value || null)}
@@ -360,7 +386,7 @@ function TaskCard({
               className="max-w-32 rounded border border-white/10 bg-black/30 px-1 py-0.5 text-[11px] text-gray-300 outline-none focus:border-sky-400/40"
             >
               <option value="">Sin asignar</option>
-              {crmUsers.map((u) => (
+              {assignees.map((u) => (
                 <option key={u.id} value={u.id}>
                   {u.name}
                   {u.id === currentUserId ? " (yo)" : ""}
@@ -381,6 +407,14 @@ function TaskCard({
         </div>
 
         <div className="flex shrink-0 gap-0.5">
+          <button
+            type="button"
+            onClick={onDelete}
+            aria-label="Eliminar tarea"
+            className="cursor-pointer rounded p-1 text-gray-500 opacity-0 transition hover:bg-red-500/10 hover:text-red-400 group-hover:opacity-100"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
           <button
             type="button"
             disabled={columnIndex === 0}
@@ -488,14 +522,14 @@ function QuickAdd({
 function NewTaskForm({
   projects,
   defaultProjectId,
-  crmUsers,
+  assignees,
   currentUserId,
   onCreated,
   onDone,
 }: {
-  projects: CrmProject[];
+  projects: { id: string; name: string }[];
   defaultProjectId: string;
-  crmUsers: ManagedUser[];
+  assignees: AssignableUser[];
   currentUserId: string;
   onCreated: () => Promise<void>;
   onDone: () => void;
@@ -525,10 +559,10 @@ function NewTaskForm({
           ))}
         </select>
 
-        {crmUsers.length > 0 ? (
+        {assignees.length > 0 ? (
           <select name="assigneeId" defaultValue={currentUserId || ""} className={fieldClass}>
             <option value="">Sin asignar</option>
-            {crmUsers.map((u) => (
+            {assignees.map((u) => (
               <option key={u.id} value={u.id}>
                 {u.name}
                 {u.id === currentUserId ? " (yo)" : ""}

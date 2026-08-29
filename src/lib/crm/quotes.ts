@@ -5,13 +5,14 @@
  * their line items and an auto-generated sequential folio via
  * `insertWithSequentialNumber`) and updating status. Quotes can target
  * either an existing CRM client or a standalone prospect entered by hand
- * (`clientId` is nullable). Every mutation requires `requireCrmAccess()`.
+ * (`clientId` is nullable). Every mutation requires `requireCrmCore()`.
  */
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { withTiming } from "@/lib/monitoring/timing";
-import { requireCrmAccess } from "./auth";
+import { requireCrmCore } from "./auth";
+import { softDelete } from "./soft-delete";
 import { addHistory } from "./history";
 import { insertWithSequentialNumber } from "./numbering";
 import { formatCurrencyMXN } from "./format";
@@ -107,7 +108,7 @@ function mapQuoteItem(row: {
 export async function getQuotes(): Promise<CrmQuote[]> {
   return withTiming("crm.getQuotes", async () => {
     const supabase = await createClient();
-    const { data } = await supabase.from("crm_quotes").select("*").order("created_at", { ascending: false });
+    const { data } = await supabase.from("crm_quotes").select("*").is("deleted_at", null).order("created_at", { ascending: false });
     return (data ?? []).map(mapQuote);
   });
 }
@@ -135,7 +136,7 @@ export async function createQuoteAction(
   _prevState: CrmActionState,
   formData: FormData
 ): Promise<CrmActionState> {
-  const check = await requireCrmAccess();
+  const check = await requireCrmCore();
   if (!check.ok) return { error: check.error };
 
   const clientId = String(formData.get("clientId") ?? "").trim();
@@ -217,7 +218,7 @@ export async function updateQuoteStatusAction(
   clientId: string | null,
   status: QuoteStatus
 ): Promise<CrmActionState> {
-  const check = await requireCrmAccess();
+  const check = await requireCrmCore();
   if (!check.ok) return { error: check.error };
 
   const supabase = await createClient();
@@ -226,6 +227,27 @@ export async function updateQuoteStatusAction(
 
   if (clientId) {
     await addHistory(supabase, clientId, "cotizacion", `Cotización actualizada a "${status}"`, check.userId);
+  }
+  revalidatePath("/admin");
+  return { success: true };
+}
+
+/** Soft-deletes a quote (recoverable; logged to `deletion_log`). */
+export async function deleteQuoteAction(quoteId: string, clientId?: string | null): Promise<CrmActionState> {
+  const check = await requireCrmCore();
+  if (!check.ok) return { error: check.error };
+
+  const result = await softDelete({
+    table: "crm_quotes",
+    id: quoteId,
+    actorId: check.userId,
+    actorEmail: check.email,
+  });
+  if (!result.ok) return { error: result.error };
+
+  if (clientId) {
+    const supabase = await createClient();
+    await addHistory(supabase, clientId, "cotizacion", "Cotización eliminada", check.userId);
   }
   revalidatePath("/admin");
   return { success: true };

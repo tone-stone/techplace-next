@@ -7,16 +7,18 @@
  */
 
 import { useActionState, useState } from "react";
-import { Plus } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { formatCurrencyMXN } from "@/lib/crm/format";
 import {
   createInvoiceAction,
+  deleteInvoiceAction,
   updateInvoiceStatusAction,
   type CrmInvoice,
   type InvoiceStatus,
 } from "@/lib/crm/invoices";
 import type { CrmActionState, CrmClient } from "@/lib/crm/clients";
 import type { CrmProject } from "@/lib/crm/projects";
+import ConfirmDialog from "@/components/admin/ConfirmDialog";
 import StatusBadge from "./StatusBadge";
 
 const STATUS_OPTIONS: InvoiceStatus[] = ["borrador", "enviada", "pagada", "vencida"];
@@ -26,13 +28,17 @@ export default function InvoicesSection({
   invoices,
   clients,
   projects,
+  readOnly = false,
 }: {
   invoices: CrmInvoice[];
   clients: CrmClient[];
   projects: CrmProject[];
+  /** `ejecutivo` sees Facturación but can't create or change anything. */
+  readOnly?: boolean;
 }) {
   const [showNewForm, setShowNewForm] = useState(false);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [toDelete, setToDelete] = useState<CrmInvoice | null>(null);
 
   const totalPending = invoices
     .filter((i) => i.status === "enviada" || i.status === "vencida")
@@ -54,17 +60,19 @@ export default function InvoicesSection({
           <p className="text-sm text-gray-400">
             Pendiente por cobrar: <span className="font-bold text-white">{formatCurrencyMXN(totalPending)}</span>
           </p>
-          <button
-            type="button"
-            onClick={() => setShowNewForm((o) => !o)}
-            className="flex cursor-pointer items-center gap-1.5 rounded-full bg-sky-500/20 px-4 py-2 text-sm font-semibold text-sky-200 hover:bg-sky-500/30"
-          >
-            <Plus className="h-4 w-4" /> Nueva factura
-          </button>
+          {!readOnly && (
+            <button
+              type="button"
+              onClick={() => setShowNewForm((o) => !o)}
+              className="flex cursor-pointer items-center gap-1.5 rounded-full bg-sky-500/20 px-4 py-2 text-sm font-semibold text-sky-200 hover:bg-sky-500/30"
+            >
+              <Plus className="h-4 w-4" /> Nueva factura
+            </button>
+          )}
         </div>
       </div>
 
-      {showNewForm && (
+      {!readOnly && showNewForm && (
         <NewInvoiceForm clients={clients} projects={projects} onDone={() => setShowNewForm(false)} />
       )}
 
@@ -78,6 +86,7 @@ export default function InvoicesSection({
               <th className="pb-3 font-medium">Vence</th>
               <th className="pb-3 font-medium">Estado</th>
               <th className="pb-3 text-right font-medium">Monto</th>
+              {!readOnly && <th className="pb-3" />}
             </tr>
           </thead>
           <tbody className="divide-y divide-white/5">
@@ -88,25 +97,43 @@ export default function InvoicesSection({
                 <td className="py-3 text-gray-400">{invoice.issuedDate}</td>
                 <td className="py-3 text-gray-400">{invoice.dueDate}</td>
                 <td className="py-3">
-                  <select
-                    value={invoice.status}
-                    disabled={updatingId === invoice.id}
-                    onChange={(e) => handleStatusChange(invoice, e.target.value as InvoiceStatus)}
-                    className="cursor-pointer rounded-lg border border-white/10 bg-black/30 px-2 py-1 text-xs text-white outline-none focus:border-sky-400/40 disabled:opacity-50"
-                  >
-                    {STATUS_OPTIONS.map((status) => (
-                      <option key={status} value={status}>
-                        {status}
-                      </option>
-                    ))}
-                  </select>
-                  <span className="ml-2 hidden sm:inline">
+                  {readOnly ? (
                     <StatusBadge status={invoice.status} />
-                  </span>
+                  ) : (
+                    <>
+                      <select
+                        value={invoice.status}
+                        disabled={updatingId === invoice.id}
+                        onChange={(e) => handleStatusChange(invoice, e.target.value as InvoiceStatus)}
+                        className="cursor-pointer rounded-lg border border-white/10 bg-black/30 px-2 py-1 text-xs text-white outline-none focus:border-sky-400/40 disabled:opacity-50"
+                      >
+                        {STATUS_OPTIONS.map((status) => (
+                          <option key={status} value={status}>
+                            {status}
+                          </option>
+                        ))}
+                      </select>
+                      <span className="ml-2 hidden sm:inline">
+                        <StatusBadge status={invoice.status} />
+                      </span>
+                    </>
+                  )}
                 </td>
                 <td className="py-3 text-right font-semibold text-white">
                   {formatCurrencyMXN(invoice.amount)}
                 </td>
+                {!readOnly && (
+                  <td className="py-3 pl-3 text-right">
+                    <button
+                      type="button"
+                      onClick={() => setToDelete(invoice)}
+                      aria-label="Eliminar factura"
+                      className="cursor-pointer rounded p-1 text-gray-500 transition-colors hover:bg-red-500/10 hover:text-red-400"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>
@@ -116,6 +143,16 @@ export default function InvoicesSection({
           <p className="py-6 text-center text-sm text-gray-400">No hay facturas todavía.</p>
         )}
       </div>
+
+      <ConfirmDialog
+        open={toDelete !== null}
+        title="Eliminar factura"
+        body={toDelete ? `Se eliminará la factura ${toDelete.number}.` : undefined}
+        onConfirm={async () => {
+          if (toDelete) await deleteInvoiceAction(toDelete.id, toDelete.clientId);
+        }}
+        onClose={() => setToDelete(null)}
+      />
     </div>
   );
 }

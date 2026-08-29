@@ -5,14 +5,15 @@
  * payments. Exports both the data-fetching functions used to hydrate the
  * admin dashboard and the server actions (create client, update status, add
  * a plan, record/mark payments) invoked from the CRM UI. Every mutation here
- * requires `requireCrmAccess()` (admin or operativo) and logs a
+ * requires `requireCrmCore()` (dios, admin, or ejecutivo) and logs a
  * corresponding entry to the client's history via `addHistory`.
  */
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { withTiming } from "@/lib/monitoring/timing";
-import { requireCrmAccess } from "./auth";
+import { requireCrmCore } from "./auth";
+import { softDelete } from "./soft-delete";
 import { addHistory, mapHistory, type ClientHistoryEntry, type HistoryEntryType } from "./history";
 
 export type { HistoryEntryType, ClientHistoryEntry } from "./history";
@@ -146,7 +147,11 @@ function mapPayment(row: {
 export async function getClients(): Promise<CrmClient[]> {
   return withTiming("crm.getClients", async () => {
     const supabase = await createClient();
-    const { data } = await supabase.from("crm_clients").select("*").order("created_at", { ascending: false });
+    const { data } = await supabase
+      .from("crm_clients")
+      .select("*")
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false });
     return (data ?? []).map(mapClient);
   });
 }
@@ -195,7 +200,7 @@ export async function createClientAction(
   _prevState: CrmActionState,
   formData: FormData
 ): Promise<CrmActionState> {
-  const check = await requireCrmAccess();
+  const check = await requireCrmCore();
   if (!check.ok) return { error: check.error };
 
   const name = String(formData.get("name") ?? "").trim();
@@ -231,7 +236,7 @@ export async function createClientAction(
 
 /** Updates a client's lifecycle status and logs the change to their history. */
 export async function updateClientStatusAction(clientId: string, status: ClientStatus): Promise<CrmActionState> {
-  const check = await requireCrmAccess();
+  const check = await requireCrmCore();
   if (!check.ok) return { error: check.error };
 
   const supabase = await createClient();
@@ -248,7 +253,7 @@ export async function addHistoryEntryAction(
   _prevState: CrmActionState,
   formData: FormData
 ): Promise<CrmActionState> {
-  const check = await requireCrmAccess();
+  const check = await requireCrmCore();
   if (!check.ok) return { error: check.error };
 
   const clientId = String(formData.get("clientId") ?? "");
@@ -267,7 +272,7 @@ export async function addHistoryEntryAction(
 
 /** `useActionState` action backing the "Nuevo plan" form on the client detail modal. */
 export async function createPlanAction(_prevState: CrmActionState, formData: FormData): Promise<CrmActionState> {
-  const check = await requireCrmAccess();
+  const check = await requireCrmCore();
   if (!check.ok) return { error: check.error };
 
   const clientId = String(formData.get("clientId") ?? "");
@@ -312,7 +317,7 @@ export async function recordPaymentAction(
   _prevState: CrmActionState,
   formData: FormData
 ): Promise<CrmActionState> {
-  const check = await requireCrmAccess();
+  const check = await requireCrmCore();
   if (!check.ok) return { error: check.error };
 
   const clientId = String(formData.get("clientId") ?? "");
@@ -356,7 +361,7 @@ export async function recordPaymentAction(
 
 /** Marks an existing payment as paid today (used by the "Marcar pagado" button). */
 export async function markPaymentPaidAction(paymentId: string, clientId: string): Promise<CrmActionState> {
-  const check = await requireCrmAccess();
+  const check = await requireCrmCore();
   if (!check.ok) return { error: check.error };
 
   const supabase = await createClient();
@@ -369,6 +374,26 @@ export async function markPaymentPaidAction(paymentId: string, clientId: string)
   if (error) return { error: error.message };
 
   await addHistory(supabase, clientId, "pago", "Pago marcado como pagado", check.userId);
+  revalidatePath("/admin");
+  return { success: true };
+}
+
+/** Soft-deletes a client (recoverable; logged to `deletion_log`). */
+export async function deleteClientAction(clientId: string): Promise<CrmActionState> {
+  const check = await requireCrmCore();
+  if (!check.ok) return { error: check.error };
+
+  const supabase = await createClient();
+  await addHistory(supabase, clientId, "otro", "Cliente eliminado", check.userId);
+
+  const result = await softDelete({
+    table: "crm_clients",
+    id: clientId,
+    actorId: check.userId,
+    actorEmail: check.email,
+  });
+  if (!result.ok) return { error: result.error };
+
   revalidatePath("/admin");
   return { success: true };
 }

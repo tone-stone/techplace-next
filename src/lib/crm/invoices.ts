@@ -3,14 +3,15 @@
 /**
  * CRM invoicing: data fetching plus server actions for creating invoices
  * (with an auto-generated sequential folio via `insertWithSequentialNumber`)
- * and updating their status. Every mutation requires `requireCrmAccess()`
+ * and updating their status. Every write requires `requireBillingWrite()`
  * and logs a matching entry to the associated client's history.
  */
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { withTiming } from "@/lib/monitoring/timing";
-import { requireCrmAccess } from "./auth";
+import { requireBillingWrite } from "./auth";
+import { softDelete } from "./soft-delete";
 import { addHistory } from "./history";
 import { insertWithSequentialNumber } from "./numbering";
 import { formatCurrencyMXN } from "./format";
@@ -62,7 +63,7 @@ function mapInvoice(row: {
 export async function getInvoices(): Promise<CrmInvoice[]> {
   return withTiming("crm.getInvoices", async () => {
     const supabase = await createClient();
-    const { data } = await supabase.from("crm_invoices").select("*").order("due_date", { ascending: true });
+    const { data } = await supabase.from("crm_invoices").select("*").is("deleted_at", null).order("due_date", { ascending: true });
     return (data ?? []).map(mapInvoice);
   });
 }
@@ -72,7 +73,7 @@ export async function createInvoiceAction(
   _prevState: CrmActionState,
   formData: FormData
 ): Promise<CrmActionState> {
-  const check = await requireCrmAccess();
+  const check = await requireBillingWrite();
   if (!check.ok) return { error: check.error };
 
   const clientId = String(formData.get("clientId") ?? "");
@@ -112,7 +113,7 @@ export async function updateInvoiceStatusAction(
   clientId: string,
   status: InvoiceStatus
 ): Promise<CrmActionState> {
-  const check = await requireCrmAccess();
+  const check = await requireBillingWrite();
   if (!check.ok) return { error: check.error };
 
   const supabase = await createClient();
@@ -120,6 +121,27 @@ export async function updateInvoiceStatusAction(
   if (error) return { error: error.message };
 
   await addHistory(supabase, clientId, "factura", `Factura actualizada a "${status}"`, check.userId);
+  revalidatePath("/admin");
+  return { success: true };
+}
+
+/** Soft-deletes an invoice (recoverable; logged to `deletion_log`). */
+export async function deleteInvoiceAction(invoiceId: string, clientId?: string): Promise<CrmActionState> {
+  const check = await requireBillingWrite();
+  if (!check.ok) return { error: check.error };
+
+  const result = await softDelete({
+    table: "crm_invoices",
+    id: invoiceId,
+    actorId: check.userId,
+    actorEmail: check.email,
+  });
+  if (!result.ok) return { error: result.error };
+
+  if (clientId) {
+    const supabase = await createClient();
+    await addHistory(supabase, clientId, "factura", "Factura eliminada", check.userId);
+  }
   revalidatePath("/admin");
   return { success: true };
 }

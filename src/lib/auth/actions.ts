@@ -1,10 +1,10 @@
 "use server";
 
 /**
- * Server actions backing the CRM and blog login forms: `login()` verifies
- * credentials and that the account's team matches the portal it signed in
- * from, and `logout()` tears down the session. Both are called directly as
- * form actions from LoginForm.tsx and IdleTimeout.tsx.
+ * Server actions backing the single login form: `login()` verifies
+ * credentials and that the account has a dashboard role, and `logout()` tears
+ * down the session. Both are called directly as form actions from
+ * LoginForm.tsx and IdleTimeout.tsx.
  */
 
 import { cookies, headers } from "next/headers";
@@ -14,26 +14,15 @@ import { after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { ACTIVITY_COOKIE } from "@/lib/auth/session";
 import { logSecurityEvent } from "@/lib/monitoring/server";
-import { canAccessBlog, canAccessCrm, type ProfileRole } from "@/lib/auth/roles";
+import { canOpenDashboard, type ProfileRole } from "@/lib/auth/roles";
+
+/** Login form state — an error message, or `null` before the first attempt. */
+export type LoginState = { error: string } | null;
 
 /**
- * Login form state. `otherPortalHref`/`otherPortalLabel` are set when the
- * credentials are valid but the account belongs to the other portal's team,
- * pointing the user at where they actually need to sign in.
- */
-export type LoginState = {
-  error: string;
-  otherPortalHref?: string;
-  otherPortalLabel?: string;
-} | null;
-
-/**
- * Signs in with email/password, then verifies the account's team can access
- * the portal (`crm` or `blog`, from the `portal` form field) it was submitted
- * from. A valid CRM account used at the blog login (or vice versa) is signed
- * back out and rejected with a link to its correct portal, rather than left
- * signed in on a portal proxy.ts would just redirect it away from anyway.
- * On success, redirects to `redirectTo`.
+ * Signs in with email/password, then verifies the account has a valid
+ * dashboard role. An account with no profile / no role is signed back out
+ * and rejected. On success, redirects to `redirectTo` (default `/admin`).
  */
 export async function login(
   _prevState: LoginState,
@@ -42,7 +31,6 @@ export async function login(
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
   const redirectTo = String(formData.get("redirectTo") ?? "/admin");
-  const portal = formData.get("portal") === "blog" ? "blog" : "crm";
 
   if (!email || !password) {
     return { error: "Por favor ingresa email y contraseña" };
@@ -56,43 +44,22 @@ export async function login(
       const ip = (await headers()).get("x-forwarded-for")?.split(",")[0]?.trim();
       await logSecurityEvent({
         message: "Intento de login fallido",
-        path: portal === "crm" ? "/login" : "/blog/login",
+        path: "/login",
         meta: { email, ip: ip ?? null },
       });
     });
     return { error: "Email o contraseña incorrectos" };
   }
 
-  // Credentials are valid, but this account might belong to the other team —
-  // e.g. a redactor account signing in at the CRM login. Reject with a link
-  // to where the account actually belongs instead of leaving them signed in
-  // on a portal proxy.ts is just going to bounce them out of anyway.
   const { data: profile } = await supabase
     .from("profiles")
-    .select("team, role")
+    .select("role")
     .eq("id", data.user.id)
     .single();
 
-  const hasAccess = portal === "crm" ? canAccessCrm : canAccessBlog;
-
-  if (!profile || !hasAccess(profile as ProfileRole)) {
+  if (!profile || !canOpenDashboard(profile as ProfileRole)) {
     await supabase.auth.signOut();
-
-    if (!profile) {
-      return { error: "Tu cuenta no tiene un equipo asignado. Contacta a un administrador." };
-    }
-
-    return portal === "crm"
-      ? {
-          error: "Esta cuenta es del equipo de redacción — no tiene acceso al CRM.",
-          otherPortalHref: "/blog/login",
-          otherPortalLabel: "Ir al portal de redacción",
-        }
-      : {
-          error: "Esta cuenta es del CRM — no tiene acceso al portal de redacción.",
-          otherPortalHref: "/login",
-          otherPortalLabel: "Ir al panel de administración",
-        };
+    return { error: "Tu cuenta no tiene acceso al panel. Contacta a un administrador." };
   }
 
   revalidatePath("/", "layout");

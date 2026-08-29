@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { canAccessCrm, type ProfileRole } from "@/lib/auth/roles";
+import { canSeeMonitoring, type ProfileRole } from "@/lib/auth/roles";
 import { getPageSpeedSummary } from "@/lib/monitoring/pagespeed";
 
 /**
@@ -28,11 +28,11 @@ export async function GET() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("team, role")
+    .select("role")
     .eq("id", user.id)
     .single();
 
-  if (!profile || !canAccessCrm(profile as ProfileRole)) {
+  if (!profile || !canSeeMonitoring(profile as ProfileRole)) {
     return NextResponse.json({ error: "Sin permiso" }, { status: 403 });
   }
 

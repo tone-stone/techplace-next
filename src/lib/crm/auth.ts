@@ -1,32 +1,34 @@
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { ACTIVITY_COOKIE, IDLE_TIMEOUT_MS } from "@/lib/auth/session";
-import { canAccessCrm, isCrmAdmin, type ProfileRole } from "@/lib/auth/roles";
+import {
+  canOpenDashboard,
+  canReadBilling,
+  canUseBlogModule,
+  canUseCrmCore,
+  canWriteBilling,
+  type ProfileRole,
+  type Role,
+} from "@/lib/auth/roles";
 
 /**
- * Auth/permission gate for CRM server actions. Every CRM mutation calls
- * either `requireCrmAccess()` (admin or operativo) or `requireCrmAdmin()`
- * (admin only, reserved for future delete actions) before touching the
- * database. Both also enforce the shared inactivity-timeout window and slide
- * it forward on success, so a server action doubles as an activity ping.
- */
-
-// Not a "use server" file: these are only ever called from within other
-// server action files, never invoked directly from a client component, so
-// they don't need to (and shouldn't) be their own callable server actions.
-
-/**
- * Shared implementation behind `requireCrmAccess`/`requireCrmAdmin`: checks
- * the inactivity window, loads the current user's profile, and evaluates
- * `predicate` against its (team, role) before allowing the caller through.
+ * Auth/permission gate for dashboard server actions. Every mutation calls one
+ * of the `require*` helpers below before touching the database. Each also
+ * enforces the shared inactivity-timeout window and slides it forward on
+ * success, so a server action doubles as an activity ping.
  *
- * @param predicate - Role check to apply, e.g. `canAccessCrm` or `isCrmAdmin`.
- * @param deniedMessage - User-facing (Spanish) error returned when the
- * predicate fails.
- * @returns `{ ok: true, userId }` on success, or `{ ok: false, error }` if
- * the session is expired, unauthenticated, or lacks the required role.
+ * Not a "use server" file: these are only ever called from within other
+ * server action files, never invoked directly from a client component.
  */
-async function requireCrmRole(predicate: (p: ProfileRole) => boolean, deniedMessage: string) {
+
+/**
+ * Checks the inactivity window, loads the current user's role, and evaluates
+ * `predicate` against it.
+ *
+ * @returns `{ ok: true, userId, role }` on success, or `{ ok: false, error }`
+ * if the session is expired, unauthenticated, or lacks the required role.
+ */
+async function requireRole(predicate: (r: Role) => boolean, deniedMessage: string) {
   const cookieStore = await cookies();
 
   // Inactivity check — same window the proxy and the client timer use.
@@ -46,8 +48,9 @@ async function requireCrmRole(predicate: (p: ProfileRole) => boolean, deniedMess
 
   if (!user) return { ok: false as const, error: "No autenticado" };
 
-  const { data: profile } = await supabase.from("profiles").select("team, role").eq("id", user.id).single();
-  if (!profile || !predicate(profile as ProfileRole)) {
+  const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).is("deleted_at", null).single();
+  const role = (profile as ProfileRole | null)?.role;
+  if (!role || !predicate(role)) {
     return { ok: false as const, error: deniedMessage };
   }
 
@@ -64,15 +67,30 @@ async function requireCrmRole(predicate: (p: ProfileRole) => boolean, deniedMess
     // next navigation instead.
   }
 
-  return { ok: true as const, userId: user.id };
+  return { ok: true as const, userId: user.id, email: user.email ?? null, role };
 }
 
-/** Gate for CRM create/update actions: allows both admin and operativo. */
-export function requireCrmAccess() {
-  return requireCrmRole(canAccessCrm, "No tienes permisos para el CRM");
+/** Any signed-in dashboard account (used by the Tareas actions). */
+export function requireDashboard() {
+  return requireRole(canOpenDashboard, "No tienes permisos para el panel");
 }
 
-/** Gate for CRM admin-only actions (e.g. future delete operations). */
-export function requireCrmAdmin() {
-  return requireCrmRole(isCrmAdmin, "Solo un administrador del CRM puede hacer esto");
+/** Clientes / Proyectos / Cotizaciones create+update: dios, admin, ejecutivo. */
+export function requireCrmCore() {
+  return requireRole(canUseCrmCore, "No tienes permisos para esta sección del CRM");
+}
+
+/** Facturación writes: dios, admin only (ejecutivo is read-only). */
+export function requireBillingWrite() {
+  return requireRole(canWriteBilling, "Solo dios o admin pueden modificar Facturación");
+}
+
+/** Facturación reads. */
+export function requireBillingRead() {
+  return requireRole(canReadBilling, "No tienes permisos para Facturación");
+}
+
+/** Blog articles create/update/delete: dios, admin, blog, redactor. */
+export function requireBlogContent() {
+  return requireRole(canUseBlogModule, "No tienes permisos para el módulo de blog");
 }

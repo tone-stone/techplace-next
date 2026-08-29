@@ -2,17 +2,13 @@
 
 import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
-import Link from "next/link";
-import { ArrowRight, Lock, LogIn, Mail } from "lucide-react";
+import { Lock, LogIn, Mail } from "lucide-react";
 import { motion } from "motion/react";
 import { login, type LoginState } from "@/lib/auth/actions";
 
 /**
- * Email/password form for both the CRM and blog logins, driven by the
- * shared `login()` server action. Renders the action's error state,
- * including the "wrong portal" case where valid credentials belong to the
- * other team — shown with a link to that portal's login instead of a plain
- * error, per the UX `login()` sets up via `otherPortalHref`/`otherPortalLabel`.
+ * Email/password form for the single `/login`, driven by the shared
+ * `login()` server action. Renders the action's error state.
  */
 
 const inputClasses =
@@ -41,15 +37,8 @@ function SubmitButton() {
 /**
  * Renders the login form and wires it to the `login()` server action.
  * @param redirectTo Path to send the user to on successful login.
- * @param portal Which portal this form was rendered on (`crm` or `blog`); sent as a hidden field so `login()` can check it against the account's team.
  */
-export default function LoginForm({
-  redirectTo = "/admin",
-  portal = "crm",
-}: {
-  redirectTo?: string;
-  portal?: "crm" | "blog";
-}) {
+export default function LoginForm({ redirectTo = "/admin" }: { redirectTo?: string }) {
   const [state, formAction] = useActionState<LoginState, FormData>(login, null);
   const [prevState, setPrevState] = useState(state);
   // Retriggers the shake animation on every new error, including a repeat of
@@ -64,7 +53,6 @@ export default function LoginForm({
   return (
     <form action={formAction} className="space-y-4 sm:space-y-5">
       <input type="hidden" name="redirectTo" value={redirectTo} />
-      <input type="hidden" name="portal" value={portal} />
       <div className="relative">
         <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-purple-400" />
         <input
@@ -98,14 +86,6 @@ export default function LoginForm({
           className="text-center"
         >
           <p className="text-red-400 text-sm">{state.error}</p>
-          {state.otherPortalHref && (
-            <Link
-              href={state.otherPortalHref}
-              className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-brand-blue hover:underline"
-            >
-              {state.otherPortalLabel} <ArrowRight className="h-3.5 w-3.5" />
-            </Link>
-          )}
         </motion.div>
       )}
 

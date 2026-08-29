@@ -4,13 +4,14 @@
  * CRM projects: data fetching plus server actions for creating projects and
  * updating their status/progress. Projects are the parent entity for tasks
  * (see tasks.ts) and can be linked to an invoice. Every mutation requires
- * `requireCrmAccess()`.
+ * `requireCrmCore()` (dios, admin, ejecutivo).
  */
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { withTiming } from "@/lib/monitoring/timing";
-import { requireCrmAccess } from "./auth";
+import { requireCrmCore } from "./auth";
+import { softDelete } from "./soft-delete";
 import { addHistory } from "./history";
 import type { CrmActionState } from "./clients";
 
@@ -57,9 +58,20 @@ function mapProject(row: {
 export async function getProjects(): Promise<CrmProject[]> {
   return withTiming("crm.getProjects", async () => {
     const supabase = await createClient();
-    const { data } = await supabase.from("crm_projects").select("*").order("created_at", { ascending: false });
+    const { data } = await supabase.from("crm_projects").select("*").is("deleted_at", null).order("created_at", { ascending: false });
     return (data ?? []).map(mapProject);
   });
+}
+
+/**
+ * `{ id, name }` for every project, via a SECURITY DEFINER RPC so roles
+ * without the Proyectos module (blog, redactor) can still label tasks by
+ * project in the Tareas module without exposing budgets or the rest.
+ */
+export async function getProjectNames(): Promise<{ id: string; name: string }[]> {
+  const supabase = await createClient();
+  const { data } = await supabase.rpc("crm_project_names");
+  return (data ?? []) as { id: string; name: string }[];
 }
 
 /** Fetches a single project by id, used to refresh `ProjectDetailModal`. */
@@ -74,7 +86,7 @@ export async function createProjectAction(
   _prevState: CrmActionState,
   formData: FormData
 ): Promise<CrmActionState> {
-  const check = await requireCrmAccess();
+  const check = await requireCrmCore();
   if (!check.ok) return { error: check.error };
 
   const clientId = String(formData.get("clientId") ?? "");
@@ -110,7 +122,7 @@ export async function updateProjectStatusAction(
   clientId: string,
   status: ProjectStatus
 ): Promise<CrmActionState> {
-  const check = await requireCrmAccess();
+  const check = await requireCrmCore();
   if (!check.ok) return { error: check.error };
 
   const supabase = await createClient();
@@ -127,13 +139,34 @@ export async function updateProjectProgressAction(
   projectId: string,
   progress: number
 ): Promise<CrmActionState> {
-  const check = await requireCrmAccess();
+  const check = await requireCrmCore();
   if (!check.ok) return { error: check.error };
 
   const supabase = await createClient();
   const { error } = await supabase.from("crm_projects").update({ progress }).eq("id", projectId);
   if (error) return { error: error.message };
 
+  revalidatePath("/admin");
+  return { success: true };
+}
+
+/** Soft-deletes a project (recoverable; logged to `deletion_log`). */
+export async function deleteProjectAction(projectId: string, clientId?: string): Promise<CrmActionState> {
+  const check = await requireCrmCore();
+  if (!check.ok) return { error: check.error };
+
+  const result = await softDelete({
+    table: "crm_projects",
+    id: projectId,
+    actorId: check.userId,
+    actorEmail: check.email,
+  });
+  if (!result.ok) return { error: result.error };
+
+  if (clientId) {
+    const supabase = await createClient();
+    await addHistory(supabase, clientId, "proyecto", "Proyecto eliminado", check.userId);
+  }
   revalidatePath("/admin");
   return { success: true };
 }

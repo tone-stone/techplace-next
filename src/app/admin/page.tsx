@@ -1,20 +1,33 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 
 /**
- * Server-rendered entry point for the CRM at `/admin`. Resolves the current
- * user's admin status, fetches every dataset the dashboard needs (clients,
- * payments, projects, invoices, quotes, tasks, users, and monitoring stats)
- * in parallel, and hands it all off to the client-side `CrmDashboard` shell.
+ * Server-rendered entry point for the dashboard at `/admin`. Resolves the
+ * signed-in account's role, fetches only the datasets that role's modules
+ * need (in parallel), and hands them to the client-side `CrmDashboard`
+ * shell. The proxy already enforced that the user is signed in with a valid
+ * role; the redirect here is defence in depth.
  */
 
 import { createClient } from "@/lib/supabase/server";
-import { listUsers } from "@/lib/auth/users";
+import { getAssignableUsers, listUsers } from "@/lib/auth/users";
+import { listArticles } from "@/lib/blog/articles";
 import { getAllPayments, getClients } from "@/lib/crm/clients";
-import { getProjects } from "@/lib/crm/projects";
+import { getProjectNames, getProjects } from "@/lib/crm/projects";
 import { getInvoices } from "@/lib/crm/invoices";
 import { getQuotes } from "@/lib/crm/quotes";
 import { getAllTasks } from "@/lib/crm/tasks";
-import { isCrmAdmin, type ProfileRole } from "@/lib/auth/roles";
+import {
+  canManageAllUsers,
+  canManageBlogUsers,
+  canReadBilling,
+  canSeeMonitoring,
+  canUseBlogModule,
+  canUseCrmCore,
+  canOpenDashboard,
+  type ProfileRole,
+  type Role,
+} from "@/lib/auth/roles";
 import {
   getErrorStats,
   getFailedLogins,
@@ -26,24 +39,34 @@ import {
 import CrmDashboard from "@/components/admin/CrmDashboard";
 
 export const metadata: Metadata = {
-  title: "CRM | TechPlace",
+  title: "Panel | TechPlace",
 };
 
-/** CRM page (RSC): loads all dashboard data server-side and renders `CrmDashboard`. */
+const EMPTY_MONITORING = {
+  recentErrors: [],
+  errorStats: { daily: [], last24h: 0, last7d: 0 },
+  webVitals: [],
+  slowOperations: [],
+  slowPages: [],
+  failedLogins: { last24h: 0, last7d: 0, recent: [] },
+};
+
 export default async function AdminPage() {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
 
-  const currentUserIsAdmin = user
-    ? await supabase
-        .from("profiles")
-        .select("team, role")
-        .eq("id", user.id)
-        .single()
-        .then(({ data }) => Boolean(data) && isCrmAdmin(data as ProfileRole))
-    : false;
+  const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).is("deleted_at", null).single();
+  const role = (profile as ProfileRole | null)?.role;
+  if (!role || !canOpenDashboard(role)) redirect("/login");
+  const r = role as Role;
+
+  const crmCore = canUseCrmCore(r);
+  const billing = canReadBilling(r);
+  const blog = canUseBlogModule(r);
+  const monitoring = canSeeMonitoring(r);
 
   const [
     clients,
@@ -52,50 +75,67 @@ export default async function AdminPage() {
     invoices,
     quotes,
     tasks,
+    assignees,
     usersResult,
-    recentErrors,
-    errorStats,
-    webVitals,
-    slowOperations,
-    slowPages,
-    failedLogins,
+    blogUsersResult,
+    articlesResult,
+    mon,
   ] = await Promise.all([
-    getClients(),
-    getAllPayments(),
-    getProjects(),
-    getInvoices(),
-    getQuotes(),
+    crmCore ? getClients() : Promise.resolve([]),
+    crmCore ? getAllPayments() : Promise.resolve([]),
+    crmCore ? getProjects() : Promise.resolve([]),
+    billing ? getInvoices() : Promise.resolve([]),
+    crmCore ? getQuotes() : Promise.resolve([]),
     getAllTasks(),
-    listUsers(),
-    getRecentErrors(),
-    getErrorStats(),
-    getWebVitalsSummary(),
-    getSlowOperations(),
-    getSlowPagesByTtfb(),
-    getFailedLogins(),
+    getAssignableUsers(),
+    canManageAllUsers(r) ? listUsers() : Promise.resolve({ users: [] }),
+    canManageBlogUsers(r) ? listUsers({ blogOnly: true }) : Promise.resolve({ users: [] }),
+    blog ? listArticles() : Promise.resolve({ articles: [] }),
+    monitoring
+      ? Promise.all([
+          getRecentErrors(),
+          getErrorStats(),
+          getWebVitalsSummary(),
+          getSlowOperations(),
+          getSlowPagesByTtfb(),
+          getFailedLogins(),
+        ])
+      : Promise.resolve(null),
   ]);
 
-  const users = "users" in usersResult ? usersResult.users : [];
+  const projectOptions = crmCore
+    ? projects.map((p) => ({ id: p.id, name: p.name }))
+    : await getProjectNames();
+
+  const monitoringProps = mon
+    ? {
+        recentErrors: mon[0],
+        errorStats: mon[1],
+        webVitals: mon[2],
+        slowOperations: mon[3],
+        slowPages: mon[4],
+        failedLogins: mon[5],
+      }
+    : EMPTY_MONITORING;
 
   return (
     <CrmDashboard
-      email={user?.email ?? ""}
-      userName={(user?.user_metadata?.full_name as string | undefined) ?? ""}
-      userId={user?.id ?? ""}
-      users={users}
-      currentUserIsAdmin={currentUserIsAdmin}
+      email={user.email ?? ""}
+      userName={(user.user_metadata?.full_name as string | undefined) ?? ""}
+      userId={user.id}
+      role={r}
+      users={"users" in usersResult ? usersResult.users : []}
+      blogUsers={"users" in blogUsersResult ? blogUsersResult.users : []}
+      assignees={assignees}
+      blogArticles={"articles" in articlesResult ? articlesResult.articles : []}
+      projectOptions={projectOptions}
       clients={clients}
       payments={payments}
       projects={projects}
       invoices={invoices}
       quotes={quotes}
       tasks={tasks}
-      recentErrors={recentErrors}
-      errorStats={errorStats}
-      webVitals={webVitals}
-      slowOperations={slowOperations}
-      slowPages={slowPages}
-      failedLogins={failedLogins}
+      {...monitoringProps}
     />
   );
 }

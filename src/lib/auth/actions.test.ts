@@ -25,7 +25,7 @@ vi.mock("next/server", () => ({
   after: (_fn: () => void) => {},
 }));
 
-let profileData: { team: string; role: string } | null = { team: "crm", role: "admin" };
+let profileData: { role: string } | null = { role: "admin" };
 
 vi.mock("@/lib/supabase/server", () => ({
   createClient: async () => ({
@@ -54,7 +54,7 @@ describe("login", () => {
     signOut.mockReset();
     redirectMock.mockReset();
     revalidatePathMock.mockReset();
-    profileData = { team: "crm", role: "admin" };
+    profileData = { role: "admin" };
   });
 
   it("rejects an empty email/password without calling Supabase", async () => {
@@ -76,9 +76,9 @@ describe("login", () => {
   it("redirects to the requested path on success", async () => {
     signInWithPassword.mockResolvedValue({ data: { user: { id: "u1" } }, error: null });
 
-    await login(null, formDataFrom({ email: "a@b.com", password: "right", redirectTo: "/blog/dashboard" }));
+    await login(null, formDataFrom({ email: "a@b.com", password: "right", redirectTo: "/admin?tab=x" }));
 
-    expect(redirectMock).toHaveBeenCalledWith("/blog/dashboard");
+    expect(redirectMock).toHaveBeenCalledWith("/admin?tab=x");
   });
 
   it("defaults to redirecting to /admin when no redirectTo is given", async () => {
@@ -97,50 +97,27 @@ describe("login", () => {
     expect(revalidatePathMock).toHaveBeenCalledWith("/", "layout");
   });
 
-  it("rejects a blog account signing in at the CRM portal, with a link to its own portal", async () => {
-    profileData = { team: "blog", role: "redactor" };
+  it("lets a redactor sign in (every role can open the dashboard)", async () => {
+    profileData = { role: "redactor" };
     signInWithPassword.mockResolvedValue({ data: { user: { id: "u1" } }, error: null });
 
-    const result = await login(null, formDataFrom({ email: "a@b.com", password: "right", portal: "crm" }));
+    await login(null, formDataFrom({ email: "a@b.com", password: "right" }));
 
-    expect(result).toEqual({
-      error: "Esta cuenta es del equipo de redacción — no tiene acceso al CRM.",
-      otherPortalHref: "/blog/login",
-      otherPortalLabel: "Ir al portal de redacción",
-    });
-    expect(signOut).toHaveBeenCalled();
-    expect(redirectMock).not.toHaveBeenCalled();
-  });
-
-  it("rejects a CRM account signing in at the blog portal, with a link to its own portal", async () => {
-    profileData = { team: "crm", role: "operativo" };
-    signInWithPassword.mockResolvedValue({ data: { user: { id: "u1" } }, error: null });
-
-    const result = await login(
-      null,
-      formDataFrom({ email: "a@b.com", password: "right", portal: "blog", redirectTo: "/blog/dashboard" })
-    );
-
-    expect(result).toEqual({
-      error: "Esta cuenta es del CRM — no tiene acceso al portal de redacción.",
-      otherPortalHref: "/login",
-      otherPortalLabel: "Ir al panel de administración",
-    });
-    expect(signOut).toHaveBeenCalled();
-    expect(redirectMock).not.toHaveBeenCalled();
-  });
-
-  it("lets a CRM admin (general admin) sign in at the blog portal", async () => {
-    profileData = { team: "crm", role: "admin" };
-    signInWithPassword.mockResolvedValue({ data: { user: { id: "u1" } }, error: null });
-
-    await login(
-      null,
-      formDataFrom({ email: "a@b.com", password: "right", portal: "blog", redirectTo: "/blog/dashboard" })
-    );
-
-    expect(redirectMock).toHaveBeenCalledWith("/blog/dashboard");
+    expect(redirectMock).toHaveBeenCalledWith("/admin");
     expect(signOut).not.toHaveBeenCalled();
+  });
+
+  it("signs an account with no dashboard role back out and rejects it", async () => {
+    profileData = null;
+    signInWithPassword.mockResolvedValue({ data: { user: { id: "u1" } }, error: null });
+
+    const result = await login(null, formDataFrom({ email: "a@b.com", password: "right" }));
+
+    expect(result).toEqual({
+      error: "Tu cuenta no tiene acceso al panel. Contacta a un administrador.",
+    });
+    expect(signOut).toHaveBeenCalled();
+    expect(redirectMock).not.toHaveBeenCalled();
   });
 });
 
@@ -152,11 +129,11 @@ describe("logout", () => {
   });
 
   it("signs out and redirects to the requested path", async () => {
-    await logout(formDataFrom({ redirectTo: "/blog/login" }));
+    await logout(formDataFrom({ redirectTo: "/login?expired=1" }));
 
     expect(signOut).toHaveBeenCalled();
     expect(cookieDelete).toHaveBeenCalledWith("tp_seen");
-    expect(redirectMock).toHaveBeenCalledWith("/blog/login");
+    expect(redirectMock).toHaveBeenCalledWith("/login?expired=1");
   });
 
   it("defaults to /login when no redirectTo is given", async () => {

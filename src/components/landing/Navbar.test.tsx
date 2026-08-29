@@ -47,14 +47,15 @@ describe("Navbar mobile menu", () => {
     expect(screen.getByRole("button", { name: "Abrir menú" })).toBeInTheDocument();
   });
 
-  it("only lists 'Ver blog' and 'Portal de redacción' under the Blog menu (no separate admin login)", async () => {
+  it("links Blog straight to /blog with no login submenu", async () => {
     const user = userEvent.setup();
     render(<Navbar />);
 
     await user.click(screen.getByRole("button", { name: "Abrir menú" }));
 
-    expect(screen.getByRole("link", { name: "Ver blog" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Portal de redacción" })).toBeInTheDocument();
-    expect(screen.queryByText("Acceso Administrador")).not.toBeInTheDocument();
+    const blogLinks = screen.getAllByRole("link", { name: "Blog" });
+    expect(blogLinks.length).toBeGreaterThan(0);
+    blogLinks.forEach((l) => expect(l).toHaveAttribute("href", "/blog"));
+    expect(screen.queryByRole("link", { name: "Portal de redacción" })).not.toBeInTheDocument();
   });
 });

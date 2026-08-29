@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ChevronDown, LogIn, Menu, PenSquare, X } from "lucide-react";
+import { LogIn, Menu, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 /**
@@ -17,14 +17,7 @@ const NAV_LINKS = [
   { href: "/#servicios", label: "Servicios" },
   { href: "/#nosotros", label: "Nosotros" },
   { href: "/#portafolio", label: "Portafolio" },
-  {
-    href: "/blog",
-    label: "Blog",
-    children: [
-      { href: "/blog", label: "Ver blog" },
-      { href: "/blog/login", label: "Portal de redacción" },
-    ],
-  },
+  { href: "/blog", label: "Blog" },
   { href: "/#contacto", label: "Contacto" },
 ];
 
@@ -34,8 +27,6 @@ export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [active, setActive] = useState("home");
-  const [blogMenuOpen, setBlogMenuOpen] = useState(false);
-  const blogMenuRef = useRef<HTMLDivElement>(null);
   // Mobile / tablet only (forced back to visible at lg: — see the nav's className):
   // hidden while actively scrolling in either direction, shown again once
   // scrolling settles. Keeps the bar out of the way while reading/scrolling
@@ -86,24 +77,6 @@ export default function Navbar() {
     return pathname.startsWith(href);
   };
 
-  useEffect(() => {
-    if (!blogMenuOpen) return;
-    const onClickOutside = (e: MouseEvent) => {
-      if (blogMenuRef.current && !blogMenuRef.current.contains(e.target as Node)) {
-        setBlogMenuOpen(false);
-      }
-    };
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setBlogMenuOpen(false);
-    };
-    document.addEventListener("mousedown", onClickOutside);
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.removeEventListener("mousedown", onClickOutside);
-      document.removeEventListener("keydown", onKeyDown);
-    };
-  }, [blogMenuOpen]);
-
   // No JS body-scroll lock here on purpose: this menu is a `fixed inset-0`
   // panel that fully covers the viewport, so it already intercepts every
   // touch — the body underneath can't receive scroll gestures regardless.
@@ -149,58 +122,16 @@ export default function Navbar() {
         </Link>
 
         <div className="hidden lg:flex items-center gap-8 text-lg font-semibold">
-          {NAV_LINKS.map((link) =>
-            link.children ? (
-              <div key={link.href} className="relative" ref={blogMenuRef}>
-                <button
-                  type="button"
-                  onClick={() => setBlogMenuOpen((open) => !open)}
-                  aria-haspopup="true"
-                  aria-expanded={blogMenuOpen}
-                  data-track={`nav_${link.label.toLowerCase()}`}
-                  className={`tp-nav-link-underline${isActive(link.href) ? " active" : ""}`}
-                >
-                  <span className="inline-flex items-center gap-1">
-                    {link.label}
-                    <ChevronDown
-                      className={`h-4 w-4 transition-transform duration-200 ${blogMenuOpen ? "rotate-180" : ""}`}
-                    />
-                  </span>
-                </button>
-
-                {blogMenuOpen && (
-                  <div
-                    className="tp-dropdown-glass tp-dropdown-in absolute left-1/2 top-full mt-3 w-56 -translate-x-1/2 rounded-2xl p-2 text-base"
-                  >
-                    {link.children.map((child) => (
-                      <Link
-                        key={child.href}
-                        href={child.href}
-                        onClick={() => setBlogMenuOpen(false)}
-                        className="flex items-center gap-2 rounded-xl px-3 py-2.5 font-medium text-gray-200 hover:bg-white/10 hover:text-brand-blue transition-colors"
-                      >
-                        {child.href === "/blog/login" ? (
-                          <PenSquare className="h-4 w-4 text-purple-400" />
-                        ) : (
-                          <ChevronDown className="h-4 w-4 -rotate-90 text-purple-400" />
-                        )}
-                        {child.label}
-                      </Link>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ) : (
-              <Link
-                key={link.href}
-                href={link.href}
-                data-track={`nav_${link.label.toLowerCase()}`}
-                className={`tp-nav-link-underline${isActive(link.href) ? " active" : ""}`}
-              >
-                {link.label}
-              </Link>
-            )
-          )}
+          {NAV_LINKS.map((link) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              data-track={`nav_${link.label.toLowerCase()}`}
+              className={`tp-nav-link-underline${isActive(link.href) ? " active" : ""}`}
+            >
+              {link.label}
+            </Link>
+          ))}
           <Link
             href="/login"
             data-track="nav_entrar"
@@ -252,31 +183,18 @@ export default function Navbar() {
             className="flex min-h-full w-full flex-col items-center justify-center gap-7 py-10 text-xl font-semibold"
           >
             {NAV_LINKS.map((link, i) => (
-              <div key={link.href} className="flex flex-col items-center gap-4">
-                <Link
-                  href={link.href}
-                  onClick={closeMenu}
-                  data-track={`navmobile_${link.label.toLowerCase()}`}
-                  style={{ animationDelay: `${0.05 * i}s` }}
-                  className={`touch-manipulation tp-menu-link-in tp-nav-link-underline tp-mobile-nav-link${
-                    isActive(link.href) ? " active" : ""
-                  }`}
-                >
-                  {link.label}
-                </Link>
-                {link.children?.map((child) => (
-                  <Link
-                    key={child.href}
-                    href={child.href}
-                    onClick={closeMenu}
-                    style={{ animationDelay: `${0.05 * i}s` }}
-                    className="touch-manipulation tp-menu-link-in flex items-center gap-1.5 rounded-lg px-3 py-2 text-base font-normal text-gray-400 hover:text-brand-blue transition-colors"
-                  >
-                    {child.href === "/blog/login" && <PenSquare className="h-3.5 w-3.5" />}
-                    {child.label}
-                  </Link>
-                ))}
-              </div>
+              <Link
+                key={link.href}
+                href={link.href}
+                onClick={closeMenu}
+                data-track={`navmobile_${link.label.toLowerCase()}`}
+                style={{ animationDelay: `${0.05 * i}s` }}
+                className={`touch-manipulation tp-menu-link-in tp-nav-link-underline tp-mobile-nav-link${
+                  isActive(link.href) ? " active" : ""
+                }`}
+              >
+                {link.label}
+              </Link>
             ))}
             <div
               style={{ animationDelay: `${0.05 * NAV_LINKS.length}s` }}
