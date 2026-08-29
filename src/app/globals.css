@@ -146,6 +146,44 @@ html {
   }
 }
 
+/* Short viewports — landscape phones, iPads in landscape, small laptop
+   windows. Two things go wrong with the hero's `flex; align-items: center`
+   there: the `md:` breakpoint has already blown the headline up to its
+   desktop size, and centring content that's now taller than the screen
+   pushes its top edge up behind the fixed navbar (`overflow-hidden` hides
+   the rest). Keep the 100vh floor so the section still fills the screen —
+   no bare background showing through below — but switch the vertical
+   placement to `auto` margins: they centre the content while it fits and
+   collapse to a plain top-aligned (scrollable) block once it doesn't, so
+   it can never ride up under the navbar. Gated on `min-width: 768px` so
+   portrait phones (narrower, already on mobile type) are untouched. */
+@media (min-width: 768px) and (max-height: 800px) {
+  #home {
+    align-items: flex-start;
+  }
+
+  .tp-hero-content {
+    margin-block: auto;
+  }
+
+  .tp-hero-slide {
+    font-size: 2.25rem;
+    line-height: 1.15;
+  }
+}
+
+/* The `blur-3xl` float blobs sit `-left-24` / `-right-16` / `-bottom-24`
+   with a 384px diameter, so on any viewport narrower/shorter than a laptop
+   `overflow-hidden` slices one off as a hard purple/indigo band down the
+   right edge or along the bottom (very visible on a 768px iPad). They're
+   pure ambient decoration — drop them below `lg` and on short viewports,
+   where they only ever read as a clipped smear. */
+@media (max-width: 1023px), (max-height: 800px) {
+  .tp-hero-blob {
+    display: none;
+  }
+}
+
 @keyframes tp-fadein {
   from {
     opacity: 0;

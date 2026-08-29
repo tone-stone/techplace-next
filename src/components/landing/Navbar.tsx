@@ -36,7 +36,7 @@ export default function Navbar() {
   const [active, setActive] = useState("home");
   const [blogMenuOpen, setBlogMenuOpen] = useState(false);
   const blogMenuRef = useRef<HTMLDivElement>(null);
-  // Mobile only (forced back to visible at md: — see the nav's className):
+  // Mobile / tablet only (forced back to visible at lg: — see the nav's className):
   // hidden while actively scrolling in either direction, shown again once
   // scrolling settles. Keeps the bar out of the way while reading/scrolling
   // through a long page on a small screen, without permanently losing it.
@@ -117,14 +117,14 @@ export default function Navbar() {
   const closeMenu = () => setMenuOpen(false);
 
   return (
-    <nav className="fixed z-50 top-2 inset-x-2 sm:top-3 sm:inset-x-3 md:top-4 md:inset-x-6 lg:left-1/2 lg:right-auto lg:-translate-x-1/2 lg:w-full lg:max-w-6xl">
+    <nav className="fixed z-50 top-2 inset-x-2 sm:top-3 sm:inset-x-3 lg:top-4 lg:left-1/2 lg:right-auto lg:-translate-x-1/2 lg:w-full lg:max-w-6xl">
       {/* The hide-on-scroll transform lives on this pill, not on <nav> itself:
           any element with a `transform` becomes the containing block for its
           `position: fixed` descendants — putting it on <nav> shrank the
           full-screen mobile menu overlay down to the pill's own box instead
           of the viewport, since the overlay is a fixed-position child of nav. */}
       <div
-        className={`relative z-50 shadow-lg rounded-2xl md:rounded-full md:backdrop-blur-md transition-all duration-300 ease-out md:translate-y-0! ${
+        className={`relative z-50 shadow-lg rounded-2xl lg:rounded-full lg:backdrop-blur-md transition-all duration-300 ease-out lg:translate-y-0! ${
           navHidden ? "-translate-y-24" : "translate-y-0"
         } ${scrolled ? "tp-navbar-bg-dark" : "tp-navbar-bg-light"}`}
       >
@@ -148,7 +148,7 @@ export default function Navbar() {
           />
         </Link>
 
-        <div className="hidden md:flex items-center gap-8 text-lg font-semibold">
+        <div className="hidden lg:flex items-center gap-8 text-lg font-semibold">
           {NAV_LINKS.map((link) =>
             link.children ? (
               <div key={link.href} className="relative" ref={blogMenuRef}>
@@ -157,6 +157,7 @@ export default function Navbar() {
                   onClick={() => setBlogMenuOpen((open) => !open)}
                   aria-haspopup="true"
                   aria-expanded={blogMenuOpen}
+                  data-track={`nav_${link.label.toLowerCase()}`}
                   className={`tp-nav-link-underline${isActive(link.href) ? " active" : ""}`}
                 >
                   <span className="inline-flex items-center gap-1">
@@ -193,6 +194,7 @@ export default function Navbar() {
               <Link
                 key={link.href}
                 href={link.href}
+                data-track={`nav_${link.label.toLowerCase()}`}
                 className={`tp-nav-link-underline${isActive(link.href) ? " active" : ""}`}
               >
                 {link.label}
@@ -201,6 +203,7 @@ export default function Navbar() {
           )}
           <Link
             href="/login"
+            data-track="nav_entrar"
             className="tp-btn-animated inline-flex items-center gap-1.5 rounded-full px-5 py-2 text-base font-bold text-white shadow-lg shadow-blue-900/30 transition-transform hover:scale-105"
           >
             <LogIn className="h-4 w-4" />
@@ -213,7 +216,7 @@ export default function Navbar() {
           onClick={toggleMenu}
           aria-label={menuOpen ? "Cerrar menú" : "Abrir menú"}
           aria-expanded={menuOpen}
-          className="touch-manipulation md:hidden relative z-50 flex items-center justify-center w-12 h-12 rounded-full text-purple-200 hover:text-brand-blue hover:bg-brand-blue/10 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue"
+          className="touch-manipulation lg:hidden relative z-50 flex items-center justify-center w-12 h-12 rounded-full text-purple-200 hover:text-brand-blue hover:bg-brand-blue/10 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue"
         >
           <span className="relative block h-6 w-6">
             <Menu
@@ -233,7 +236,7 @@ export default function Navbar() {
 
       {menuOpen && (
         <div
-          className="tp-menu-overlay-in fixed inset-0 z-40 md:hidden overflow-y-auto overscroll-contain bg-[#0a0a18]/95"
+          className="tp-menu-overlay-in fixed inset-0 z-40 lg:hidden overflow-y-auto overscroll-contain bg-[#0a0a18]/95"
         >
           {/* `min-h-full` (not the outer div's own `flex justify-center`) does
               the centering: a flex container with `justify-content: center`
@@ -253,6 +256,7 @@ export default function Navbar() {
                 <Link
                   href={link.href}
                   onClick={closeMenu}
+                  data-track={`navmobile_${link.label.toLowerCase()}`}
                   style={{ animationDelay: `${0.05 * i}s` }}
                   className={`touch-manipulation tp-menu-link-in tp-nav-link-underline tp-mobile-nav-link${
                     isActive(link.href) ? " active" : ""
@@ -281,6 +285,7 @@ export default function Navbar() {
               <Link
                 href="/login"
                 onClick={closeMenu}
+                data-track="navmobile_entrar"
                 className="tp-btn-animated inline-flex items-center gap-1.5 rounded-full px-6 py-3 text-lg font-bold text-white shadow-lg transition-transform active:scale-95"
               >
                 <LogIn className="h-5 w-5" />

@@ -15,13 +15,18 @@ import type { CrmActionState } from "./clients";
 
 export type TaskStatus = "por_hacer" | "en_progreso" | "terminado";
 
+const TASK_STATUSES: TaskStatus[] = ["por_hacer", "en_progreso", "terminado"];
+
 export type CrmTask = {
   id: string;
   projectId: string;
   title: string;
   description: string | null;
   status: TaskStatus;
+  /** Free-text assignee (legacy rows / notes). Prefer `assigneeId`. */
   assignee: string | null;
+  /** `auth.users` id of the assigned account, or null. */
+  assigneeId: string | null;
   dueDate: string | null;
   createdAt: string;
 };
@@ -34,6 +39,7 @@ function mapTask(row: {
   description: string | null;
   status: string;
   assignee: string | null;
+  assignee_id: string | null;
   due_date: string | null;
   created_at: string;
 }): CrmTask {
@@ -44,6 +50,7 @@ function mapTask(row: {
     description: row.description,
     status: row.status as TaskStatus,
     assignee: row.assignee,
+    assigneeId: row.assignee_id,
     dueDate: row.due_date,
     createdAt: row.created_at,
   };
@@ -70,7 +77,14 @@ export async function createTaskAction(
   const title = String(formData.get("title") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim();
   const assignee = String(formData.get("assignee") ?? "").trim();
+  const assigneeId = String(formData.get("assigneeId") ?? "").trim();
   const dueDate = String(formData.get("dueDate") ?? "").trim();
+  const statusRaw = String(formData.get("status") ?? "").trim();
+  // Optional: the board's quick-add composer creates a card straight into the
+  // column it was opened from. Anything unrecognised falls back to the DB default.
+  const status = TASK_STATUSES.includes(statusRaw as TaskStatus)
+    ? (statusRaw as TaskStatus)
+    : undefined;
 
   if (!projectId || !title) {
     return { error: "Selecciona un proyecto y escribe el título de la tarea" };
@@ -82,7 +96,9 @@ export async function createTaskAction(
     title,
     description: description || null,
     assignee: assignee || null,
+    assignee_id: assigneeId || null,
     due_date: dueDate || null,
+    ...(status ? { status } : {}),
     created_by: check.userId,
   });
 
@@ -99,6 +115,29 @@ export async function updateTaskStatusAction(taskId: string, status: TaskStatus)
 
   const supabase = await createClient();
   const { error } = await supabase.from("crm_tasks").update({ status }).eq("id", taskId);
+  if (error) return { error: error.message };
+
+  revalidatePath("/admin");
+  return { success: true };
+}
+
+/**
+ * Assigns a task to a CRM account, or clears the assignment when
+ * `assigneeId` is null. Also clears the legacy free-text `assignee` so the
+ * two never disagree.
+ */
+export async function updateTaskAssigneeAction(
+  taskId: string,
+  assigneeId: string | null
+): Promise<CrmActionState> {
+  const check = await requireCrmAccess();
+  if (!check.ok) return { error: check.error };
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("crm_tasks")
+    .update({ assignee_id: assigneeId, assignee: null })
+    .eq("id", taskId);
   if (error) return { error: error.message };
 
   revalidatePath("/admin");

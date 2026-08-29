@@ -30,7 +30,9 @@ import type {
   SlowPage,
   WebVitalSummary,
 } from "@/lib/monitoring/queries";
-import type { WebVitalRating } from "@/lib/monitoring/types";
+import type { WebVitalName, WebVitalRating } from "@/lib/monitoring/types";
+import PageSpeedSection from "./PageSpeedSection";
+import EngagementSection from "./EngagementSection";
 
 /* ------------------------------------------------------------------ */
 /*  KPI tiles                                                          */
@@ -178,6 +180,15 @@ function formatMetricValue(name: string, value: number): string {
   return `${Math.round(value)} ms`;
 }
 
+/** What each Web Vital acronym stands for and, briefly, what it measures. */
+const VITAL_META: Record<WebVitalName, { full: string; hint: string }> = {
+  LCP: { full: "Largest Contentful Paint", hint: "Carga del contenido principal" },
+  INP: { full: "Interaction to Next Paint", hint: "Respuesta a las interacciones" },
+  CLS: { full: "Cumulative Layout Shift", hint: "Estabilidad visual (saltos de diseño)" },
+  TTFB: { full: "Time to First Byte", hint: "Respuesta inicial del servidor" },
+  FCP: { full: "First Contentful Paint", hint: "Primer contenido visible en pantalla" },
+};
+
 /** Per-metric horizontal bar gauges showing p75 and rating for each Web Vital. */
 function WebVitalsGauges({ vitals }: { vitals: WebVitalSummary[] }) {
   if (vitals.length === 0) {
@@ -188,18 +199,26 @@ function WebVitalsGauges({ vitals }: { vitals: WebVitalSummary[] }) {
     <div className="space-y-4">
       {vitals.map((v) => {
         const style = RATING_STYLE[v.rating];
+        const meta = VITAL_META[v.name];
         // Bar fill relative to the "poor" threshold isn't stored here, so use
         // a simple 3-band split matching the KPI badge instead of a precise scale.
         const fill = v.rating === "good" ? 33 : v.rating === "needs-improvement" ? 66 : 100;
         return (
-          <div key={v.name} className="flex items-center gap-3">
-            <span className="w-14 shrink-0 text-xs font-semibold text-gray-300">{v.name}</span>
-            <div className="h-5 flex-1 overflow-hidden rounded-sm bg-white/5">
-              <div className={`h-full rounded-l-sm rounded-r ${style.bar}`} style={{ width: `${fill}%` }} />
+          <div key={v.name} className="space-y-1.5">
+            <div className="flex items-baseline justify-between gap-3">
+              <p className="min-w-0 text-xs">
+                <span className="font-semibold text-gray-200" title={meta.full}>
+                  {v.name}
+                </span>
+                <span className="ml-1.5 text-gray-500">{meta.hint}</span>
+              </p>
+              <span className={`shrink-0 text-xs font-bold tabular-nums ${style.text}`}>
+                {formatMetricValue(v.name, v.p75)}
+              </span>
             </div>
-            <span className={`w-24 shrink-0 text-right text-xs font-bold ${style.text}`}>
-              {formatMetricValue(v.name, v.p75)}
-            </span>
+            <div className="h-2.5 overflow-hidden rounded-full bg-white/5">
+              <div className={`h-full rounded-full ${style.bar}`} style={{ width: `${fill}%` }} />
+            </div>
           </div>
         );
       })}
@@ -245,7 +264,7 @@ function ErrorRow({ event }: { event: MonitoringErrorEvent }) {
           {event.source === "server" ? <Server className="h-3.5 w-3.5" /> : <Bug className="h-3.5 w-3.5" />}
         </span>
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
+          <div className="flex min-w-0 items-center gap-2">
             <p className="truncate text-sm font-medium text-white">
               {event.message || "Error sin mensaje"}
             </p>
@@ -442,6 +461,10 @@ export default function MonitoringSection({
     <div className="space-y-6">
       <StatTiles stats={stats} />
 
+      <PageSpeedSection />
+
+      <EngagementSection />
+
       <div className="tp-dark-card-crm rounded-2xl p-5 sm:p-6">
         <div className="mb-4 flex items-center gap-2">
           <AlertTriangle className="h-4 w-4 text-red-300" />
@@ -450,7 +473,7 @@ export default function MonitoringSection({
         <ErrorTrendChart data={errorStats.daily} />
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-6 *:min-w-0 lg:grid-cols-2">
         <div className="tp-dark-card-crm rounded-2xl p-5 sm:p-6">
           <div className="mb-4 flex items-center gap-2">
             <Gauge className="h-4 w-4 text-sky-300" />
@@ -476,7 +499,7 @@ export default function MonitoringSection({
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-6 *:min-w-0 lg:grid-cols-2">
         <div className="tp-dark-card-crm rounded-2xl p-5 sm:p-6">
           <div className="mb-4 flex items-center gap-2">
             <MapPin className="h-4 w-4 text-sky-300" />

@@ -7,14 +7,18 @@
  */
 
 /**
- * Discriminator for a monitoring event's row type. Note: the ingestion API
- * route (`src/app/api/monitoring/events/route.ts`) only accepts `"error"`
- * and `"web_vital"` from the client; `"timing"` and `"security"` events are
- * written directly by trusted server code via `src/lib/monitoring/server.ts`,
- * which is why `"security"` isn't listed here even though it's a valid
- * `kind` value in the table.
+ * Discriminator for a monitoring event's row type. The ingestion API route
+ * (`src/app/api/monitoring/events/route.ts`) accepts `"error"`, `"web_vital"`,
+ * `"engagement"` and `"interaction"` from the client; `"timing"` and
+ * `"security"` events are written directly by trusted server code via
+ * `src/lib/monitoring/server.ts`, which is why `"security"` isn't listed
+ * here even though it's a valid `kind` value in the table.
  */
-export type MonitoringKind = "error" | "web_vital" | "timing";
+export type MonitoringKind = "error" | "web_vital" | "timing" | "engagement" | "interaction";
+/** Passive engagement signals collected by `EngagementTracker` on the landing page. */
+export type EngagementMetricName = "section_time" | "scroll_depth";
+/** Active interaction signals: tagged-element clicks and the contact-form funnel. */
+export type InteractionMetricName = "click" | "form";
 /** Whether an event originated in the browser or on the server. */
 export type MonitoringSource = "client" | "server";
 /** Severity of a monitoring event, independent of its `kind`. */
@@ -39,7 +43,7 @@ export type MonitoringEventPayload = {
   message?: string;
   stack?: string;
   digest?: string;
-  metricName?: WebVitalName;
+  metricName?: WebVitalName | EngagementMetricName | InteractionMetricName;
   metricValue?: number;
   metricRating?: WebVitalRating;
   durationMs?: number;

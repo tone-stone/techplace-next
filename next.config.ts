@@ -21,6 +21,9 @@ const nextConfig: NextConfig = {
     },
   },
   images: {
+    // next/image now rejects any `quality` prop not enumerated here (default
+    // is [75]). The portfolio grid ships at 75, its carousel thumbnails at 70.
+    qualities: [70, 75],
     // Lets next/image resize + re-encode blog photos (Cloudinary covers/gallery,
     // plus legacy uploads still hosted on Supabase Storage from before the
     // Cloudinary migration) instead of shipping full-resolution originals.

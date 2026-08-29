@@ -307,3 +307,154 @@ export async function getFailedLogins(days = 7, limit = 30): Promise<FailedLogin
 
   return { last24h, last7d, recent };
 }
+
+/* ------------------------------------------------------------------ */
+/*  Visitor engagement (landing page behaviour analytics)             */
+/* ------------------------------------------------------------------ */
+
+/** Average time one visit spends with a given `<section id>` at least half in view. */
+export type SectionEngagement = { section: string; avgSeconds: number; visits: number };
+
+/** Share of visits that scrolled at least `depth` percent down the landing page. */
+export type ScrollDepthPoint = { depth: number; reachedPct: number; visits: number };
+
+/** A `data-track` value and how many times it was clicked in the window. */
+export type CtaClick = { track: string; count: number };
+
+/** Contact-form funnel counts: field focused → submitted → server accepted / errored. */
+export type ContactFunnel = { start: number; submit: number; success: number; error: number };
+
+/** Reads `meta` off a row as a loose record (jsonb comes back already parsed). */
+function metaOf(row: { meta?: unknown }): Record<string, unknown> {
+  return row.meta && typeof row.meta === "object" ? (row.meta as Record<string, unknown>) : {};
+}
+
+/**
+ * Average dwell time per landing-page section over the last `days` days:
+ * total accumulated visible time / distinct visits, longest first.
+ */
+export async function getSectionEngagement(days = 7): Promise<SectionEngagement[]> {
+  const supabase = await createClient();
+  const since = new Date(Date.now() - days * DAY_MS).toISOString();
+
+  const { data, error } = await supabase
+    .from("monitoring_events")
+    .select("metric_value, meta")
+    .eq("kind", "engagement")
+    .eq("metric_name", "section_time")
+    .gte("created_at", since)
+    .not("metric_value", "is", null);
+
+  if (error || !data) return [];
+
+  const totalMs = new Map<string, number>();
+  const visitors = new Map<string, Set<string>>();
+  for (const row of data) {
+    const meta = metaOf(row);
+    const section = typeof meta.section === "string" ? meta.section : null;
+    if (!section || row.metric_value == null) continue;
+    totalMs.set(section, (totalMs.get(section) ?? 0) + row.metric_value);
+    const set = visitors.get(section) ?? new Set<string>();
+    if (typeof meta.visitId === "string") set.add(meta.visitId);
+    visitors.set(section, set);
+  }
+
+  return [...totalMs.entries()]
+    .map(([section, ms]) => {
+      const visits = Math.max(1, visitors.get(section)?.size ?? 1);
+      return { section, avgSeconds: ms / visits / 1000, visits };
+    })
+    .sort((a, b) => b.avgSeconds - a.avgSeconds);
+}
+
+/**
+ * Scroll-depth funnel over the last `days` days: for each of 25/50/75/100 %,
+ * the share of visits (distinct visit ids) that reached at least that depth.
+ */
+export async function getScrollDepth(days = 7): Promise<ScrollDepthPoint[]> {
+  const supabase = await createClient();
+  const since = new Date(Date.now() - days * DAY_MS).toISOString();
+
+  const { data, error } = await supabase
+    .from("monitoring_events")
+    .select("metric_value, meta")
+    .eq("kind", "engagement")
+    .eq("metric_name", "scroll_depth")
+    .gte("created_at", since)
+    .not("metric_value", "is", null);
+
+  const marks = [25, 50, 75, 100];
+  if (error || !data) return marks.map((depth) => ({ depth, reachedPct: 0, visits: 0 }));
+
+  const allVisits = new Set<string>();
+  const reached = new Map<number, Set<string>>(marks.map((m) => [m, new Set<string>()]));
+  for (const row of data) {
+    const meta = metaOf(row);
+    const visitId = typeof meta.visitId === "string" ? meta.visitId : null;
+    if (!visitId || row.metric_value == null) continue;
+    allVisits.add(visitId);
+    for (const mark of marks) {
+      if (row.metric_value >= mark) reached.get(mark)!.add(visitId);
+    }
+  }
+
+  const total = Math.max(1, allVisits.size);
+  return marks.map((depth) => {
+    const visits = reached.get(depth)!.size;
+    return { depth, reachedPct: (visits / total) * 100, visits };
+  });
+}
+
+/** Top `data-track` clicks over the last `days` days, most-clicked first. */
+export async function getCtaClicks(days = 7, limit = 12): Promise<CtaClick[]> {
+  const supabase = await createClient();
+  const since = new Date(Date.now() - days * DAY_MS).toISOString();
+
+  const { data, error } = await supabase
+    .from("monitoring_events")
+    .select("meta")
+    .eq("kind", "interaction")
+    .eq("metric_name", "click")
+    .gte("created_at", since);
+
+  if (error || !data) return [];
+
+  const counts = new Map<string, number>();
+  for (const row of data) {
+    const track = metaOf(row).track;
+    if (typeof track !== "string") continue;
+    counts.set(track, (counts.get(track) ?? 0) + 1);
+  }
+
+  return [...counts.entries()]
+    .map(([track, count]) => ({ track, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, limit);
+}
+
+/** Contact-form funnel counts (`form: "contacto"`) over the last `days` days. */
+export async function getContactFunnel(days = 7): Promise<ContactFunnel> {
+  const supabase = await createClient();
+  const since = new Date(Date.now() - days * DAY_MS).toISOString();
+  const empty: ContactFunnel = { start: 0, submit: 0, success: 0, error: 0 };
+
+  const { data, error } = await supabase
+    .from("monitoring_events")
+    .select("meta")
+    .eq("kind", "interaction")
+    .eq("metric_name", "form")
+    .gte("created_at", since);
+
+  if (error || !data) return empty;
+
+  const out = { ...empty };
+  for (const row of data) {
+    const meta = metaOf(row);
+    if (meta.form !== "contacto") continue;
+    if (meta.step === "start") out.start++;
+    else if (meta.step === "submit") out.submit++;
+    else if (meta.step === "success") out.success++;
+    else if (meta.step === "error") out.error++;
+  }
+  return out;
+}

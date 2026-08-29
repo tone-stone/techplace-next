@@ -15,8 +15,8 @@ import {
   FileText,
   History,
   LayoutDashboard,
-  Menu,
   LogOut,
+  Menu,
   Newspaper,
   Tags,
   Users,
@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { logout } from "@/lib/auth/actions";
 import IdleTimeout from "@/components/auth/IdleTimeout";
+import DashboardUserCard from "@/components/dashboard/DashboardUserCard";
 import { CATEGORIES } from "@/lib/blog-posts";
 import type { ManagedArticle } from "@/lib/blog/articles";
 import type { ManagedUser } from "@/lib/auth/users";
@@ -55,6 +56,7 @@ const NAV_ITEMS: { id: Section; label: string; icon: typeof Newspaper }[] = [
  */
 export default function AdminDashboard({
   email,
+  userName,
   userId,
   initialUsers,
   role,
@@ -70,6 +72,7 @@ export default function AdminDashboard({
   onDelete,
 }: {
   email: string;
+  userName: string;
   userId: string;
   initialUsers: ManagedUser[];
   role: DashboardRole;
@@ -135,9 +138,7 @@ export default function AdminDashboard({
 
       <div className="mt-8 space-y-4 border-t border-white/10 pt-5">
         {canPreview && <RolePreviewSwitch role={role} onChange={onRoleChange} compact />}
-        <div className="px-1">
-          <p className="truncate text-xs text-gray-400">{email}</p>
-        </div>
+        <DashboardUserCard name={userName} email={email} redirectTo="/blog/login" />
         <Link
           href="/blog"
           className="block rounded-full border border-white/10 px-3 py-2 text-center text-xs text-gray-300 transition-colors hover:border-purple-400/40 hover:text-purple-300"
@@ -196,19 +197,18 @@ export default function AdminDashboard({
           />
           <p className="text-sm font-bold text-white lg:hidden">Panel de Administrador</p>
 
-          <div className="ml-auto flex items-center gap-3">
-            <form action={logout}>
-              <input type="hidden" name="redirectTo" value="/blog/login" />
-              <button
-                type="submit"
-                aria-label="Cerrar sesión"
-                title="Cerrar sesión"
-                className="inline-flex items-center justify-center rounded-full border border-white/10 p-2 text-gray-300 transition-colors hover:border-red-400/40 hover:text-red-300"
-              >
-                <LogOut className="h-4 w-4" />
-              </button>
-            </form>
-          </div>
+          <form action={logout} className="ml-auto">
+            <input type="hidden" name="redirectTo" value="/blog/login" />
+            <button
+              type="submit"
+              aria-label="Cerrar sesión"
+              title="Cerrar sesión"
+              className="flex items-center gap-1.5 rounded-full border border-white/10 px-3 py-1.5 text-xs font-medium text-gray-300 transition-colors hover:border-red-400/40 hover:bg-red-500/10 hover:text-red-300"
+            >
+              <LogOut className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Salir</span>
+            </button>
+          </form>
         </header>
 
         <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6 sm:py-10">

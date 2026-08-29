@@ -25,12 +25,14 @@ import type { ActivityAction, ActivityEntry, DashboardRole } from "./types";
  */
 export default function DashboardClient({
   email,
+  userName,
   userId,
   initialRole,
   initialArticles,
   initialUsers,
 }: {
   email: string;
+  userName: string;
   userId: string;
   initialRole: DashboardRole;
   initialArticles: ManagedArticle[];
@@ -92,6 +94,7 @@ export default function DashboardClient({
     return (
       <AdminDashboard
         email={email}
+        userName={userName}
         userId={userId}
         initialUsers={initialUsers}
         role={role}
@@ -112,6 +115,7 @@ export default function DashboardClient({
   return (
     <RedactorDashboard
       email={email}
+      userName={userName}
       role={role}
       canPreview={isRealAdmin}
       onRoleChange={handleRoleChange}

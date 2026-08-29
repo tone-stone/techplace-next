@@ -23,11 +23,11 @@ export default function Hero() {
       <div className="tp-hero-overlay" />
       <div
         aria-hidden
-        className="pointer-events-none absolute -top-24 -left-24 h-96 w-96 rounded-full bg-violet-700/20 blur-3xl z-[1] animate-[tp-float_9s_ease-in-out_infinite]"
+        className="tp-hero-blob pointer-events-none absolute -top-24 -left-24 h-96 w-96 rounded-full bg-violet-700/20 blur-3xl z-[1] animate-[tp-float_9s_ease-in-out_infinite]"
       />
       <div
         aria-hidden
-        className="pointer-events-none absolute -bottom-24 -right-16 h-96 w-96 rounded-full bg-indigo-600/25 blur-3xl z-[1] animate-[tp-float_11s_ease-in-out_infinite_reverse]"
+        className="tp-hero-blob pointer-events-none absolute -bottom-24 -right-16 h-96 w-96 rounded-full bg-indigo-600/25 blur-3xl z-[1] animate-[tp-float_11s_ease-in-out_infinite_reverse]"
       />
 
       <div className="tp-hero-content relative z-20 text-center w-full max-w-full px-5 sm:px-6 md:max-w-2xl mx-auto">
@@ -65,6 +65,7 @@ export default function Hero() {
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
           <a
             href="#contacto"
+            data-track="hero_cta_cotizacion"
             className="tp-btn-animated inline-flex items-center text-white px-6 sm:px-8 md:px-10 py-3 md:py-4 rounded-full text-base sm:text-lg font-bold shadow-lg shadow-blue-900/40 transition-transform duration-300 hover:scale-105 active:scale-[0.97]"
           >
             <ShieldCheck className="mr-2 h-5 w-5" />
@@ -72,6 +73,7 @@ export default function Hero() {
           </a>
           <a
             href="#portafolio"
+            data-track="hero_ver_proyectos"
             className="inline-flex items-center rounded-full border border-white/25 px-6 sm:px-8 py-3 md:py-4 text-base sm:text-lg font-bold text-white/90 transition-colors duration-300 hover:bg-white/10 hover:text-white"
           >
             Ver proyectos

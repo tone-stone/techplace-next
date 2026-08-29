@@ -50,6 +50,7 @@ export default async function BlogDashboardPage() {
   return (
     <DashboardClient
       email={user.email ?? ""}
+      userName={(user.user_metadata?.full_name as string | undefined) ?? ""}
       userId={user.id}
       initialRole={initialRole}
       initialArticles={initialArticles}

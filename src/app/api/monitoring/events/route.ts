@@ -11,12 +11,27 @@ import {
 
 /**
  * Public ingestion endpoint for the monitoring system's browser-side
- * reporter (`reportEvent` in `src/lib/monitoring/client.ts`). Accepts
- * `"error"` and `"web_vital"` events only — `"timing"` and `"security"`
- * events are written server-side directly, never through this route.
+ * reporter (`reportEvent` in `src/lib/monitoring/client.ts`). Accepts the
+ * client-originating kinds — `"error"`, `"web_vital"`, `"engagement"` and
+ * `"interaction"`. `"timing"` and `"security"` events are written
+ * server-side directly, never through this route.
  */
 
-const KINDS: MonitoringKind[] = ["error", "web_vital"];
+const KINDS: MonitoringKind[] = ["error", "web_vital", "engagement", "interaction"];
+
+/** Cap the stored `meta` blob — these are tiny by design ({visitId, section, …}). */
+const MAX_META_BYTES = 1024;
+
+/** Accepts a plain object under the size cap; anything else becomes `{}`. */
+function sanitizeMeta(meta: unknown): Record<string, unknown> {
+  if (!meta || typeof meta !== "object" || Array.isArray(meta)) return {};
+  try {
+    if (JSON.stringify(meta).length > MAX_META_BYTES) return {};
+  } catch {
+    return {};
+  }
+  return meta as Record<string, unknown>;
+}
 const SOURCES: MonitoringSource[] = ["client", "server"];
 const LEVELS: MonitoringLevel[] = ["error", "warning", "info"];
 
@@ -77,7 +92,7 @@ export async function POST(request: NextRequest) {
     metric_rating: typeof payload.metricRating === "string" ? payload.metricRating : null,
     user_agent: request.headers.get("user-agent")?.slice(0, 300) ?? null,
     user_id: user?.id ?? null,
-    meta: payload.meta && typeof payload.meta === "object" ? payload.meta : {},
+    meta: sanitizeMeta(payload.meta),
   });
 
   if (error) {

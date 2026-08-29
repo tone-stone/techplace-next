@@ -9,9 +9,9 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { FileText, LayoutDashboard, LogOut, Newspaper, Tags } from "lucide-react";
-import { logout } from "@/lib/auth/actions";
+import { FileText, LayoutDashboard, Newspaper, Tags } from "lucide-react";
 import IdleTimeout from "@/components/auth/IdleTimeout";
+import DashboardUserCard from "@/components/dashboard/DashboardUserCard";
 import { CATEGORIES } from "@/lib/blog-posts";
 import type { ManagedArticle } from "@/lib/blog/articles";
 import ArticleForm from "./ArticleForm";
@@ -28,6 +28,7 @@ import type { DashboardRole } from "./types";
  */
 export default function RedactorDashboard({
   email,
+  userName,
   role,
   canPreview,
   onRoleChange,
@@ -39,6 +40,7 @@ export default function RedactorDashboard({
   onEdit,
 }: {
   email: string;
+  userName: string;
   role: DashboardRole;
   canPreview: boolean;
   onRoleChange: (role: DashboardRole) => void;
@@ -75,19 +77,18 @@ export default function RedactorDashboard({
           </div>
 
           <div className="flex items-center gap-3 sm:gap-4">
-            <span className="hidden text-sm text-gray-400 md:inline">{email}</span>
-            <Link href="/blog" className="text-sm text-gray-400 transition-colors hover:text-indigo-300">
+            <Link
+              href="/blog"
+              className="hidden text-sm text-gray-400 transition-colors hover:text-indigo-300 sm:inline"
+            >
               Ver blog
             </Link>
-            <form action={logout}>
-              <input type="hidden" name="redirectTo" value="/blog/login" />
-              <button
-                type="submit"
-                className="inline-flex items-center gap-1.5 rounded-full border border-white/10 px-3 py-2 text-sm text-gray-300 transition-colors hover:border-red-400/40 hover:text-red-300 sm:px-4"
-              >
-                <LogOut className="h-4 w-4" /> <span className="hidden sm:inline">Salir</span>
-              </button>
-            </form>
+            <DashboardUserCard
+              name={userName}
+              email={email}
+              redirectTo="/blog/login"
+              className="max-w-56"
+            />
           </div>
         </div>
       </header>

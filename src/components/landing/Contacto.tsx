@@ -3,8 +3,9 @@
 import Image from "next/image";
 import { Globe, Mail, MapPin, MessageSquare, Send, User } from "lucide-react";
 import { FaFacebookF, FaWhatsapp } from "react-icons/fa6";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Reveal from "./Reveal";
+import { trackInteraction } from "@/lib/monitoring/engagement";
 
 /** Status/feedback message shown under the contact form after a submit attempt, or `null` before one happens. */
 type EstadoForm = { message: string; error: boolean } | null;
@@ -17,6 +18,14 @@ type EstadoForm = { message: string; error: boolean } | null;
 export default function Contacto() {
   const [estado, setEstado] = useState<EstadoForm>(null);
   const [enviando, setEnviando] = useState(false);
+  // Funnel tracking: fire `start` once, on the first field the visitor touches.
+  const startedRef = useRef(false);
+
+  const handleFirstFocus = () => {
+    if (startedRef.current) return;
+    startedRef.current = true;
+    trackInteraction("form", { form: "contacto", step: "start" });
+  };
 
   // Submits the form via fetch (instead of a normal POST navigation) so we can
   // show inline success/error feedback without leaving the page.
@@ -25,6 +34,7 @@ export default function Contacto() {
     const form = e.currentTarget;
     setEnviando(true);
     setEstado({ message: "Enviando…", error: false });
+    trackInteraction("form", { form: "contacto", step: "submit" });
 
     try {
       const res = await fetch(form.action, {
@@ -36,17 +46,20 @@ export default function Contacto() {
       if (res.ok) {
         setEstado({ message: "¡Mensaje enviado! Te responderemos pronto 😊", error: false });
         form.reset();
+        trackInteraction("form", { form: "contacto", step: "success" });
       } else {
         setEstado({
           message: "Error al enviar. Intenta de nuevo o contáctanos por WhatsApp.",
           error: true,
         });
+        trackInteraction("form", { form: "contacto", step: "error" });
       }
     } catch {
       setEstado({
         message: "Error al enviar. Intenta de nuevo o contáctanos por WhatsApp.",
         error: true,
       });
+      trackInteraction("form", { form: "contacto", step: "error" });
     } finally {
       setEnviando(false);
     }
@@ -62,7 +75,13 @@ export default function Contacto() {
         </Reveal>
         <div className="flex flex-col md:flex-row gap-10 items-center justify-between">
           <Reveal className="tp-glass w-full md:w-1/2 rounded-3xl p-6 sm:p-8">
-            <form onSubmit={handleSubmit} className="space-y-6" action="https://formspree.io/f/xwpbgpkr" method="POST">
+            <form
+              onSubmit={handleSubmit}
+              onFocus={handleFirstFocus}
+              className="space-y-6"
+              action="https://formspree.io/f/xwpbgpkr"
+              method="POST"
+            >
               <div className="relative group">
                 <input
                   type="text"

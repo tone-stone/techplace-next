@@ -80,6 +80,7 @@ export default async function AdminPage() {
   return (
     <CrmDashboard
       email={user?.email ?? ""}
+      userName={(user?.user_metadata?.full_name as string | undefined) ?? ""}
       userId={user?.id ?? ""}
       users={users}
       currentUserIsAdmin={currentUserIsAdmin}

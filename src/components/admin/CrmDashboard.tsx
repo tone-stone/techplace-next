@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { logout } from "@/lib/auth/actions";
 import IdleTimeout from "@/components/auth/IdleTimeout";
+import DashboardUserCard from "@/components/dashboard/DashboardUserCard";
 import UserManagement from "@/components/blog/dashboard/UserManagement";
 import type { ManagedUser } from "@/lib/auth/users";
 import type { ClientPayment, CrmClient } from "@/lib/crm/clients";
@@ -80,6 +81,7 @@ const NAV_ITEMS: { id: Section; label: string; icon: typeof Users }[] = [
  */
 export default function CrmDashboard({
   email,
+  userName = "",
   userId = "",
   users = [],
   currentUserIsAdmin = false,
@@ -97,6 +99,7 @@ export default function CrmDashboard({
   failedLogins = { last24h: 0, last7d: 0, recent: [] },
 }: {
   email: string;
+  userName?: string;
   userId?: string;
   users?: ManagedUser[];
   currentUserIsAdmin?: boolean;
@@ -161,8 +164,8 @@ export default function CrmDashboard({
         ))}
       </nav>
 
-      <div className="mt-8 border-t border-white/10 pt-5">
-        <p className="truncate px-1 text-xs text-gray-400">{email}</p>
+      <div className="mt-8 border-t border-white/10 pt-4">
+        <DashboardUserCard name={userName} email={email} redirectTo="/login" />
       </div>
     </>
   );
@@ -220,19 +223,18 @@ export default function CrmDashboard({
               <span className="truncate font-bold text-white">{currentLabel}</span>
             </nav>
 
-            <div className="ml-auto flex items-center gap-3">
-              <form action={logout}>
-                <input type="hidden" name="redirectTo" value="/login" />
-                <button
-                  type="submit"
-                  aria-label="Cerrar sesión"
-                  title="Cerrar sesión"
-                  className="inline-flex items-center justify-center rounded-full border border-white/10 p-2 text-gray-300 transition-colors hover:border-red-400/40 hover:text-red-300"
-                >
-                  <LogOut className="h-4 w-4" />
-                </button>
-              </form>
-            </div>
+            <form action={logout} className="ml-auto">
+              <input type="hidden" name="redirectTo" value="/login" />
+              <button
+                type="submit"
+                aria-label="Cerrar sesión"
+                title="Cerrar sesión"
+                className="flex items-center gap-1.5 rounded-full border border-white/10 px-3 py-1.5 text-xs font-medium text-gray-300 transition-colors hover:border-red-400/40 hover:bg-red-500/10 hover:text-red-300"
+              >
+                <LogOut className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Salir</span>
+              </button>
+            </form>
           </div>
 
           {/* Mobile quick-nav: every section at a glance, horizontal scroll */}
@@ -273,7 +275,14 @@ export default function CrmDashboard({
             <InvoicesSection invoices={invoices} clients={clients} projects={projects} />
           )}
           {section === "cotizaciones" && <QuotesSection quotes={quotes} clients={clients} />}
-          {section === "tareas" && <TasksSection tasks={tasks} projects={projects} />}
+          {section === "tareas" && (
+            <TasksSection
+              tasks={tasks}
+              projects={projects}
+              users={users}
+              currentUserId={userId}
+            />
+          )}
           {section === "usuarios" && currentUserIsAdmin && (
             <UserManagement currentUserId={userId} initialUsers={users} />
           )}
