@@ -14,6 +14,7 @@ import {
   Briefcase,
   ChevronRight,
   FileText,
+  HandCoins,
   Kanban,
   LayoutDashboard,
   LogOut,
@@ -41,6 +42,7 @@ import UserManagement from "@/components/blog/dashboard/UserManagement";
 import type { AssignableUser, ManagedUser } from "@/lib/auth/users";
 import type { ManagedArticle } from "@/lib/blog/articles";
 import type { ClientPayment, CrmClient } from "@/lib/crm/clients";
+import type { CollectionItem, ClientHealth } from "@/lib/crm/collections";
 import type { CrmProject } from "@/lib/crm/projects";
 import type { CrmInvoice } from "@/lib/crm/invoices";
 import type { CrmQuote } from "@/lib/crm/quotes";
@@ -57,6 +59,7 @@ import OverviewSection from "./crm/OverviewSection";
 import ClientsSection from "./crm/ClientsSection";
 import ProjectsSection from "./crm/ProjectsSection";
 import InvoicesSection from "./crm/InvoicesSection";
+import CobranzaSection from "./crm/CobranzaSection";
 import QuotesSection from "./crm/QuotesSection";
 import TasksSection from "./crm/TasksSection";
 import BlogSection from "./crm/BlogSection";
@@ -67,6 +70,7 @@ type Section =
   | "clientes"
   | "proyectos"
   | "facturacion"
+  | "cobranza"
   | "cotizaciones"
   | "tareas"
   | "blog"
@@ -78,6 +82,7 @@ const NAV_ITEMS: { id: Section; label: string; icon: typeof Users }[] = [
   { id: "clientes", label: "Clientes", icon: Users },
   { id: "proyectos", label: "Proyectos", icon: Briefcase },
   { id: "facturacion", label: "Facturación", icon: Receipt },
+  { id: "cobranza", label: "Cobranza", icon: HandCoins },
   { id: "cotizaciones", label: "Cotizaciones", icon: FileText },
   { id: "tareas", label: "Tareas", icon: Kanban },
   { id: "blog", label: "Blog", icon: Newspaper },
@@ -89,7 +94,7 @@ const NAV_ITEMS: { id: Section; label: string; icon: typeof Users }[] = [
 function visibleSections(role: Role): Section[] {
   const out: Section[] = [];
   if (canUseCrmCore(role)) out.push("resumen", "clientes", "proyectos");
-  if (canReadBilling(role)) out.push("facturacion");
+  if (canReadBilling(role)) out.push("facturacion", "cobranza");
   if (canUseCrmCore(role)) out.push("cotizaciones");
   out.push("tareas");
   if (canUseBlogModule(role)) out.push("blog");
@@ -118,6 +123,8 @@ export default function CrmDashboard({
   projects = [],
   invoices = [],
   quotes = [],
+  collections = [],
+  clientHealth = {},
   tasks,
   recentErrors = [],
   errorStats = { daily: [], last24h: 0, last7d: 0 },
@@ -140,6 +147,8 @@ export default function CrmDashboard({
   projects?: CrmProject[];
   invoices?: CrmInvoice[];
   quotes?: CrmQuote[];
+  collections?: CollectionItem[];
+  clientHealth?: Record<string, ClientHealth>;
   tasks: CrmTask[];
   recentErrors?: MonitoringErrorEvent[];
   errorStats?: ErrorStats;
@@ -301,7 +310,7 @@ export default function CrmDashboard({
             <OverviewSection clients={clients} projects={projects} payments={payments} />
           )}
           {section === "clientes" && allowed.includes("clientes") && (
-            <ClientsSection clients={clients} />
+            <ClientsSection clients={clients} health={clientHealth} />
           )}
           {section === "proyectos" && allowed.includes("proyectos") && (
             <ProjectsSection projects={projects} clients={clients} />
@@ -314,6 +323,9 @@ export default function CrmDashboard({
               readOnly={!canWriteBilling(role)}
             />
           )}
+          {section === "cobranza" && allowed.includes("cobranza") && (
+            <CobranzaSection collections={collections} />
+          )}
           {section === "cotizaciones" && allowed.includes("cotizaciones") && (
             <QuotesSection quotes={quotes} clients={clients} />
           )}
@@ -321,6 +333,7 @@ export default function CrmDashboard({
             <TasksSection
               tasks={tasks}
               projects={projectOptions}
+              clientOptions={clients.map((c) => ({ id: c.id, name: c.company }))}
               assignees={assignees}
               currentUserId={userId}
               defaultView={canUseCrmCore(role) ? "proyecto" : "mias"}

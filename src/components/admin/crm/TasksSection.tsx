@@ -51,9 +51,12 @@ function initials(name: string): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
+type TaskView = "proyecto" | "mias" | "sueltas";
+
 export default function TasksSection({
   tasks: initialTasks,
   projects,
+  clientOptions = [],
   assignees = [],
   currentUserId = "",
   defaultView = "proyecto",
@@ -61,6 +64,8 @@ export default function TasksSection({
 }: {
   tasks: CrmTask[];
   projects: { id: string; name: string }[];
+  /** Clients a task can optionally be tagged with (empty for roles without CRM core). */
+  clientOptions?: { id: string; name: string }[];
   assignees?: AssignableUser[];
   currentUserId?: string;
   /** "mias" for roles that mostly work their own assigned tasks (blog, redactor). */
@@ -70,7 +75,9 @@ export default function TasksSection({
 }) {
   const [tasks, setTasks] = useState(initialTasks);
   const [projectId, setProjectId] = useState(projects[0]?.id ?? "");
-  const [view, setView] = useState<"proyecto" | "mias">(defaultView);
+  const [view, setView] = useState<TaskView>(
+    defaultView === "proyecto" && projects.length === 0 ? "sueltas" : defaultView
+  );
   const [showDetailForm, setShowDetailForm] = useState(false);
   const [quickAddCol, setQuickAddCol] = useState<TaskStatus | null>(null);
   const [dragTaskId, setDragTaskId] = useState<string | null>(null);
@@ -78,12 +85,15 @@ export default function TasksSection({
 
   const resolveName = (id: string | null) =>
     id ? (assignees.find((u) => u.id === id)?.name ?? null) : null;
-  const projectNameOf = (id: string) => projects.find((p) => p.id === id)?.name ?? "—";
+  const projectNameOf = (id: string | null) =>
+    id ? (projects.find((p) => p.id === id)?.name ?? "—") : "Sin proyecto";
 
   const boardTasks =
     view === "mias"
       ? tasks.filter((t) => currentUserId && t.assigneeId === currentUserId)
-      : tasks.filter((t) => t.projectId === projectId);
+      : view === "sueltas"
+        ? tasks.filter((t) => t.projectId === null)
+        : tasks.filter((t) => t.projectId === projectId);
 
   const refresh = async () => {
     setTasks(await getAllTasks());
@@ -115,17 +125,6 @@ export default function TasksSection({
     await deleteTaskAction(taskId);
   };
 
-  if (projects.length === 0) {
-    return (
-      <div className="tp-dark-card-crm rounded-2xl p-5 sm:p-6">
-        <h2 className="mb-2 text-lg font-bold text-white">Tareas</h2>
-        <p className="text-sm text-gray-400">
-          Crea un proyecto primero para poder darle seguimiento a tareas.
-        </p>
-      </div>
-    );
-  }
-
   return (
     <div className="tp-dark-card-crm rounded-2xl p-5 sm:p-6">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -136,6 +135,7 @@ export default function TasksSection({
             {(
               [
                 { id: "proyecto", label: "Por proyecto" },
+                { id: "sueltas", label: "Sueltas" },
                 { id: "mias", label: "Mis tareas" },
               ] as const
             ).map(({ id, label }) => (
@@ -156,7 +156,7 @@ export default function TasksSection({
             ))}
           </div>
 
-          {view === "proyecto" && (
+          {view === "proyecto" && projects.length > 0 && (
             <select
               value={projectId}
               onChange={(e) => setProjectId(e.target.value)}
@@ -183,7 +183,8 @@ export default function TasksSection({
       {showDetailForm && (
         <NewTaskForm
           projects={projects}
-          defaultProjectId={projectId}
+          clientOptions={clientOptions}
+          defaultProjectId={view === "proyecto" ? projectId : ""}
           assignees={assignees}
           currentUserId={currentUserId}
           onCreated={refresh}
@@ -193,6 +194,11 @@ export default function TasksSection({
 
       {view === "mias" && !currentUserId ? (
         <p className="text-sm text-gray-400">Inicia sesión para ver las tareas asignadas a ti.</p>
+      ) : view === "proyecto" && projects.length === 0 ? (
+        <p className="text-sm text-gray-400">
+          No hay proyectos todavía. Usa la vista <span className="font-semibold text-gray-200">Sueltas</span> para
+          tareas que no cuelgan de un proyecto.
+        </p>
       ) : (
         <>
           <p className="mb-3 hidden text-xs text-gray-500 sm:block">
@@ -515,12 +521,14 @@ function QuickAdd({
 }
 
 /**
- * Inline form for `createTaskAction`: pick the project and assignee (defaults
- * to the signed-in user), plus optional due date and description. Refetches
- * the task list and collapses itself on success.
+ * Inline form for `createTaskAction`: optional project and client, assignee
+ * (defaults to the signed-in user), plus optional due date and description.
+ * A task needs only a title — leave the project on "Sin proyecto" for a
+ * standalone task. Refetches the task list and collapses itself on success.
  */
 function NewTaskForm({
   projects,
+  clientOptions,
   defaultProjectId,
   assignees,
   currentUserId,
@@ -528,6 +536,7 @@ function NewTaskForm({
   onDone,
 }: {
   projects: { id: string; name: string }[];
+  clientOptions: { id: string; name: string }[];
   defaultProjectId: string;
   assignees: AssignableUser[];
   currentUserId: string;
@@ -552,12 +561,24 @@ function NewTaskForm({
         <input name="title" required placeholder="Título de la tarea" className={`${fieldClass} sm:col-span-2`} />
 
         <select name="projectId" defaultValue={defaultProjectId} className={fieldClass}>
+          <option value="">— Sin proyecto —</option>
           {projects.map((p) => (
             <option key={p.id} value={p.id}>
               {p.name}
             </option>
           ))}
         </select>
+
+        {clientOptions.length > 0 && (
+          <select name="clientId" defaultValue="" className={fieldClass}>
+            <option value="">— Sin cliente —</option>
+            {clientOptions.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+        )}
 
         {assignees.length > 0 ? (
           <select name="assigneeId" defaultValue={currentUserId || ""} className={fieldClass}>

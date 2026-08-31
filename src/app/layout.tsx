@@ -3,10 +3,13 @@
  * and the base site metadata (title, description, keywords, Open Graph and
  * Twitter cards), then mounts `MonitoringClient` inside `<body>` so
  * site-wide error and Web Vitals reporting is active on every route before
- * `children` renders.
+ * `children` renders. Vercel's `<Analytics />` is mounted after `children`
+ * for privacy-friendly page-view traffic stats (script + beacons are
+ * same-origin under `/_vercel/insights`, so the CSP needs no change).
  */
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Orbitron } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
 import MonitoringClient from "@/components/monitoring/MonitoringClient";
 import EngagementTracker from "@/components/monitoring/EngagementTracker";
 import "./globals.css";
@@ -169,6 +172,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <MonitoringClient />
         <EngagementTracker />
         {children}
+        <Analytics />
       </body>
     </html>
   );

@@ -57,7 +57,7 @@ describe("CrmDashboard", () => {
     const user = userEvent.setup();
     renderDash("admin");
     await user.click(screen.getAllByRole("button", { name: "Tareas" })[0]);
-    expect(screen.getByText(/crea un proyecto primero/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /nueva tarea/i })).toBeInTheDocument();
   });
 
   it("hides Monitoreo, Usuarios and Blog for an ejecutivo", () => {

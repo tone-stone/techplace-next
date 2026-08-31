@@ -37,6 +37,7 @@ import { getDueDateUrgency } from "@/lib/crm/plan-status";
 import ConfirmDialog from "@/components/admin/ConfirmDialog";
 import StatusBadge from "./StatusBadge";
 import ModalPortal from "./ModalPortal";
+import ContactsPanel from "./ContactsPanel";
 
 const HISTORY_LABELS: Record<string, string> = {
   nota: "Nota",
@@ -148,7 +149,7 @@ export default function ClientDetailModal({ clientId, onClose }: { clientId: str
 
 /** Modal body once the client detail has loaded: header info plus the plans/payments/history panels. */
 function ClientDetailContent({ detail, onChanged }: { detail: ClientDetail; onChanged: () => void }) {
-  const { client, history, plans, payments } = detail;
+  const { client, contacts, history, plans, payments } = detail;
 
   return (
     <div className="space-y-8">
@@ -172,6 +173,7 @@ function ClientDetailContent({ detail, onChanged }: { detail: ClientDetail; onCh
         </div>
       </div>
 
+      <ContactsPanel clientId={client.id} contacts={contacts} onChanged={onChanged} />
       <PlansPanel clientId={client.id} plans={plans} onChanged={onChanged} />
       <PaymentsPanel clientId={client.id} plans={plans} payments={payments} onChanged={onChanged} />
       <HistoryPanel clientId={client.id} history={history} onChanged={onChanged} />

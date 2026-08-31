@@ -15,8 +15,10 @@ import { withTiming } from "@/lib/monitoring/timing";
 import { requireCrmCore } from "./auth";
 import { softDelete } from "./soft-delete";
 import { addHistory, mapHistory, type ClientHistoryEntry, type HistoryEntryType } from "./history";
+import { getContactsByClient, type CrmContact } from "./contacts";
 
 export type { HistoryEntryType, ClientHistoryEntry } from "./history";
+export type { CrmContact } from "./contacts";
 
 export type ClientStatus = "lead" | "negociacion" | "activo" | "inactivo";
 export type PlanStatus = "activo" | "pausado" | "cancelado";
@@ -61,6 +63,7 @@ export type ClientPayment = {
 
 export type ClientDetail = {
   client: CrmClient;
+  contacts: CrmContact[];
   history: ClientHistoryEntry[];
   plans: ClientPlan[];
   payments: ClientPayment[];
@@ -174,21 +177,24 @@ export async function getAllPayments(): Promise<ClientPayment[]> {
 export async function getClientDetail(clientId: string): Promise<ClientDetail | null> {
   const supabase = await createClient();
 
-  const [{ data: client }, { data: history }, { data: plans }, { data: payments }] = await Promise.all([
-    supabase.from("crm_clients").select("*").eq("id", clientId).single(),
-    supabase
-      .from("crm_client_history")
-      .select("*")
-      .eq("client_id", clientId)
-      .order("created_at", { ascending: false }),
-    supabase.from("crm_plans").select("*").eq("client_id", clientId).order("next_due_date", { ascending: true }),
-    supabase.from("crm_payments").select("*").eq("client_id", clientId).order("due_date", { ascending: false }),
-  ]);
+  const [{ data: client }, contacts, { data: history }, { data: plans }, { data: payments }] =
+    await Promise.all([
+      supabase.from("crm_clients").select("*").eq("id", clientId).single(),
+      getContactsByClient(clientId),
+      supabase
+        .from("crm_client_history")
+        .select("*")
+        .eq("client_id", clientId)
+        .order("created_at", { ascending: false }),
+      supabase.from("crm_plans").select("*").eq("client_id", clientId).order("next_due_date", { ascending: true }),
+      supabase.from("crm_payments").select("*").eq("client_id", clientId).order("due_date", { ascending: false }),
+    ]);
 
   if (!client) return null;
 
   return {
     client: mapClient(client),
+    contacts,
     history: (history ?? []).map(mapHistory),
     plans: (plans ?? []).map(mapPlan),
     payments: (payments ?? []).map(mapPayment),

@@ -13,6 +13,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getAssignableUsers, listUsers } from "@/lib/auth/users";
 import { listArticles } from "@/lib/blog/articles";
 import { getAllPayments, getClients } from "@/lib/crm/clients";
+import { getClientHealthMap, getUpcomingCollections } from "@/lib/crm/collections";
 import { getProjectNames, getProjects } from "@/lib/crm/projects";
 import { getInvoices } from "@/lib/crm/invoices";
 import { getQuotes } from "@/lib/crm/quotes";
@@ -74,6 +75,8 @@ export default async function AdminPage() {
     projects,
     invoices,
     quotes,
+    collections,
+    clientHealth,
     tasks,
     assignees,
     usersResult,
@@ -86,6 +89,8 @@ export default async function AdminPage() {
     crmCore ? getProjects() : Promise.resolve([]),
     billing ? getInvoices() : Promise.resolve([]),
     crmCore ? getQuotes() : Promise.resolve([]),
+    billing ? getUpcomingCollections() : Promise.resolve([]),
+    billing ? getClientHealthMap() : Promise.resolve({}),
     getAllTasks(),
     getAssignableUsers(),
     canManageAllUsers(r) ? listUsers() : Promise.resolve({ users: [] }),
@@ -134,6 +139,8 @@ export default async function AdminPage() {
       projects={projects}
       invoices={invoices}
       quotes={quotes}
+      collections={collections}
+      clientHealth={clientHealth}
       tasks={tasks}
       {...monitoringProps}
     />

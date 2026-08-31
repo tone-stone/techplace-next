@@ -20,7 +20,10 @@ const TASK_STATUSES: TaskStatus[] = ["por_hacer", "en_progreso", "terminado"];
 
 export type CrmTask = {
   id: string;
-  projectId: string;
+  /** Null for standalone tasks that don't hang off a project. */
+  projectId: string | null;
+  /** Optional client the task relates to (standalone or project tasks alike). */
+  clientId: string | null;
   title: string;
   description: string | null;
   status: TaskStatus;
@@ -35,7 +38,8 @@ export type CrmTask = {
 /** Converts a raw `crm_tasks` row (snake_case) into a `CrmTask`. */
 function mapTask(row: {
   id: string;
-  project_id: string;
+  project_id: string | null;
+  client_id: string | null;
   title: string;
   description: string | null;
   status: string;
@@ -47,6 +51,7 @@ function mapTask(row: {
   return {
     id: row.id,
     projectId: row.project_id,
+    clientId: row.client_id,
     title: row.title,
     description: row.description,
     status: row.status as TaskStatus,
@@ -74,7 +79,8 @@ export async function createTaskAction(
   const check = await requireDashboard();
   if (!check.ok) return { error: check.error };
 
-  const projectId = String(formData.get("projectId") ?? "");
+  const projectId = String(formData.get("projectId") ?? "").trim();
+  const clientId = String(formData.get("clientId") ?? "").trim();
   const title = String(formData.get("title") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim();
   const assignee = String(formData.get("assignee") ?? "").trim();
@@ -87,13 +93,14 @@ export async function createTaskAction(
     ? (statusRaw as TaskStatus)
     : undefined;
 
-  if (!projectId || !title) {
-    return { error: "Selecciona un proyecto y escribe el título de la tarea" };
+  if (!title) {
+    return { error: "Escribe el título de la tarea" };
   }
 
   const supabase = await createClient();
   const { error } = await supabase.from("crm_tasks").insert({
-    project_id: projectId,
+    project_id: projectId || null,
+    client_id: clientId || null,
     title,
     description: description || null,
     assignee: assignee || null,

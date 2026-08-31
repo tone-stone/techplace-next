@@ -7,8 +7,10 @@
  */
 
 import { useActionState, useMemo, useState } from "react";
-import { Mail, Phone, Plus, Search } from "lucide-react";
+import { CalendarClock, Mail, Phone, Plus, Search } from "lucide-react";
 import { createClientAction, type ClientStatus, type CrmActionState, type CrmClient } from "@/lib/crm/clients";
+import type { ClientHealth } from "@/lib/crm/collections";
+import { formatCurrencyMXN } from "@/lib/crm/format";
 import StatusBadge from "./StatusBadge";
 import ClientDetailModal from "./ClientDetailModal";
 
@@ -21,7 +23,14 @@ const FILTERS: { id: ClientStatus | "todos"; label: string }[] = [
 ];
 
 /** Renders the client list with status filters, search, and the "new client" form. */
-export default function ClientsSection({ clients }: { clients: CrmClient[] }) {
+export default function ClientsSection({
+  clients,
+  health = {},
+}: {
+  clients: CrmClient[];
+  /** Per-client billing health keyed by client id (see `getClientHealthMap`). */
+  health?: Record<string, ClientHealth>;
+}) {
   const [filter, setFilter] = useState<ClientStatus | "todos">("todos");
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -111,6 +120,25 @@ export default function ClientsSection({ clients }: { clients: CrmClient[] }) {
                   </span>
                 )}
               </div>
+              {(() => {
+                const h = health[client.id];
+                if (!h) return null;
+                return (
+                  <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
+                    <span className="flex items-center gap-1 text-gray-400">
+                      <CalendarClock className="h-3 w-3" />
+                      {h.hasActivePlan && h.nextDueDate
+                        ? `Próximo cobro ${h.nextDueDate}`
+                        : "Sin plan activo"}
+                    </span>
+                    {h.overdueAmount > 0 && (
+                      <span className="font-semibold text-red-400">
+                        Vencido {formatCurrencyMXN(h.overdueAmount)}
+                      </span>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           </button>
         ))}
