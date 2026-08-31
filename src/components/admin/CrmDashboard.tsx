@@ -24,6 +24,7 @@ import {
   Receipt,
   ScrollText,
   Server,
+  Settings,
   UserCog,
   Users,
   X,
@@ -32,6 +33,7 @@ import { logout } from "@/lib/auth/actions";
 import {
   assignableRoles,
   canManageAllUsers,
+  canManageSettings,
   canReadBilling,
   canSeeMonitoring,
   canUseBlogModule,
@@ -77,6 +79,8 @@ import TicketsSection from "./it/TicketsSection";
 import TasksSection from "./crm/TasksSection";
 import BlogSection from "./crm/BlogSection";
 import MonitoringSection from "./monitoring/MonitoringSection";
+import SettingsSection, { type EnvStatus } from "./SettingsSection";
+import type { AppSettings } from "@/lib/settings";
 
 type Section =
   | "resumen"
@@ -91,7 +95,8 @@ type Section =
   | "tareas"
   | "blog"
   | "usuarios"
-  | "monitoreo";
+  | "monitoreo"
+  | "configuracion";
 
 const NAV_ITEMS: { id: Section; label: string; icon: typeof Users }[] = [
   { id: "resumen", label: "Resumen", icon: LayoutDashboard },
@@ -152,6 +157,8 @@ export default function CrmDashboard({
   contracts = [],
   services = [],
   contractUsage = {},
+  appSettings = null,
+  envStatus = { resend: false, cron: false, fromEmail: false },
   tasks,
   recentErrors = [],
   errorStats = { daily: [], last24h: 0, last7d: 0 },
@@ -182,6 +189,8 @@ export default function CrmDashboard({
   contracts?: CrmContract[];
   services?: CrmService[];
   contractUsage?: Record<string, ClientMonthUsage>;
+  appSettings?: AppSettings | null;
+  envStatus?: EnvStatus;
   tasks: CrmTask[];
   recentErrors?: MonitoringErrorEvent[];
   errorStats?: ErrorStats;
@@ -195,7 +204,10 @@ export default function CrmDashboard({
   const [section, setSection] = useState<Section>(navItems[0]?.id ?? "tareas");
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const currentLabel = navItems.find((n) => n.id === section)?.label ?? navItems[0]?.label ?? "Panel";
+  const currentLabel =
+    section === "configuracion"
+      ? "Configuración"
+      : (navItems.find((n) => n.id === section)?.label ?? navItems[0]?.label ?? "Panel");
 
   const navButtonClass = (active: boolean) =>
     `flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${
@@ -237,7 +249,21 @@ export default function CrmDashboard({
         ))}
       </nav>
 
-      <div className="mt-8 border-t border-white/10 pt-4">
+      <div className="mt-8 space-y-2 border-t border-white/10 pt-4">
+        {canManageSettings(role) && (
+          <button
+            type="button"
+            onClick={() => {
+              setSection("configuracion");
+              setSidebarOpen(false);
+            }}
+            aria-current={section === "configuracion" ? "page" : undefined}
+            className={navButtonClass(section === "configuracion")}
+          >
+            <Settings className="h-4 w-4" />
+            Configuración
+          </button>
+        )}
         <DashboardUserCard name={userName} email={email} redirectTo="/login" />
       </div>
     </>
@@ -422,6 +448,9 @@ export default function CrmDashboard({
               slowPages={slowPages}
               failedLogins={failedLogins}
             />
+          )}
+          {section === "configuracion" && canManageSettings(role) && appSettings && (
+            <SettingsSection settings={appSettings} env={envStatus} />
           )}
         </main>
       </div>

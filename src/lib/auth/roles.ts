@@ -58,6 +58,8 @@ export const canUseTasks = isOneOf(...ROLES);
 /** Soporte: Activos e IT Service Desk (tickets). Same set as CRM core for now;
  *  split out if a dedicated `soporte` role is ever added. */
 export const canUseSupport = isOneOf("dios", "admin", "ejecutivo");
+/** Configuración de la organización (app_settings). */
+export const canManageSettings = isOneOf("dios", "admin");
 
 /* --- Account-on-account rules --- */
 

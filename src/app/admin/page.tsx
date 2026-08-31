@@ -24,9 +24,11 @@ import { getAllTasks } from "@/lib/crm/tasks";
 import { getAssets } from "@/lib/it/assets";
 import { getTickets } from "@/lib/it/tickets";
 import { getMonthlyUsageByClient } from "@/lib/it/time-entries";
+import { getAppSettings } from "@/lib/settings";
 import {
   canManageAllUsers,
   canManageBlogUsers,
+  canManageSettings,
   canReadBilling,
   canSeeMonitoring,
   canUseBlogModule,
@@ -91,6 +93,7 @@ export default async function AdminPage() {
     assets,
     tickets,
     contactsAll,
+    appSettings,
     tasks,
     assignees,
     usersResult,
@@ -111,6 +114,7 @@ export default async function AdminPage() {
     support ? getAssets() : Promise.resolve([]),
     support ? getTickets() : Promise.resolve([]),
     support ? getAllContacts() : Promise.resolve([]),
+    canManageSettings(r) ? getAppSettings() : Promise.resolve(null),
     getAllTasks(),
     getAssignableUsers(),
     canManageAllUsers(r) ? listUsers() : Promise.resolve({ users: [] }),
@@ -143,6 +147,12 @@ export default async function AdminPage() {
       }
     : EMPTY_MONITORING;
 
+  const envStatus = {
+    resend: !!process.env.RESEND_API_KEY,
+    cron: !!process.env.CRON_SECRET,
+    fromEmail: !!process.env.BILLING_FROM_EMAIL,
+  };
+
   return (
     <CrmDashboard
       email={user.email ?? ""}
@@ -167,6 +177,8 @@ export default async function AdminPage() {
       contracts={contracts}
       services={services}
       contractUsage={contractUsage}
+      appSettings={appSettings}
+      envStatus={envStatus}
       tasks={tasks}
       {...monitoringProps}
     />

@@ -7,6 +7,7 @@ import {
   canUseBlogModule,
   canUseCrmCore,
   canUseSupport,
+  canManageSettings,
   canWriteBilling,
   type ProfileRole,
   type Role,
@@ -99,4 +100,9 @@ export function requireBlogContent() {
 /** Soporte: Activos e IT Service Desk. dios, admin, ejecutivo. */
 export function requireSupport() {
   return requireRole(canUseSupport, "No tienes permisos para el módulo de Soporte");
+}
+
+/** Configuración de la organización. dios, admin. */
+export function requireSettings() {
+  return requireRole(canManageSettings, "Solo dios o admin pueden cambiar la configuración");
 }
