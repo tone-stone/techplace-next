@@ -92,11 +92,32 @@ export type ItTicketEvent = {
   createdAt: string;
 };
 
+export type ItTimeEntry = {
+  id: string;
+  ticketId: string;
+  userId: string | null;
+  minutes: number;
+  description: string | null;
+  workedOn: string;
+  billable: boolean;
+  createdAt: string;
+};
+
 export type TicketDetail = {
   ticket: ItTicket;
   messages: ItTicketMessage[];
   events: ItTicketEvent[];
+  timeEntries: ItTimeEntry[];
 };
+
+/** Minutes → "1h 30m" / "45m" / "2h". */
+export function formatMinutes(minutes: number): string {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  if (h && m) return `${h}h ${m}m`;
+  if (h) return `${h}h`;
+  return `${m}m`;
+}
 
 export function mapTicket(row: {
   id: string;
@@ -164,6 +185,28 @@ export function mapTicketEvent(row: {
     ticketId: row.ticket_id,
     kind: row.kind,
     detail: row.detail,
+    createdAt: row.created_at,
+  };
+}
+
+export function mapTimeEntry(row: {
+  id: string;
+  ticket_id: string;
+  user_id: string | null;
+  minutes: number;
+  description: string | null;
+  worked_on: string;
+  billable: boolean;
+  created_at: string;
+}): ItTimeEntry {
+  return {
+    id: row.id,
+    ticketId: row.ticket_id,
+    userId: row.user_id,
+    minutes: row.minutes,
+    description: row.description,
+    workedOn: row.worked_on,
+    billable: row.billable,
     createdAt: row.created_at,
   };
 }

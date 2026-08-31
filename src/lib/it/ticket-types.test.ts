@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { SLA_HOURS, slaDueAt } from "./ticket-types";
+import { SLA_HOURS, formatMinutes, slaDueAt } from "./ticket-types";
 
 describe("slaDueAt", () => {
   const from = new Date("2026-08-31T09:00:00.000Z");
@@ -16,5 +16,14 @@ describe("slaDueAt", () => {
       const due = new Date(slaDueAt(priority as keyof typeof SLA_HOURS, from)).getTime();
       expect(due - from.getTime()).toBe(hours * 3_600_000);
     }
+  });
+});
+
+describe("formatMinutes", () => {
+  it("formats hours and minutes", () => {
+    expect(formatMinutes(90)).toBe("1h 30m");
+    expect(formatMinutes(120)).toBe("2h");
+    expect(formatMinutes(45)).toBe("45m");
+    expect(formatMinutes(0)).toBe("0m");
   });
 });

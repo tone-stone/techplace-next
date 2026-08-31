@@ -17,11 +17,13 @@ import {
   updateTicketPriorityAction,
   updateTicketStatusAction,
 } from "@/lib/it/tickets";
+import { addTimeEntryAction, deleteTimeEntryAction } from "@/lib/it/time-entries";
 import {
   PRIORITY_LABELS,
   STATUS_LABELS,
   TICKET_PRIORITIES,
   TICKET_STATUSES,
+  formatMinutes,
   type TicketDetail,
   type TicketPriority,
   type TicketStatus,
@@ -203,6 +205,13 @@ export default function TicketDetailModal({
                 </span>
               </div>
 
+              <TimePanel
+                ticketId={t.id}
+                entries={detail.timeEntries}
+                assignees={assignees}
+                onChanged={refresh}
+              />
+
               <div>
                 <h3 className="mb-3 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-gray-300">
                   <MessageSquare className="h-4 w-4 text-sky-300" /> Conversación
@@ -308,5 +317,99 @@ function ReplyBox({ ticketId, onSent }: { ticketId: string; onSent: () => void }
         </button>
       </div>
     </form>
+  );
+}
+
+/** Logged-time list + "registrar tiempo" composer. */
+function TimePanel({
+  ticketId,
+  entries,
+  assignees,
+  onChanged,
+}: {
+  ticketId: string;
+  entries: TicketDetail["timeEntries"];
+  assignees: AssignableUser[];
+  onChanged: () => void;
+}) {
+  const [formKey, setFormKey] = useState(0);
+  const [state, formAction] = useActionState<CrmActionState, FormData>(async (prev, formData) => {
+    const result = await addTimeEntryAction(prev, formData);
+    if (result && "success" in result) {
+      setFormKey((k) => k + 1);
+      onChanged();
+    }
+    return result;
+  }, null);
+
+  const total = entries.reduce((s, e) => s + e.minutes, 0);
+  const billable = entries.filter((e) => e.billable).reduce((s, e) => s + e.minutes, 0);
+  const who = (id: string | null) => (id ? (assignees.find((u) => u.id === id)?.name ?? "—") : "—");
+
+  return (
+    <div>
+      <h3 className="mb-3 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-gray-300">
+        <Clock className="h-4 w-4 text-sky-300" /> Tiempo · {formatMinutes(total)}
+        {billable !== total && <span className="text-[11px] font-normal text-gray-500">({formatMinutes(billable)} facturable)</span>}
+      </h3>
+
+      <form key={formKey} action={formAction} className="flex flex-wrap items-center gap-2">
+        <input type="hidden" name="ticketId" value={ticketId} />
+        <input
+          name="hours"
+          type="number"
+          min="0"
+          step="0.25"
+          required
+          placeholder="Horas"
+          className="w-20 rounded-lg border border-white/10 bg-black/30 px-2.5 py-1.5 text-xs text-white outline-none focus:border-sky-400/40"
+          aria-label="Horas"
+        />
+        <input
+          name="workedOn"
+          type="date"
+          className="rounded-lg border border-white/10 bg-black/30 px-2.5 py-1.5 text-xs text-white outline-none focus:border-sky-400/40"
+          aria-label="Fecha"
+        />
+        <input
+          name="description"
+          placeholder="Qué se hizo"
+          className="min-w-32 flex-1 rounded-lg border border-white/10 bg-black/30 px-2.5 py-1.5 text-xs text-white placeholder-gray-500 outline-none focus:border-sky-400/40"
+        />
+        <label className="flex items-center gap-1 text-[11px] text-gray-400">
+          <input name="billable" type="checkbox" defaultChecked className="h-3.5 w-3.5" /> Facturable
+        </label>
+        <button
+          type="submit"
+          className="cursor-pointer rounded-full bg-sky-500/20 px-3 py-1.5 text-xs font-semibold text-sky-200 hover:bg-sky-500/30"
+        >
+          Registrar
+        </button>
+        {state && "error" in state && <p className="w-full text-xs text-red-400">{state.error}</p>}
+      </form>
+
+      <div className="mt-3 space-y-1.5">
+        {entries.map((e) => (
+          <div key={e.id} className="flex items-center justify-between gap-2 text-xs">
+            <span className="text-gray-300">
+              <span className="font-semibold text-white">{formatMinutes(e.minutes)}</span> · {e.workedOn} · {who(e.userId)}
+              {e.description ? ` — ${e.description}` : ""}
+              {!e.billable && <span className="ml-1 text-gray-500">(no facturable)</span>}
+            </span>
+            <button
+              type="button"
+              onClick={async () => {
+                await deleteTimeEntryAction(e.id);
+                onChanged();
+              }}
+              aria-label="Eliminar registro de tiempo"
+              className="cursor-pointer rounded-full p-1 text-gray-500 hover:bg-red-500/10 hover:text-red-400"
+            >
+              <Trash2 className="h-3 w-3" />
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }

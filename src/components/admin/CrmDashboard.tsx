@@ -56,6 +56,7 @@ import type { CrmQuote } from "@/lib/crm/quotes";
 import type { CrmTask } from "@/lib/crm/tasks";
 import type { ItAsset } from "@/lib/it/asset-types";
 import type { ItTicket } from "@/lib/it/ticket-types";
+import type { ClientMonthUsage } from "@/lib/it/time-entries";
 import type {
   ErrorStats,
   FailedLoginStats,
@@ -150,6 +151,7 @@ export default function CrmDashboard({
   contacts = [],
   contracts = [],
   services = [],
+  contractUsage = {},
   tasks,
   recentErrors = [],
   errorStats = { daily: [], last24h: 0, last7d: 0 },
@@ -179,6 +181,7 @@ export default function CrmDashboard({
   contacts?: CrmContact[];
   contracts?: CrmContract[];
   services?: CrmService[];
+  contractUsage?: Record<string, ClientMonthUsage>;
   tasks: CrmTask[];
   recentErrors?: MonitoringErrorEvent[];
   errorStats?: ErrorStats;
@@ -363,6 +366,7 @@ export default function CrmDashboard({
             <ContractsSection
               contracts={contracts}
               services={services}
+              usageByClient={contractUsage}
               clients={clients.map((c) => ({ id: c.id, name: c.company }))}
             />
           )}

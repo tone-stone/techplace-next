@@ -25,6 +25,7 @@ import {
   mapTicket,
   mapTicketEvent,
   mapTicketMessage,
+  mapTimeEntry,
   slaDueAt,
   type TicketDetail,
   type TicketPriority,
@@ -77,7 +78,7 @@ export async function getTickets() {
 /** One ticket with its message thread and event log. */
 export async function getTicketDetail(ticketId: string): Promise<TicketDetail | null> {
   const supabase = await createClient();
-  const [{ data: ticket }, { data: messages }, { data: events }] = await Promise.all([
+  const [{ data: ticket }, { data: messages }, { data: events }, { data: timeEntries }] = await Promise.all([
     supabase.from("it_tickets").select("*").eq("id", ticketId).is("deleted_at", null).maybeSingle(),
     supabase
       .from("it_ticket_messages")
@@ -89,12 +90,19 @@ export async function getTicketDetail(ticketId: string): Promise<TicketDetail | 
       .select("*")
       .eq("ticket_id", ticketId)
       .order("created_at", { ascending: true }),
+    supabase
+      .from("it_ticket_time_entries")
+      .select("*")
+      .eq("ticket_id", ticketId)
+      .is("deleted_at", null)
+      .order("worked_on", { ascending: false }),
   ]);
   if (!ticket) return null;
   return {
     ticket: mapTicket(ticket),
     messages: (messages ?? []).map(mapTicketMessage),
     events: (events ?? []).map(mapTicketEvent),
+    timeEntries: (timeEntries ?? []).map(mapTimeEntry),
   };
 }
 

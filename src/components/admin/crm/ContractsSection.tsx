@@ -27,6 +27,7 @@ import {
 } from "@/lib/crm/contract-types";
 import { formatCurrencyMXN } from "@/lib/crm/format";
 import type { CrmActionState } from "@/lib/crm/clients";
+import type { ClientMonthUsage } from "@/lib/it/time-entries";
 import ConfirmDialog from "@/components/admin/ConfirmDialog";
 import ContractDetailModal from "./ContractDetailModal";
 
@@ -45,10 +46,13 @@ export default function ContractsSection({
   contracts,
   services,
   clients,
+  usageByClient = {},
 }: {
   contracts: CrmContract[];
   services: CrmService[];
   clients: { id: string; name: string }[];
+  /** Minutes logged this month per client id (see `getMonthlyUsageByClient`). */
+  usageByClient?: Record<string, ClientMonthUsage>;
 }) {
   const [view, setView] = useState<"contratos" | "catalogo">("contratos");
   const [query, setQuery] = useState("");
@@ -153,6 +157,17 @@ export default function ContractsSection({
                   <p className="mt-0.5 text-xs text-gray-400">{nameOf(c.clientId)}</p>
                   <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
                     {c.includedHours != null && <span>{c.includedHours} h incluidas</span>}
+                    {(() => {
+                      const used = (usageByClient[c.clientId]?.minutes ?? 0) / 60;
+                      if (used === 0 && c.includedHours == null) return null;
+                      const over = c.includedHours != null && used > c.includedHours;
+                      return (
+                        <span className={over ? "font-semibold text-amber-400" : "text-gray-400"}>
+                          {used.toFixed(1)} h este mes
+                          {c.includedHours != null ? ` / ${c.includedHours} h` : ""}
+                        </span>
+                      );
+                    })()}
                     {c.slaHours != null && <span>SLA {c.slaHours} h</span>}
                     {c.billingAmount != null && (
                       <span>

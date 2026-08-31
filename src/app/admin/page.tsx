@@ -23,6 +23,7 @@ import { getQuotes } from "@/lib/crm/quotes";
 import { getAllTasks } from "@/lib/crm/tasks";
 import { getAssets } from "@/lib/it/assets";
 import { getTickets } from "@/lib/it/tickets";
+import { getMonthlyUsageByClient } from "@/lib/it/time-entries";
 import {
   canManageAllUsers,
   canManageBlogUsers,
@@ -86,6 +87,7 @@ export default async function AdminPage() {
     clientHealth,
     contracts,
     services,
+    contractUsage,
     assets,
     tickets,
     contactsAll,
@@ -105,6 +107,7 @@ export default async function AdminPage() {
     billing ? getClientHealthMap() : Promise.resolve({}),
     billing ? getContracts() : Promise.resolve([]),
     billing ? getServices() : Promise.resolve([]),
+    billing ? getMonthlyUsageByClient() : Promise.resolve({}),
     support ? getAssets() : Promise.resolve([]),
     support ? getTickets() : Promise.resolve([]),
     support ? getAllContacts() : Promise.resolve([]),
@@ -163,6 +166,7 @@ export default async function AdminPage() {
       contacts={contactsAll}
       contracts={contracts}
       services={services}
+      contractUsage={contractUsage}
       tasks={tasks}
       {...monitoringProps}
     />
