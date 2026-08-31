@@ -18,6 +18,7 @@ import { getProjectNames, getProjects } from "@/lib/crm/projects";
 import { getInvoices } from "@/lib/crm/invoices";
 import { getQuotes } from "@/lib/crm/quotes";
 import { getAllTasks } from "@/lib/crm/tasks";
+import { getAssets } from "@/lib/it/assets";
 import {
   canManageAllUsers,
   canManageBlogUsers,
@@ -25,6 +26,7 @@ import {
   canSeeMonitoring,
   canUseBlogModule,
   canUseCrmCore,
+  canUseSupport,
   canOpenDashboard,
   type ProfileRole,
   type Role,
@@ -66,6 +68,7 @@ export default async function AdminPage() {
 
   const crmCore = canUseCrmCore(r);
   const billing = canReadBilling(r);
+  const support = canUseSupport(r);
   const blog = canUseBlogModule(r);
   const monitoring = canSeeMonitoring(r);
 
@@ -77,6 +80,7 @@ export default async function AdminPage() {
     quotes,
     collections,
     clientHealth,
+    assets,
     tasks,
     assignees,
     usersResult,
@@ -91,6 +95,7 @@ export default async function AdminPage() {
     crmCore ? getQuotes() : Promise.resolve([]),
     billing ? getUpcomingCollections() : Promise.resolve([]),
     billing ? getClientHealthMap() : Promise.resolve({}),
+    support ? getAssets() : Promise.resolve([]),
     getAllTasks(),
     getAssignableUsers(),
     canManageAllUsers(r) ? listUsers() : Promise.resolve({ users: [] }),
@@ -141,6 +146,7 @@ export default async function AdminPage() {
       quotes={quotes}
       collections={collections}
       clientHealth={clientHealth}
+      assets={assets}
       tasks={tasks}
       {...monitoringProps}
     />

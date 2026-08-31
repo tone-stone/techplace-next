@@ -55,6 +55,9 @@ export const canUseBlogModule = isOneOf("dios", "admin", "blog", "redactor");
 export const canDeleteArticles = isOneOf("dios", "admin", "blog", "redactor");
 /** Tareas module — available to every role. */
 export const canUseTasks = isOneOf(...ROLES);
+/** Soporte: Activos e IT Service Desk (tickets). Same set as CRM core for now;
+ *  split out if a dedicated `soporte` role is ever added. */
+export const canUseSupport = isOneOf("dios", "admin", "ejecutivo");
 
 /* --- Account-on-account rules --- */
 

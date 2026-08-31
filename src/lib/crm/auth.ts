@@ -6,6 +6,7 @@ import {
   canReadBilling,
   canUseBlogModule,
   canUseCrmCore,
+  canUseSupport,
   canWriteBilling,
   type ProfileRole,
   type Role,
@@ -93,4 +94,9 @@ export function requireBillingRead() {
 /** Blog articles create/update/delete: dios, admin, blog, redactor. */
 export function requireBlogContent() {
   return requireRole(canUseBlogModule, "No tienes permisos para el módulo de blog");
+}
+
+/** Soporte: Activos e IT Service Desk. dios, admin, ejecutivo. */
+export function requireSupport() {
+  return requireRole(canUseSupport, "No tienes permisos para el módulo de Soporte");
 }
