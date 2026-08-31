@@ -22,6 +22,7 @@ import {
   Menu,
   Newspaper,
   Receipt,
+  ScrollText,
   Server,
   UserCog,
   Users,
@@ -46,6 +47,8 @@ import type { AssignableUser, ManagedUser } from "@/lib/auth/users";
 import type { ManagedArticle } from "@/lib/blog/articles";
 import type { ClientPayment, CrmClient } from "@/lib/crm/clients";
 import type { CrmContact } from "@/lib/crm/contacts";
+import type { CrmContract } from "@/lib/crm/contracts";
+import type { CrmService } from "@/lib/crm/services";
 import type { CollectionItem, ClientHealth } from "@/lib/crm/collections";
 import type { CrmProject } from "@/lib/crm/projects";
 import type { CrmInvoice } from "@/lib/crm/invoices";
@@ -67,6 +70,7 @@ import ProjectsSection from "./crm/ProjectsSection";
 import InvoicesSection from "./crm/InvoicesSection";
 import CobranzaSection from "./crm/CobranzaSection";
 import QuotesSection from "./crm/QuotesSection";
+import ContractsSection from "./crm/ContractsSection";
 import AssetsSection from "./it/AssetsSection";
 import TicketsSection from "./it/TicketsSection";
 import TasksSection from "./crm/TasksSection";
@@ -80,6 +84,7 @@ type Section =
   | "facturacion"
   | "cobranza"
   | "cotizaciones"
+  | "contratos"
   | "soporte"
   | "activos"
   | "tareas"
@@ -94,6 +99,7 @@ const NAV_ITEMS: { id: Section; label: string; icon: typeof Users }[] = [
   { id: "facturacion", label: "Facturación", icon: Receipt },
   { id: "cobranza", label: "Cobranza", icon: HandCoins },
   { id: "cotizaciones", label: "Cotizaciones", icon: FileText },
+  { id: "contratos", label: "Contratos", icon: ScrollText },
   { id: "soporte", label: "Soporte", icon: LifeBuoy },
   { id: "activos", label: "Activos", icon: Server },
   { id: "tareas", label: "Tareas", icon: Kanban },
@@ -108,6 +114,7 @@ function visibleSections(role: Role): Section[] {
   if (canUseCrmCore(role)) out.push("resumen", "clientes", "proyectos");
   if (canReadBilling(role)) out.push("facturacion", "cobranza");
   if (canUseCrmCore(role)) out.push("cotizaciones");
+  if (canReadBilling(role)) out.push("contratos");
   if (canUseSupport(role)) out.push("soporte", "activos");
   out.push("tareas");
   if (canUseBlogModule(role)) out.push("blog");
@@ -141,6 +148,8 @@ export default function CrmDashboard({
   assets = [],
   tickets = [],
   contacts = [],
+  contracts = [],
+  services = [],
   tasks,
   recentErrors = [],
   errorStats = { daily: [], last24h: 0, last7d: 0 },
@@ -168,6 +177,8 @@ export default function CrmDashboard({
   assets?: ItAsset[];
   tickets?: ItTicket[];
   contacts?: CrmContact[];
+  contracts?: CrmContract[];
+  services?: CrmService[];
   tasks: CrmTask[];
   recentErrors?: MonitoringErrorEvent[];
   errorStats?: ErrorStats;
@@ -347,6 +358,13 @@ export default function CrmDashboard({
           )}
           {section === "cotizaciones" && allowed.includes("cotizaciones") && (
             <QuotesSection quotes={quotes} clients={clients} />
+          )}
+          {section === "contratos" && allowed.includes("contratos") && (
+            <ContractsSection
+              contracts={contracts}
+              services={services}
+              clients={clients.map((c) => ({ id: c.id, name: c.company }))}
+            />
           )}
           {section === "soporte" && allowed.includes("soporte") && (
             <TicketsSection

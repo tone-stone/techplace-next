@@ -14,6 +14,8 @@ import { getAssignableUsers, listUsers } from "@/lib/auth/users";
 import { listArticles } from "@/lib/blog/articles";
 import { getAllPayments, getClients } from "@/lib/crm/clients";
 import { getAllContacts } from "@/lib/crm/contacts";
+import { getContracts } from "@/lib/crm/contracts";
+import { getServices } from "@/lib/crm/services";
 import { getClientHealthMap, getUpcomingCollections } from "@/lib/crm/collections";
 import { getProjectNames, getProjects } from "@/lib/crm/projects";
 import { getInvoices } from "@/lib/crm/invoices";
@@ -82,6 +84,8 @@ export default async function AdminPage() {
     quotes,
     collections,
     clientHealth,
+    contracts,
+    services,
     assets,
     tickets,
     contactsAll,
@@ -99,6 +103,8 @@ export default async function AdminPage() {
     crmCore ? getQuotes() : Promise.resolve([]),
     billing ? getUpcomingCollections() : Promise.resolve([]),
     billing ? getClientHealthMap() : Promise.resolve({}),
+    billing ? getContracts() : Promise.resolve([]),
+    billing ? getServices() : Promise.resolve([]),
     support ? getAssets() : Promise.resolve([]),
     support ? getTickets() : Promise.resolve([]),
     support ? getAllContacts() : Promise.resolve([]),
@@ -155,6 +161,8 @@ export default async function AdminPage() {
       assets={assets}
       tickets={tickets}
       contacts={contactsAll}
+      contracts={contracts}
+      services={services}
       tasks={tasks}
       {...monitoringProps}
     />
