@@ -55,9 +55,38 @@ Reglas del proyecto:
 - Toda tabla nueva: `id uuid primary key default gen_random_uuid()`, `created_at`,
   `updated_at` (si muta, con trigger `set_updated_at`), `deleted_at` /
   `deleted_by`, e índice parcial `*_alive_idx` (`where deleted_at is null`).
+- **`org_id uuid not null references public.organizations(id)`** en toda tabla de
+  negocio nueva (ver "Multi-tenant" abajo). Ponlo aunque hoy no haya política que
+  lo use — así no hay que retrofitear.
 - Políticas RLS con el patrón `public.current_role_name() = any (array[...])`
   (ver `0017_five_role_model.sql`).
 - Los archivos nuevos ya no llevan el header de "Ejecutar en el SQL Editor".
+
+---
+
+## Multi-tenant (estado y plan)
+
+`0025_tenant_seam.sql` dejó la **costura**: existe `public.organizations`,
+`profiles.org_id` (una sola org, "TechPlace"), `handle_new_user()` asigna la org
+por defecto, y `public.current_org_id()` está disponible como
+`public.current_role_name()`. **Ninguna política filtra por org todavía** — el
+comportamiento no cambió.
+
+Cuando entre el **segundo cliente**, se hace el milestone completo como su propia
+tanda de migraciones:
+
+1. `alter table <t> add column org_id uuid references public.organizations(id)`
+   en cada tabla de negocio (todas menos `organizations`, `profiles`,
+   `monitoring_events`, `activity_log`, `deletion_log`).
+2. Backfill: `update <t> set org_id = (select id from public.organizations where slug = 'techplace')`.
+3. `alter table <t> alter column org_id set not null`.
+4. Reescribir las 4 políticas de cada tabla añadiendo `and org_id = public.current_org_id()`
+   al `using` / `with check`. Trigger `before insert` que rellene `org_id` con
+   `current_org_id()` si viene null, para no tocar cada `insert` de la app.
+5. Resolución de tenant (subdominio o selector), rol por-organización
+   (`memberships` en vez de `profiles.role`), y portal `/portal` para contactos
+   de cliente (auth separada). Probar aislamiento con 2 orgs reales.
+6. `app_settings` pasa de fila única a PK `org_id`.
 
 ## Archivos
 
