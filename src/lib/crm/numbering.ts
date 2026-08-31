@@ -27,8 +27,8 @@ import type { createClient } from "@/lib/supabase/server";
  */
 export async function insertWithSequentialNumber<T extends Record<string, unknown>>(
   supabase: Awaited<ReturnType<typeof createClient>>,
-  table: "crm_invoices" | "crm_quotes",
-  prefix: "TP" | "COT",
+  table: "crm_invoices" | "crm_quotes" | "it_tickets",
+  prefix: "TP" | "COT" | "TK",
   row: T
 ): Promise<{ data: { id: string }; number: string } | { error: string }> {
   const year = new Date().getFullYear();

@@ -13,12 +13,14 @@ import { createClient } from "@/lib/supabase/server";
 import { getAssignableUsers, listUsers } from "@/lib/auth/users";
 import { listArticles } from "@/lib/blog/articles";
 import { getAllPayments, getClients } from "@/lib/crm/clients";
+import { getAllContacts } from "@/lib/crm/contacts";
 import { getClientHealthMap, getUpcomingCollections } from "@/lib/crm/collections";
 import { getProjectNames, getProjects } from "@/lib/crm/projects";
 import { getInvoices } from "@/lib/crm/invoices";
 import { getQuotes } from "@/lib/crm/quotes";
 import { getAllTasks } from "@/lib/crm/tasks";
 import { getAssets } from "@/lib/it/assets";
+import { getTickets } from "@/lib/it/tickets";
 import {
   canManageAllUsers,
   canManageBlogUsers,
@@ -81,6 +83,8 @@ export default async function AdminPage() {
     collections,
     clientHealth,
     assets,
+    tickets,
+    contactsAll,
     tasks,
     assignees,
     usersResult,
@@ -96,6 +100,8 @@ export default async function AdminPage() {
     billing ? getUpcomingCollections() : Promise.resolve([]),
     billing ? getClientHealthMap() : Promise.resolve({}),
     support ? getAssets() : Promise.resolve([]),
+    support ? getTickets() : Promise.resolve([]),
+    support ? getAllContacts() : Promise.resolve([]),
     getAllTasks(),
     getAssignableUsers(),
     canManageAllUsers(r) ? listUsers() : Promise.resolve({ users: [] }),
@@ -147,6 +153,8 @@ export default async function AdminPage() {
       collections={collections}
       clientHealth={clientHealth}
       assets={assets}
+      tickets={tickets}
+      contacts={contactsAll}
       tasks={tasks}
       {...monitoringProps}
     />

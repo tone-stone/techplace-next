@@ -87,3 +87,18 @@ export function collectionsDigestEmail(opts: {
     html,
   };
 }
+
+/** IT Service Desk: notification to a client's ticket contact (public reply, resolved…). */
+export function ticketUpdateEmail(opts: {
+  number: string;
+  ticketSubject: string;
+  contactName: string | null;
+  heading: string;
+  body: string;
+}): { subject: string; html: string } {
+  const html = shell(opts.heading, `
+    <p>${opts.contactName ? `Hola ${opts.contactName},` : "Hola,"}</p>
+    <p style="font-size:14px;color:#64748b">Ticket <strong>${opts.number}</strong> — ${opts.ticketSubject}</p>
+    <div style="white-space:pre-wrap;font-size:14px;border-left:3px solid #e2e8f0;padding-left:12px;margin:12px 0">${opts.body}</div>`);
+  return { subject: `[${opts.number}] ${opts.heading}`, html };
+}

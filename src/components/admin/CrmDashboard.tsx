@@ -17,6 +17,7 @@ import {
   HandCoins,
   Kanban,
   LayoutDashboard,
+  LifeBuoy,
   LogOut,
   Menu,
   Newspaper,
@@ -44,12 +45,14 @@ import UserManagement from "@/components/blog/dashboard/UserManagement";
 import type { AssignableUser, ManagedUser } from "@/lib/auth/users";
 import type { ManagedArticle } from "@/lib/blog/articles";
 import type { ClientPayment, CrmClient } from "@/lib/crm/clients";
+import type { CrmContact } from "@/lib/crm/contacts";
 import type { CollectionItem, ClientHealth } from "@/lib/crm/collections";
 import type { CrmProject } from "@/lib/crm/projects";
 import type { CrmInvoice } from "@/lib/crm/invoices";
 import type { CrmQuote } from "@/lib/crm/quotes";
 import type { CrmTask } from "@/lib/crm/tasks";
 import type { ItAsset } from "@/lib/it/asset-types";
+import type { ItTicket } from "@/lib/it/ticket-types";
 import type {
   ErrorStats,
   FailedLoginStats,
@@ -65,6 +68,7 @@ import InvoicesSection from "./crm/InvoicesSection";
 import CobranzaSection from "./crm/CobranzaSection";
 import QuotesSection from "./crm/QuotesSection";
 import AssetsSection from "./it/AssetsSection";
+import TicketsSection from "./it/TicketsSection";
 import TasksSection from "./crm/TasksSection";
 import BlogSection from "./crm/BlogSection";
 import MonitoringSection from "./monitoring/MonitoringSection";
@@ -76,6 +80,7 @@ type Section =
   | "facturacion"
   | "cobranza"
   | "cotizaciones"
+  | "soporte"
   | "activos"
   | "tareas"
   | "blog"
@@ -89,6 +94,7 @@ const NAV_ITEMS: { id: Section; label: string; icon: typeof Users }[] = [
   { id: "facturacion", label: "Facturación", icon: Receipt },
   { id: "cobranza", label: "Cobranza", icon: HandCoins },
   { id: "cotizaciones", label: "Cotizaciones", icon: FileText },
+  { id: "soporte", label: "Soporte", icon: LifeBuoy },
   { id: "activos", label: "Activos", icon: Server },
   { id: "tareas", label: "Tareas", icon: Kanban },
   { id: "blog", label: "Blog", icon: Newspaper },
@@ -102,7 +108,7 @@ function visibleSections(role: Role): Section[] {
   if (canUseCrmCore(role)) out.push("resumen", "clientes", "proyectos");
   if (canReadBilling(role)) out.push("facturacion", "cobranza");
   if (canUseCrmCore(role)) out.push("cotizaciones");
-  if (canUseSupport(role)) out.push("activos");
+  if (canUseSupport(role)) out.push("soporte", "activos");
   out.push("tareas");
   if (canUseBlogModule(role)) out.push("blog");
   if (canManageAllUsers(role)) out.push("usuarios");
@@ -133,6 +139,8 @@ export default function CrmDashboard({
   collections = [],
   clientHealth = {},
   assets = [],
+  tickets = [],
+  contacts = [],
   tasks,
   recentErrors = [],
   errorStats = { daily: [], last24h: 0, last7d: 0 },
@@ -158,6 +166,8 @@ export default function CrmDashboard({
   collections?: CollectionItem[];
   clientHealth?: Record<string, ClientHealth>;
   assets?: ItAsset[];
+  tickets?: ItTicket[];
+  contacts?: CrmContact[];
   tasks: CrmTask[];
   recentErrors?: MonitoringErrorEvent[];
   errorStats?: ErrorStats;
@@ -337,6 +347,16 @@ export default function CrmDashboard({
           )}
           {section === "cotizaciones" && allowed.includes("cotizaciones") && (
             <QuotesSection quotes={quotes} clients={clients} />
+          )}
+          {section === "soporte" && allowed.includes("soporte") && (
+            <TicketsSection
+              tickets={tickets}
+              clients={clients.map((c) => ({ id: c.id, name: c.company }))}
+              assignees={assignees}
+              contacts={contacts.map((c) => ({ id: c.id, name: c.name, clientId: c.clientId }))}
+              assets={assets.map((a) => ({ id: a.id, name: a.name, clientId: a.clientId }))}
+              currentUserId={userId}
+            />
           )}
           {section === "activos" && allowed.includes("activos") && (
             <AssetsSection

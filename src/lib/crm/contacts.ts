@@ -74,6 +74,19 @@ export async function getContactsByClient(clientId: string): Promise<CrmContact[
   });
 }
 
+/** Every live contact across all clients — for pickers that span clients (e.g. Soporte). */
+export async function getAllContacts(): Promise<CrmContact[]> {
+  return withTiming("crm.getAllContacts", async () => {
+    const supabase = await createClient();
+    const { data } = await supabase
+      .from("crm_contacts")
+      .select("*")
+      .is("deleted_at", null)
+      .order("is_primary", { ascending: false });
+    return (data ?? []).map(mapContact);
+  });
+}
+
 /**
  * Copies the current primary contact's name/email/phone onto the parent
  * `crm_clients` row so list/summary/PDF code that reads that snapshot stays in

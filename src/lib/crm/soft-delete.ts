@@ -9,7 +9,7 @@ import { createClient } from "@/lib/supabase/server";
 
 export type SoftDeleteResult = { ok: true } | { ok: false; error: string };
 
-/** Tables that carry `deleted_at` / `deleted_by` (see migrations 0018, 0019, 0021). */
+/** Tables that carry `deleted_at` / `deleted_by` (see migrations 0018-0022). */
 export type DeletableTable =
   | "crm_clients"
   | "crm_contacts"
@@ -18,6 +18,7 @@ export type DeletableTable =
   | "crm_quotes"
   | "crm_tasks"
   | "it_assets"
+  | "it_tickets"
   | "articles"
   | "profiles";
 
