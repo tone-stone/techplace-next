@@ -10,18 +10,19 @@
  */
 
 import { useMemo, useState } from "react";
-import { CheckCircle2, HandCoins } from "lucide-react";
+import { CalendarClock, CheckCircle2, HandCoins } from "lucide-react";
 import { markPaymentPaidAction } from "@/lib/crm/clients";
-import type { CollectionItem } from "@/lib/crm/collections";
+import type { CollectionItem, ScheduledCharge } from "@/lib/crm/collections";
 import { formatCurrencyMXN } from "@/lib/crm/format";
 import { getDueDateUrgency } from "@/lib/crm/plan-status";
 
-type View = "semana" | "vencidos" | "mes";
+type View = "semana" | "vencidos" | "mes" | "programados";
 
 const VIEWS: { id: View; label: string }[] = [
   { id: "semana", label: "Esta semana" },
   { id: "vencidos", label: "Vencidos" },
   { id: "mes", label: "Este mes" },
+  { id: "programados", label: "Programados" },
 ];
 
 function urgencyBadgeClass(urgency: ReturnType<typeof getDueDateUrgency>) {
@@ -36,7 +37,13 @@ function daysLabel(daysLeft: number): string {
   return `en ${daysLeft} d`;
 }
 
-export default function CobranzaSection({ collections }: { collections: CollectionItem[] }) {
+export default function CobranzaSection({
+  collections,
+  scheduledCharges = [],
+}: {
+  collections: CollectionItem[];
+  scheduledCharges?: ScheduledCharge[];
+}) {
   const [view, setView] = useState<View>("semana");
   const [paidIds, setPaidIds] = useState<Set<string>>(new Set());
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -59,7 +66,9 @@ export default function CobranzaSection({ collections }: { collections: Collecti
     };
   }, [live]);
 
-  const rows = buckets[view];
+  const isScheduled = view === "programados";
+  const paymentRows = view === "programados" ? [] : buckets[view];
+  const rows = isScheduled ? scheduledCharges : paymentRows;
   const total = rows.reduce((sum, r) => sum + r.amount, 0);
 
   const markPaid = async (item: CollectionItem) => {
@@ -93,14 +102,50 @@ export default function CobranzaSection({ collections }: { collections: Collecti
       </div>
 
       <p className="mb-4 text-sm text-gray-400">
-        {rows.length} cobro(s) · <span className="font-semibold text-white">{formatCurrencyMXN(total)}</span>
+        {rows.length} {isScheduled ? "plan(es)" : "cobro(s)"} ·{" "}
+        <span className="font-semibold text-white">{formatCurrencyMXN(total)}</span>
+        {isScheduled && (
+          <span className="ml-2 text-xs text-gray-500">
+            · el cobro se genera solo el día de corte
+          </span>
+        )}
       </p>
 
       {rows.length === 0 ? (
-        <p className="py-6 text-center text-sm text-gray-500">Nada que cobrar en esta vista.</p>
+        <p className="py-6 text-center text-sm text-gray-500">
+          {isScheduled ? "Ningún cliente tiene un plan activo." : "Nada que cobrar en esta vista."}
+        </p>
+      ) : isScheduled ? (
+        <div className="space-y-2">
+          {scheduledCharges.map((s) => {
+            const urgency = getDueDateUrgency(s.nextDueDate);
+            return (
+              <div
+                key={s.planId}
+                className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/5 bg-white/2 p-4"
+              >
+                <div className="min-w-0">
+                  <p className="font-semibold text-white">
+                    {s.company}
+                    <span className="ml-2 text-sm font-normal text-gray-400">{formatCurrencyMXN(s.amount)}</span>
+                  </p>
+                  <p className="mt-0.5 text-xs text-gray-500">
+                    {s.planName} · {s.billingCycle}
+                    {s.contactName ? ` · ${s.contactName}` : ""}
+                  </p>
+                </div>
+                <span
+                  className={`flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium ${urgencyBadgeClass(urgency)}`}
+                >
+                  <CalendarClock className="h-3.5 w-3.5" /> {s.nextDueDate} · {daysLabel(s.daysLeft)}
+                </span>
+              </div>
+            );
+          })}
+        </div>
       ) : (
         <div className="space-y-2">
-          {rows.map((item) => {
+          {paymentRows.map((item) => {
             const urgency = getDueDateUrgency(item.dueDate);
             return (
               <div

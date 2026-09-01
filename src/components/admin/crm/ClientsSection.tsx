@@ -26,6 +26,7 @@ import type { CrmQuote } from "@/lib/crm/quotes";
 import type { CrmInvoice } from "@/lib/crm/invoices";
 import type { CrmTask } from "@/lib/crm/tasks";
 import type { CrmContract } from "@/lib/crm/contracts";
+import type { CrmExpense } from "@/lib/crm/expenses";
 import type { ItTicket } from "@/lib/it/ticket-types";
 import type { ItAsset } from "@/lib/it/asset-types";
 import { formatCurrencyMXN, initialsOf } from "@/lib/crm/format";
@@ -72,6 +73,7 @@ export default function ClientsSection({
   contracts = [],
   tickets = [],
   assets = [],
+  expenses = [],
   serviceOptions = [],
   canWriteBilling = false,
   canReadBilling = false,
@@ -88,6 +90,7 @@ export default function ClientsSection({
   contracts?: CrmContract[];
   tickets?: ItTicket[];
   assets?: ItAsset[];
+  expenses?: CrmExpense[];
   /** Service names suggested in the client form's "Servicio" field. */
   serviceOptions?: string[];
   /** Gates the "+ Factura" contextual action in the workspace. */
@@ -146,6 +149,7 @@ export default function ClientsSection({
           contracts: contracts.filter((c) => c.clientId === openId),
           tickets: tickets.filter((t) => t.clientId === openId),
           assets: assets.filter((a) => a.clientId === openId),
+          expenses: expenses.filter((e) => e.clientId === openId),
         }}
       />
     );

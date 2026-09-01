@@ -25,6 +25,7 @@ import {
   ScrollText,
   Server,
   Settings,
+  TrendingDown,
   UserCog,
   Users,
   X,
@@ -55,7 +56,8 @@ import type { ServicePackage } from "@/lib/services/catalog";
 
 /** Landing-catalog pricing for one offering, passed through to the Servicios tab. */
 export type ServicePricing = { title: string; slug: string; packages: ServicePackage[] };
-import type { CollectionItem, ClientHealth } from "@/lib/crm/collections";
+import type { CollectionItem, ClientHealth, ScheduledCharge } from "@/lib/crm/collections";
+import type { CrmExpense } from "@/lib/crm/expenses";
 import type { CrmProject } from "@/lib/crm/projects";
 import type { CrmInvoice } from "@/lib/crm/invoices";
 import type { CrmQuote } from "@/lib/crm/quotes";
@@ -76,6 +78,7 @@ import ClientsSection from "./crm/ClientsSection";
 import ProjectsSection from "./crm/ProjectsSection";
 import InvoicesSection from "./crm/InvoicesSection";
 import CobranzaSection from "./crm/CobranzaSection";
+import ExpensesSection from "./crm/ExpensesSection";
 import QuotesSection from "./crm/QuotesSection";
 import ContractsSection from "./crm/ContractsSection";
 import AssetsSection from "./it/AssetsSection";
@@ -92,6 +95,7 @@ type Section =
   | "proyectos"
   | "facturacion"
   | "cobranza"
+  | "egresos"
   | "cotizaciones"
   | "contratos"
   | "soporte"
@@ -108,6 +112,7 @@ const NAV_ITEMS: { id: Section; label: string; icon: typeof Users }[] = [
   { id: "proyectos", label: "Proyectos", icon: Briefcase },
   { id: "facturacion", label: "Facturación", icon: Receipt },
   { id: "cobranza", label: "Cobranza", icon: HandCoins },
+  { id: "egresos", label: "Egresos", icon: TrendingDown },
   { id: "cotizaciones", label: "Cotizaciones", icon: FileText },
   { id: "contratos", label: "Servicios", icon: ScrollText },
   { id: "soporte", label: "Soporte", icon: LifeBuoy },
@@ -122,7 +127,7 @@ const NAV_ITEMS: { id: Section; label: string; icon: typeof Users }[] = [
 function visibleSections(role: Role): Section[] {
   const out: Section[] = [];
   if (canUseCrmCore(role)) out.push("resumen", "clientes", "proyectos");
-  if (canReadBilling(role)) out.push("facturacion", "cobranza");
+  if (canReadBilling(role)) out.push("facturacion", "cobranza", "egresos");
   if (canUseCrmCore(role)) out.push("cotizaciones");
   if (canReadBilling(role)) out.push("contratos");
   if (canUseSupport(role)) out.push("soporte", "activos");
@@ -154,6 +159,8 @@ export default function CrmDashboard({
   invoices = [],
   quotes = [],
   collections = [],
+  scheduledCharges = [],
+  expenses = [],
   clientHealth = {},
   assets = [],
   tickets = [],
@@ -188,6 +195,8 @@ export default function CrmDashboard({
   invoices?: CrmInvoice[];
   quotes?: CrmQuote[];
   collections?: CollectionItem[];
+  scheduledCharges?: ScheduledCharge[];
+  expenses?: CrmExpense[];
   clientHealth?: Record<string, ClientHealth>;
   assets?: ItAsset[];
   tickets?: ItTicket[];
@@ -389,6 +398,7 @@ export default function CrmDashboard({
               contracts={contracts}
               tickets={tickets}
               assets={assets}
+              expenses={expenses}
               serviceOptions={[
                 ...new Set([
                   ...catalogServiceNames,
@@ -412,7 +422,13 @@ export default function CrmDashboard({
             />
           )}
           {section === "cobranza" && allowed.includes("cobranza") && (
-            <CobranzaSection collections={collections} />
+            <CobranzaSection collections={collections} scheduledCharges={scheduledCharges} />
+          )}
+          {section === "egresos" && allowed.includes("egresos") && (
+            <ExpensesSection
+              expenses={expenses}
+              clients={clients.map((c) => ({ id: c.id, name: c.company }))}
+            />
           )}
           {section === "cotizaciones" && allowed.includes("cotizaciones") && (
             <QuotesSection quotes={quotes} clients={clients} />

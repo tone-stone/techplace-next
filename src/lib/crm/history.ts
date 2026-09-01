@@ -22,6 +22,7 @@ export type HistoryEntryType =
   | "proyecto"
   | "factura"
   | "cotizacion"
+  | "egreso"
   | "otro";
 
 export type ClientHistoryEntry = {

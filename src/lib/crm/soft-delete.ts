@@ -19,6 +19,7 @@ export type DeletableTable =
   | "crm_tasks"
   | "crm_services"
   | "crm_contracts"
+  | "crm_expenses"
   | "it_assets"
   | "it_tickets"
   | "it_ticket_time_entries"

@@ -138,10 +138,15 @@ export default function ContractsSection({
       {view === "contratos" ? (
         <>
           {showNew && (
-            <NewContractForm clients={clients} onDone={() => setShowNew(false)} />
+            <NewContractForm
+              key={clientFilter}
+              clients={clients}
+              defaultClientId={clientFilter !== "todos" ? clientFilter : undefined}
+              onDone={() => setShowNew(false)}
+            />
           )}
 
-          <div className="mb-4 flex flex-wrap gap-2">
+          <div className="mb-4 flex flex-wrap items-center gap-2">
             <select
               value={clientFilter}
               onChange={(e) => setClientFilter(e.target.value)}
@@ -154,6 +159,20 @@ export default function ContractsSection({
                 </option>
               ))}
             </select>
+            <span className="text-xs text-gray-500">
+              {clientFilter === "todos"
+                ? `${filtered.length} servicio(s)`
+                : `${filtered.length} de ${nameOf(clientFilter)}`}
+            </span>
+            {clientFilter !== "todos" && (
+              <button
+                type="button"
+                onClick={() => setClientFilter("todos")}
+                className="cursor-pointer rounded-full border border-white/10 px-2 py-0.5 text-[11px] text-gray-400 hover:border-white/20 hover:text-gray-200"
+              >
+                Limpiar
+              </button>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -221,9 +240,12 @@ export default function ContractsSection({
 /** Inline "Nuevo servicio" form (creates a `crm_contracts` row). */
 function NewContractForm({
   clients,
+  defaultClientId,
   onDone,
 }: {
   clients: { id: string; name: string }[];
+  /** Pre-selected client — set to the active filter so a filtered "Nuevo servicio" inherits it. */
+  defaultClientId?: string;
   onDone: () => void;
 }) {
   const [state, formAction] = useActionState<CrmActionState, FormData>(async (prev, formData) => {
@@ -236,7 +258,7 @@ function NewContractForm({
     <form action={formAction} className="mb-4 space-y-2 rounded-xl border border-white/10 bg-white/5 p-4">
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         <input name="title" required placeholder="Título (Soporte IT 2026)" className={`sm:col-span-2 ${FIELD}`} />
-        <select name="clientId" defaultValue="" required className={FIELD}>
+        <select name="clientId" defaultValue={defaultClientId ?? ""} required className={FIELD}>
           <option value="" disabled>
             Cliente…
           </option>

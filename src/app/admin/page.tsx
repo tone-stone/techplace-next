@@ -17,7 +17,8 @@ import { getAllContacts } from "@/lib/crm/contacts";
 import { getContracts } from "@/lib/crm/contracts";
 import { getServices } from "@/lib/crm/services";
 import { SERVICES } from "@/lib/services/catalog";
-import { getClientHealthMap, getUpcomingCollections } from "@/lib/crm/collections";
+import { getClientHealthMap, getScheduledCharges, getUpcomingCollections } from "@/lib/crm/collections";
+import { getExpenses } from "@/lib/crm/expenses";
 import { getProjectNames, getProjects } from "@/lib/crm/projects";
 import { getInvoices } from "@/lib/crm/invoices";
 import { getQuotes } from "@/lib/crm/quotes";
@@ -87,6 +88,8 @@ export default async function AdminPage() {
     invoices,
     quotes,
     collections,
+    scheduledCharges,
+    expenses,
     clientHealth,
     contracts,
     services,
@@ -108,6 +111,8 @@ export default async function AdminPage() {
     billing ? getInvoices() : Promise.resolve([]),
     crmCore ? getQuotes() : Promise.resolve([]),
     billing ? getUpcomingCollections() : Promise.resolve([]),
+    billing ? getScheduledCharges() : Promise.resolve([]),
+    billing ? getExpenses() : Promise.resolve([]),
     billing ? getClientHealthMap() : Promise.resolve({}),
     billing ? getContracts() : Promise.resolve([]),
     billing ? getServices() : Promise.resolve([]),
@@ -171,6 +176,8 @@ export default async function AdminPage() {
       invoices={invoices}
       quotes={quotes}
       collections={collections}
+      scheduledCharges={scheduledCharges}
+      expenses={expenses}
       clientHealth={clientHealth}
       assets={assets}
       tickets={tickets}

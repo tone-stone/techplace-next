@@ -33,6 +33,7 @@ import {
   ScrollText,
   Server,
   Trash2,
+  TrendingDown,
   Wallet,
   X,
 } from "lucide-react";
@@ -56,6 +57,12 @@ import type { CrmQuote } from "@/lib/crm/quotes";
 import { createInvoiceAction, createInvoiceFromPaymentAction, type CrmInvoice } from "@/lib/crm/invoices";
 import { createTaskAction, type CrmTask } from "@/lib/crm/tasks";
 import type { CrmContract } from "@/lib/crm/contracts";
+import { createExpenseAction, deleteExpenseAction } from "@/lib/crm/expenses";
+import {
+  EXPENSE_CATEGORIES,
+  EXPENSE_CATEGORY_LABELS,
+  type CrmExpense,
+} from "@/lib/crm/expense-types";
 import type { ItTicket } from "@/lib/it/ticket-types";
 import type { ItAsset } from "@/lib/it/asset-types";
 import { formatCurrencyMXN, initialsOf } from "@/lib/crm/format";
@@ -75,6 +82,7 @@ export type ClientRelated = {
   contracts: CrmContract[];
   tickets: ItTicket[];
   assets: ItAsset[];
+  expenses: CrmExpense[];
 };
 
 const CLIENT_STATUS_OPTIONS: ClientStatus[] = ["lead", "negociacion", "activo", "inactivo"];
@@ -262,7 +270,9 @@ function ClientDetailContent({
   const activeProjects = related.projects.filter((p) => p.status !== "completado").length;
   const openQuotes = related.quotes.filter((q) => q.status === "borrador" || q.status === "enviada").length;
   const overdue = payments.filter((p) => p.status === "vencido").reduce((s, p) => s + p.amount, 0);
-  const invoiced = related.invoices.filter((i) => i.status === "pagada").reduce((s, i) => s + i.amount, 0);
+  const cobrado = payments.filter((p) => p.status === "pagado").reduce((s, p) => s + p.amount, 0);
+  const gastado = related.expenses.reduce((s, e) => s + e.amount, 0);
+  const neto = cobrado - gastado;
 
   return (
     <div className="space-y-8">
@@ -319,7 +329,7 @@ function ClientDetailContent({
           ) : null;
         })()}
 
-        <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
           <DetailKpi icon={Briefcase} label="Proyectos activos" value={String(activeProjects)} tone="blue" />
           <DetailKpi icon={FileText} label="Cotizaciones abiertas" value={String(openQuotes)} tone="fuchsia" />
           <DetailKpi
@@ -328,7 +338,14 @@ function ClientDetailContent({
             value={overdue > 0 ? formatCurrencyMXN(overdue) : "Al día"}
             tone={overdue > 0 ? "rose" : "emerald"}
           />
-          <DetailKpi icon={Wallet} label="Facturado" value={formatCurrencyMXN(invoiced)} tone="emerald" />
+          <DetailKpi icon={Wallet} label="Cobrado" value={formatCurrencyMXN(cobrado)} tone="emerald" />
+          <DetailKpi icon={TrendingDown} label="Egresos" value={formatCurrencyMXN(gastado)} tone="rose" />
+          <DetailKpi
+            icon={Wallet}
+            label="Neto"
+            value={formatCurrencyMXN(neto)}
+            tone={neto < 0 ? "rose" : "emerald"}
+          />
         </div>
 
         {editing ? (
@@ -383,6 +400,14 @@ function ClientDetailContent({
         payments={payments}
         invoices={related.invoices}
         canWriteBilling={canWriteBilling}
+        onChanged={onChanged}
+      />
+      <ExpensesPanel
+        clientId={client.id}
+        plans={plans}
+        payments={payments}
+        expenses={related.expenses}
+        cobrado={cobrado}
         onChanged={onChanged}
       />
       <RelatedPanels
@@ -1419,6 +1444,158 @@ function PaymentsPanel({
           })}
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * The client's egresos with a running net (cobrado − gastado), an inline
+ * "Nuevo egreso" form (optionally tied to a plan or the cobro it offsets),
+ * and delete.
+ */
+function ExpensesPanel({
+  clientId,
+  plans,
+  payments,
+  expenses,
+  cobrado,
+  onChanged,
+}: {
+  clientId: string;
+  plans: ClientDetail["plans"];
+  payments: ClientDetail["payments"];
+  expenses: CrmExpense[];
+  cobrado: number;
+  onChanged: () => void;
+}) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [toDelete, setToDelete] = useState<CrmExpense | null>(null);
+  const [state, formAction] = useActionState<CrmActionState, FormData>(async (prev, fd) => {
+    const res = await createExpenseAction(prev, fd);
+    if (res && "success" in res) {
+      setOpen(false);
+      router.refresh();
+      onChanged();
+    }
+    return res;
+  }, null);
+
+  const gastado = expenses.reduce((s, e) => s + e.amount, 0);
+  const neto = cobrado - gastado;
+
+  return (
+    <div>
+      <div className="mb-3 flex items-center justify-between">
+        <SectionHeading icon={TrendingDown} title={`Egresos (${expenses.length})`} tone="rose" />
+        <PanelToggle open={open} onClick={() => setOpen((o) => !o)} label="Nuevo" />
+      </div>
+
+      <p className="mb-3 text-xs text-gray-400">
+        Cobrado <span className="text-emerald-300">{formatCurrencyMXN(cobrado)}</span> − Egresos{" "}
+        <span className="text-rose-300">{formatCurrencyMXN(gastado)}</span> = Neto{" "}
+        <span className={neto < 0 ? "font-semibold text-rose-300" : "font-semibold text-emerald-300"}>
+          {formatCurrencyMXN(neto)}
+        </span>
+      </p>
+
+      {open && (
+        <form action={formAction} className="mb-4 space-y-2 rounded-xl border border-white/10 bg-white/5 p-4">
+          <input type="hidden" name="clientId" value={clientId} />
+          <input name="concept" required placeholder="Concepto (Hosting sitio web)" className={RELATED_FIELD} />
+          <div className="grid grid-cols-2 gap-2">
+            <input
+              name="amount"
+              type="number"
+              min="0"
+              step="0.01"
+              required
+              placeholder="Monto MXN"
+              className={RELATED_FIELD}
+            />
+            <input name="expenseDate" type="date" className={RELATED_FIELD} />
+            <select name="category" defaultValue="hosting" className={RELATED_FIELD}>
+              {EXPENSE_CATEGORIES.map((c) => (
+                <option key={c} value={c}>
+                  {EXPENSE_CATEGORY_LABELS[c]}
+                </option>
+              ))}
+            </select>
+            <input name="vendor" placeholder="Proveedor" className={RELATED_FIELD} />
+            {plans.length > 0 && (
+              <select name="planId" defaultValue="" className={RELATED_FIELD}>
+                <option value="">Sin plan</option>
+                {plans.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+            )}
+            <select name="paymentId" defaultValue="" className={RELATED_FIELD}>
+              <option value="">Sin cobro asociado</option>
+              {payments.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {formatCurrencyMXN(p.amount)} · {p.dueDate}
+                </option>
+              ))}
+            </select>
+          </div>
+          {state && "error" in state && <p className="text-xs text-red-400">{state.error}</p>}
+          <button
+            type="submit"
+            className="w-full cursor-pointer rounded-lg bg-rose-500/20 py-2 text-sm font-semibold text-rose-200 hover:bg-rose-500/30"
+          >
+            Guardar egreso
+          </button>
+        </form>
+      )}
+
+      {expenses.length === 0 ? (
+        <p className="text-sm text-gray-500">Sin egresos para este cliente.</p>
+      ) : (
+        <div className="space-y-2">
+          {expenses.map((e) => (
+            <div
+              key={e.id}
+              className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-white/5 bg-white/2 p-3"
+            >
+              <div>
+                <p className="font-medium text-white">{e.concept}</p>
+                <p className="text-xs text-gray-400">
+                  {EXPENSE_CATEGORY_LABELS[e.category] ?? e.category} · {e.expenseDate}
+                  {e.vendor ? ` · ${e.vendor}` : ""}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-rose-300">−{formatCurrencyMXN(e.amount)}</span>
+                <button
+                  type="button"
+                  onClick={() => setToDelete(e)}
+                  aria-label="Eliminar egreso"
+                  className="cursor-pointer rounded-full p-1.5 text-gray-500 hover:bg-red-500/10 hover:text-red-400"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <ConfirmDialog
+        open={toDelete !== null}
+        title="Eliminar egreso"
+        body={toDelete ? `Se eliminará "${toDelete.concept}".` : undefined}
+        onConfirm={async () => {
+          if (toDelete) {
+            await deleteExpenseAction(toDelete.id, clientId);
+            router.refresh();
+            onChanged();
+          }
+        }}
+        onClose={() => setToDelete(null)}
+      />
     </div>
   );
 }
