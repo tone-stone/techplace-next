@@ -33,13 +33,20 @@ export default function Navbar() {
   // through a long page on a small screen, without permanently losing it.
   const [navHidden, setNavHidden] = useState(false);
   const hideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Read inside the scroll handler without making `menuOpen` a dependency of
+  // the effect below — re-subscribing the scroll listener on every menu
+  // open/close is needless work on the tap that opens the menu.
+  const menuOpenRef = useRef(menuOpen);
+  useEffect(() => {
+    menuOpenRef.current = menuOpen;
+  }, [menuOpen]);
 
   useEffect(() => {
     const onScroll = () => {
       const y = window.scrollY;
       setScrolled(y > 30);
 
-      if (!menuOpen) {
+      if (!menuOpenRef.current) {
         setNavHidden(y > 30);
         if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current);
         hideTimeoutRef.current = setTimeout(() => setNavHidden(false), 350);
@@ -50,7 +57,7 @@ export default function Navbar() {
       window.removeEventListener("scroll", onScroll);
       if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current);
     };
-  }, [menuOpen]);
+  }, []);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -182,10 +189,18 @@ export default function Navbar() {
             }}
             className="flex min-h-full w-full flex-col items-center justify-center gap-7 py-10 text-xl font-semibold"
           >
+            {/* prefetch={false}: this overlay only mounts on the tap that opens
+                the menu, and every visible <Link> kicks off an App-Router
+                prefetch (RSC fetch + parse) at once — a main-thread burst
+                landing exactly on that tap, which janks the open on iOS
+                Safari/Chrome. Browsers that skip prefetch (e.g. Brave) don't
+                see it. The targets are cheap in-page anchors plus /blog and
+                /login, so on-demand navigation is fine. */}
             {NAV_LINKS.map((link, i) => (
               <Link
                 key={link.href}
                 href={link.href}
+                prefetch={false}
                 onClick={closeMenu}
                 data-track={`navmobile_${link.label.toLowerCase()}`}
                 style={{ animationDelay: `${0.05 * i}s` }}
@@ -202,6 +217,7 @@ export default function Navbar() {
             >
               <Link
                 href="/login"
+                prefetch={false}
                 onClick={closeMenu}
                 data-track="navmobile_entrar"
                 className="tp-btn-animated inline-flex items-center gap-1.5 rounded-full px-6 py-3 text-lg font-bold text-white shadow-lg transition-transform active:scale-95"
