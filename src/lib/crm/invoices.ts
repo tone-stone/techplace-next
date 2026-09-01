@@ -23,6 +23,8 @@ export type CrmInvoice = {
   id: string;
   clientId: string;
   projectId: string | null;
+  /** The recurring charge this invoice was generated from, if any. */
+  paymentId: string | null;
   number: string;
   amount: number;
   status: InvoiceStatus;
@@ -37,6 +39,7 @@ function mapInvoice(row: {
   id: string;
   client_id: string;
   project_id: string | null;
+  payment_id: string | null;
   number: string;
   amount: number;
   status: string;
@@ -49,6 +52,7 @@ function mapInvoice(row: {
     id: row.id,
     clientId: row.client_id,
     projectId: row.project_id,
+    paymentId: row.payment_id,
     number: row.number,
     amount: Number(row.amount),
     status: row.status as InvoiceStatus,
@@ -101,6 +105,74 @@ export async function createInvoiceAction(
     clientId,
     "factura",
     `Factura ${result.number} creada por ${formatCurrencyMXN(amount)}`,
+    check.userId
+  );
+  revalidatePath("/admin");
+  return { success: true };
+}
+
+/**
+ * One-click "Generar factura del mes": creates a `crm_invoices` row from a
+ * recurring charge (`crm_payments`), carrying its amount and due date and a
+ * note with the plan name + client RFC. Refuses if that charge already has an
+ * invoice, so it can be shown as "Ya facturado" instead.
+ */
+export async function createInvoiceFromPaymentAction(paymentId: string): Promise<CrmActionState> {
+  const check = await requireBillingWrite();
+  if (!check.ok) return { error: check.error };
+
+  const supabase = await createClient();
+
+  const { data: payment } = await supabase
+    .from("crm_payments")
+    .select("id, client_id, plan_id, amount, due_date, status")
+    .eq("id", paymentId)
+    .single();
+  if (!payment) return { error: "No se encontró el cobro" };
+
+  const { data: existing } = await supabase
+    .from("crm_invoices")
+    .select("number")
+    .eq("payment_id", paymentId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (existing) return { error: `Ese cobro ya tiene la factura ${existing.number}` };
+
+  let planName: string | null = null;
+  if (payment.plan_id) {
+    const { data: plan } = await supabase.from("crm_plans").select("name").eq("id", payment.plan_id).single();
+    planName = plan?.name ?? null;
+  }
+  const { data: client } = await supabase
+    .from("crm_clients")
+    .select("rfc")
+    .eq("id", payment.client_id)
+    .single();
+
+  const notes = [
+    planName ? `Servicio: ${planName}` : "Cobro recurrente",
+    `Periodo ${payment.due_date}`,
+    client?.rfc ? `RFC ${client.rfc}` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  const result = await insertWithSequentialNumber(supabase, "crm_invoices", "TP", {
+    client_id: payment.client_id,
+    amount: payment.amount,
+    due_date: payment.due_date,
+    status: payment.status === "pagado" ? "pagada" : "enviada",
+    notes,
+    payment_id: paymentId,
+    created_by: check.userId,
+  });
+  if ("error" in result) return { error: result.error };
+
+  await addHistory(
+    supabase,
+    payment.client_id,
+    "factura",
+    `Factura ${result.number} generada desde el cobro de ${formatCurrencyMXN(Number(payment.amount))}`,
     check.userId
   );
   revalidatePath("/admin");

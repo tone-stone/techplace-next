@@ -53,7 +53,7 @@ import {
 } from "@/lib/crm/clients";
 import { createProjectAction, type CrmProject } from "@/lib/crm/projects";
 import type { CrmQuote } from "@/lib/crm/quotes";
-import { createInvoiceAction, type CrmInvoice } from "@/lib/crm/invoices";
+import { createInvoiceAction, createInvoiceFromPaymentAction, type CrmInvoice } from "@/lib/crm/invoices";
 import { createTaskAction, type CrmTask } from "@/lib/crm/tasks";
 import type { CrmContract } from "@/lib/crm/contracts";
 import type { ItTicket } from "@/lib/it/ticket-types";
@@ -377,7 +377,14 @@ function ClientDetailContent({
       <ContactsPanel clientId={client.id} contacts={contacts} onChanged={onChanged} />
       <BillingPanel clientId={client.id} billing={billing} onChanged={onChanged} />
       <PlansPanel clientId={client.id} plans={plans} onChanged={onChanged} />
-      <PaymentsPanel clientId={client.id} plans={plans} payments={payments} onChanged={onChanged} />
+      <PaymentsPanel
+        clientId={client.id}
+        plans={plans}
+        payments={payments}
+        invoices={related.invoices}
+        canWriteBilling={canWriteBilling}
+        onChanged={onChanged}
+      />
       <RelatedPanels
         clientId={client.id}
         clients={clients}
@@ -1238,13 +1245,18 @@ function PaymentsPanel({
   clientId,
   plans,
   payments,
+  invoices,
+  canWriteBilling,
   onChanged,
 }: {
   clientId: string;
   plans: ClientDetail["plans"];
   payments: ClientDetail["payments"];
+  invoices: CrmInvoice[];
+  canWriteBilling: boolean;
   onChanged: () => void;
 }) {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [state, formAction] = useActionState<CrmActionState, FormData>(async (prevState, formData) => {
     const result = await recordPaymentAction(prevState, formData);
@@ -1255,11 +1267,26 @@ function PaymentsPanel({
     return result;
   }, null);
   const [markingId, setMarkingId] = useState<string | null>(null);
+  const [invoicingId, setInvoicingId] = useState<string | null>(null);
+  const [invoiceError, setInvoiceError] = useState<string | null>(null);
 
   const handleMarkPaid = async (paymentId: string) => {
     setMarkingId(paymentId);
     await markPaymentPaidAction(paymentId, clientId);
     setMarkingId(null);
+    onChanged();
+  };
+
+  const handleGenerateInvoice = async (paymentId: string) => {
+    setInvoicingId(paymentId);
+    setInvoiceError(null);
+    const res = await createInvoiceFromPaymentAction(paymentId);
+    setInvoicingId(null);
+    if (res && "error" in res) {
+      setInvoiceError(res.error);
+      return;
+    }
+    router.refresh();
     onChanged();
   };
 
@@ -1275,6 +1302,8 @@ function PaymentsPanel({
           <Plus className="h-3.5 w-3.5" /> Nuevo pago
         </button>
       </div>
+
+      {invoiceError && <p className="mb-2 text-xs text-red-400">{invoiceError}</p>}
 
       {open && (
         <form action={formAction} className="mb-4 space-y-2 rounded-xl border border-white/10 bg-white/5 p-4">
@@ -1334,6 +1363,7 @@ function PaymentsPanel({
         <div className="space-y-2">
           {payments.map((payment) => {
             const urgency = getDueDateUrgency(payment.dueDate);
+            const invoice = invoices.find((i) => i.paymentId === payment.id);
             return (
               <div
                 key={payment.id}
@@ -1346,7 +1376,7 @@ function PaymentsPanel({
                     {payment.method ? ` · ${payment.method}` : ""}
                   </p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   {payment.status === "pagado" ? (
                     <StatusBadge status="pagado" />
                   ) : (
@@ -1365,6 +1395,23 @@ function PaymentsPanel({
                         <CheckCircle2 className="h-3.5 w-3.5" /> Marcar pagado
                       </button>
                     </>
+                  )}
+
+                  {invoice ? (
+                    <span className="flex items-center gap-1 rounded-full border border-teal-400/30 bg-teal-500/10 px-2.5 py-1 text-xs font-medium text-teal-300">
+                      <Receipt className="h-3.5 w-3.5" /> {invoice.number}
+                    </span>
+                  ) : (
+                    canWriteBilling && (
+                      <button
+                        type="button"
+                        disabled={invoicingId === payment.id}
+                        onClick={() => handleGenerateInvoice(payment.id)}
+                        className="flex cursor-pointer items-center gap-1 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-xs font-medium text-gray-300 hover:border-sky-400/40 hover:text-white disabled:opacity-50"
+                      >
+                        <Receipt className="h-3.5 w-3.5" /> Generar factura
+                      </button>
+                    )
                   )}
                 </div>
               </div>
