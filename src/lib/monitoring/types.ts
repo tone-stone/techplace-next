@@ -15,10 +15,18 @@
  * here even though it's a valid `kind` value in the table.
  */
 export type MonitoringKind = "error" | "web_vital" | "timing" | "engagement" | "interaction";
-/** Passive engagement signals collected by `EngagementTracker` on the landing page. */
-export type EngagementMetricName = "section_time" | "scroll_depth";
-/** Active interaction signals: tagged-element clicks and the contact-form funnel. */
-export type InteractionMetricName = "click" | "form";
+/**
+ * Passive engagement signals collected by `EngagementTracker`. `session` is
+ * emitted once per tab session with `meta: { device, viewport, referrer,
+ * visitor }` (audience breakdown); the rest are landing-page only.
+ */
+export type EngagementMetricName = "section_time" | "scroll_depth" | "session";
+/**
+ * Active interaction signals: `click` = tagged-element (`data-track`) click,
+ * `form` = contact-form funnel step, `outbound` = click on a link to another
+ * origin (`meta: { host }`).
+ */
+export type InteractionMetricName = "click" | "form" | "outbound";
 /** Whether an event originated in the browser or on the server. */
 export type MonitoringSource = "client" | "server";
 /** Severity of a monitoring event, independent of its `kind`. */

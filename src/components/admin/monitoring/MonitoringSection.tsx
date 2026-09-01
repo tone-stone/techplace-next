@@ -31,6 +31,7 @@ import type {
   WebVitalSummary,
 } from "@/lib/monitoring/queries";
 import type { WebVitalName, WebVitalRating } from "@/lib/monitoring/types";
+import ReportSection from "./ReportSection";
 import PageSpeedSection from "./PageSpeedSection";
 import EngagementSection from "./EngagementSection";
 import DeletionsSection from "./DeletionsSection";
@@ -461,6 +462,8 @@ export default function MonitoringSection({
   return (
     <div className="space-y-6">
       <StatTiles stats={stats} />
+
+      <ReportSection />
 
       <PageSpeedSection />
 

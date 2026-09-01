@@ -8,8 +8,13 @@ import { trackEngagement, trackInteraction } from "@/lib/monitoring/engagement";
  * Site-wide behaviour analytics collector, mounted once in the root layout
  * next to `MonitoringClient`. Renders nothing; wires three passive listeners:
  *
+ *  0. One `engagement` / `session` event per tab session — device class,
+ *     viewport, referrer source, and new-vs-returning visitor (audience
+ *     breakdown in the monitoring report).
  *  1. Delegated `[data-track]` clicks (every page) — CTAs, nav links, the
- *     floating WhatsApp button. Fires an `interaction` / `click` event.
+ *     floating WhatsApp button. Fires an `interaction` / `click` event. The
+ *     same listener also fires `interaction` / `outbound` for any click on a
+ *     link to another origin.
  *  2. Per-section dwell time (landing page only) — an IntersectionObserver
  *     accumulates how long each `<section id>` is at least half in view, and
  *     flushes the totals as `engagement` / `section_time` events on tab-hide
@@ -27,19 +32,83 @@ const SCROLL_MARKS = [25, 50, 75, 100] as const;
 export default function EngagementTracker() {
   const pathname = usePathname();
 
-  // 1. Delegated CTA clicks — all routes, set up once.
+  // 0. One session event per tab — device / viewport / referrer / returning.
+  useEffect(() => {
+    try {
+      if (sessionStorage.getItem("tp_session_pinged")) return;
+      sessionStorage.setItem("tp_session_pinged", "1");
+    } catch {
+      // no sessionStorage → still send once per mount
+    }
+
+    const w = window.innerWidth;
+    const device = w < 768 ? "mobile" : w < 1024 ? "tablet" : "desktop";
+
+    let visitor: "new" | "returning" = "new";
+    try {
+      visitor = localStorage.getItem("tp_returning") ? "returning" : "new";
+      localStorage.setItem("tp_returning", "1");
+    } catch {
+      // ignore
+    }
+
+    let referrer = "(direct)";
+    try {
+      if (document.referrer) {
+        const host = new URL(document.referrer).hostname.replace(/^www\./, "");
+        if (host === window.location.hostname) referrer = "(internal)";
+        else if (/google\./.test(host)) referrer = "google";
+        else if (/(facebook|fb)\./.test(host)) referrer = "facebook";
+        else if (/instagram\./.test(host)) referrer = "instagram";
+        else if (/bing\./.test(host)) referrer = "bing";
+        else if (/(t\.co|twitter\.|x\.com)/.test(host)) referrer = "twitter";
+        else referrer = host;
+      }
+    } catch {
+      // ignore
+    }
+
+    trackEngagement("session", 1, {
+      device,
+      viewport: `${window.innerWidth}x${window.innerHeight}`,
+      referrer,
+      visitor,
+      landing: window.location.pathname,
+    });
+  }, []);
+
+  // 1. Delegated CTA + outbound clicks — all routes, set up once.
   useEffect(() => {
     const onClick = (e: MouseEvent) => {
       const target = e.target as Element | null;
-      const el = target?.closest?.("[data-track]");
-      if (!el) return;
-      const track = el.getAttribute("data-track");
-      if (!track) return;
-      trackInteraction("click", {
-        track,
-        text: (el.textContent || "").trim().replace(/\s+/g, " ").slice(0, 60) || undefined,
-        href: el instanceof HTMLAnchorElement && el.href ? el.href : undefined,
-      });
+
+      const tagged = target?.closest?.("[data-track]");
+      const track = tagged?.getAttribute("data-track");
+      if (track) {
+        trackInteraction("click", {
+          track,
+          text: (tagged!.textContent || "").trim().replace(/\s+/g, " ").slice(0, 60) || undefined,
+          href: tagged instanceof HTMLAnchorElement && tagged.href ? tagged.href : undefined,
+        });
+      }
+
+      const link = target?.closest?.("a[href]") as HTMLAnchorElement | null;
+      if (link?.href) {
+        try {
+          const u = new URL(link.href, window.location.href);
+          if (
+            (u.protocol === "http:" || u.protocol === "https:") &&
+            u.host !== window.location.host
+          ) {
+            trackInteraction("outbound", {
+              host: u.host.replace(/^www\./, ""),
+              href: u.href.slice(0, 200),
+            });
+          }
+        } catch {
+          // not a parseable URL — ignore
+        }
+      }
     };
     document.addEventListener("click", onClick, { capture: true });
     return () => document.removeEventListener("click", onClick, { capture: true });
