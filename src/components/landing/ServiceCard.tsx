@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRef, type ReactNode } from "react";
 
 type ServiceCardProps = {
@@ -54,12 +55,12 @@ export default function ServiceCard({
       </div>
       <h3 className="text-2xl font-bold text-white mb-2 drop-shadow">{title}</h3>
       <p className="text-gray-300 mb-3 text-justify">{description}</p>
-      <a
+      <Link
         href={linkHref}
         className="-mx-2 -mb-3 mt-2 inline-block px-2 pt-1 pb-3 text-brand-blue font-bold underline underline-offset-4 hover:text-brand-blue transition duration-200"
       >
-        {linkLabel}
-      </a>
+        {linkLabel} →
+      </Link>
     </div>
   );
 }

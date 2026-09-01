@@ -7,6 +7,7 @@ import dynamic from "next/dynamic";
 import { ChevronLeft, ChevronRight, ExternalLink, X } from "lucide-react";
 import { FaFacebookF, FaGithub, FaLinkedinIn, FaWhatsapp } from "react-icons/fa6";
 import Reveal from "./Reveal";
+import { CAROUSEL_PROJECTS as PROYECTOS } from "@/lib/portfolio";
 
 /**
  * Landing section (`#portafolio`) presenting past projects in a carousel
@@ -27,72 +28,6 @@ const PortafolioCarousel = dynamic(() => import("./PortafolioCarousel"), {
     </div>
   ),
 });
-
-const PROYECTOS = [
-  {
-    image: "/img/portfolio/tijuana-innovadora.webp",
-    title: "Tijuana Innovadora",
-    description: "Sitio institucional para movimiento ciudadano de arte, ciencia y tecnología.",
-    tags: ["Desarrollo web", "Sitio institucional"],
-    url: "https://tijuanainnovadora.org/",
-  },
-  {
-    image: "/img/portfolio/property-dreamz.webp",
-    title: "Property Dreamz",
-    description: "Plataforma inmobiliaria bilingüe para bienes raíces en México.",
-    tags: ["Desarrollo web", "Plataforma inmobiliaria", "Bilingüe"],
-    url: "https://www.propertydreamz.com/",
-  },
-  {
-    image: "/img/portfolio/noticias33.webp",
-    title: "Noticias 33",
-    description: "Portal de noticias de México y el mundo.",
-    tags: ["Desarrollo web", "Portal de noticias"],
-    url: "https://noticias33.com/",
-  },
-  {
-    image: "/img/portfolio/old-souls.webp",
-    title: "Old Souls Restaurante",
-    description: "Desarrollo web, seguridad, experiencia industrial.",
-    tags: ["Desarrollo web", "Ciberseguridad", "Experiencia industrial"],
-    url: "https://www.oldsoulsrestaurante.com/",
-  },
-  {
-    image: "/img/portfolio/edie.webp",
-    title: "Escuela de Ingles Especializada",
-    description: "Desarrollo web y SEO local.",
-    tags: ["Desarrollo web", "SEO local"],
-    url: "https://industrialbajasupply.com/",
-  },
-  {
-    image: "/img/portfolio/cervantes.webp",
-    title: "Cervantes Quijano Abogados",
-    description: "Admin web + correo empresarial seguro.",
-    tags: ["Panel administrativo", "Correo empresarial", "Seguridad"],
-    url: "https://prosin.com.mx/",
-  },
-  {
-    image: "/img/portfolio/prosin.webp",
-    title: "PROSIN",
-    description: "Desarrollo web, seguridad, experiencia industrial.",
-    tags: ["Desarrollo web", "Ciberseguridad", "Experiencia industrial"],
-    url: "https://www.oldsoulsrestaurante.com/",
-  },
-  {
-    image: "/img/portfolio/rentas.webp",
-    title: "Rentas TJ",
-    description: "Desarrollo web y SEO local.",
-    tags: ["Desarrollo web", "SEO local"],
-    url: "https://industrialbajasupply.com/",
-  },
-  {
-    image: "/img/portfolio/bel-industrial.webp",
-    title: "BelIndusrial",
-    description: "Admin web + correo empresarial seguro.",
-    tags: ["Panel administrativo", "Correo empresarial", "Seguridad"],
-    url: "https://prosin.com.mx/",
-  },
-];
 
 const SOCIAL_LINKS = [
   { href: "https://facebook.com/techplacetijuana", icon: FaFacebookF, label: "Facebook" },
