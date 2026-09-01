@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { clientIp, rateLimit } from "@/lib/rate-limit";
 import {
   MAX_MESSAGE_LENGTH,
   MAX_STACK_LENGTH,
@@ -48,7 +49,19 @@ const LEVELS: MonitoringLevel[] = ["error", "warning", "info"];
  * insert itself failed (e.g. the table doesn't exist yet) — the beacon
  * caller never inspects the response, so this deliberately avoids a 500.
  */
+/**
+ * Generous per-IP cap: a normal session sends a burst of ~5 web-vital
+ * samples plus scattered interaction/engagement events, so this only bites
+ * a scripted flood of the open write endpoint.
+ */
+const RATE_LIMIT = { limit: 100, windowMs: 5 * 60 * 1000 };
+
 export async function POST(request: NextRequest) {
+  if (!rateLimit(`mon:${clientIp(request)}`, RATE_LIMIT).ok) {
+    // The sendBeacon caller ignores the response; just refuse the write.
+    return new NextResponse(null, { status: 429 });
+  }
+
   let body: unknown;
   try {
     body = await request.json();

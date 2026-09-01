@@ -11,8 +11,9 @@ import { trackInteraction } from "@/lib/monitoring/engagement";
 type EstadoForm = { message: string; error: boolean } | null;
 
 /**
- * The "Contáctanos" section (`#contacto`): a contact form that posts to
- * Formspree, plus direct WhatsApp/website/Facebook links and business hours.
+ * The "Contáctanos" section (`#contacto`): a contact form that posts to our
+ * `/api/contact` proxy (rate limit + honeypot + time trap, then forwarded to
+ * Formspree), plus direct WhatsApp/website/Facebook links and business hours.
  * Handles form submission asynchronously so the page never navigates away.
  */
 export default function Contacto() {
@@ -20,6 +21,9 @@ export default function Contacto() {
   const [enviando, setEnviando] = useState(false);
   // Funnel tracking: fire `start` once, on the first field the visitor touches.
   const startedRef = useRef(false);
+  // Time trap: when the form was rendered. The server rejects submits that
+  // arrive implausibly fast (bots) or after the page sat open for hours.
+  const [renderedAt] = useState(() => Date.now());
 
   const handleFirstFocus = () => {
     if (startedRef.current) return;
@@ -48,10 +52,15 @@ export default function Contacto() {
         form.reset();
         trackInteraction("form", { form: "contacto", step: "success" });
       } else {
-        setEstado({
-          message: "Error al enviar. Intenta de nuevo o contáctanos por WhatsApp.",
-          error: true,
-        });
+        const fallback =
+          res.status === 429
+            ? "Demasiados intentos. Espera unos minutos e inténtalo de nuevo."
+            : "Error al enviar. Intenta de nuevo o contáctanos por WhatsApp.";
+        const message = await res
+          .json()
+          .then((d) => (typeof d?.error === "string" ? d.error : fallback))
+          .catch(() => fallback);
+        setEstado({ message, error: true });
         trackInteraction("form", { form: "contacto", step: "error" });
       }
     } catch {
@@ -79,7 +88,7 @@ export default function Contacto() {
               onSubmit={handleSubmit}
               onFocus={handleFirstFocus}
               className="space-y-6"
-              action="https://formspree.io/f/xwpbgpkr"
+              action="/api/contact"
               method="POST"
             >
               <div className="relative group">
@@ -112,7 +121,16 @@ export default function Contacto() {
                 />
                 <MessageSquare className="absolute left-4 top-3.5 h-4 w-4 text-purple-400" />
               </div>
-              <input type="text" name="_gotcha" className="hidden" tabIndex={-1} autoComplete="off" />
+              {/* Honeypot + time trap — both checked server-side in /api/contact. */}
+              <input
+                type="text"
+                name="_gotcha"
+                className="hidden"
+                tabIndex={-1}
+                autoComplete="off"
+                aria-hidden="true"
+              />
+              <input type="hidden" name="_ts" value={renderedAt} readOnly />
 
               {estado && (
                 <p

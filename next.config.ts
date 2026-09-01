@@ -78,6 +78,13 @@ const nextConfig: NextConfig = {
       { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
       { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
       { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
+      // Isolate this browsing context from any window that opens it / it opens
+      // (defence against tab-nabbing and cross-window XS-Leaks). The site's
+      // outbound links already use rel="noopener"; nothing here needs an
+      // opener relationship, and iframes (Google Maps) are unaffected by COOP.
+      { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
+      { key: "X-DNS-Prefetch-Control", value: "off" },
+      { key: "X-Permitted-Cross-Domain-Policies", value: "none" },
     ];
 
     if (process.env.NODE_ENV === "production") {
@@ -96,6 +103,7 @@ const nextConfig: NextConfig = {
         "base-uri 'self'",
         "form-action 'self'",
         "frame-ancestors 'self'",
+        "upgrade-insecure-requests",
       ].join("; ");
       headers.unshift({ key: "Content-Security-Policy", value: csp });
     }
