@@ -10,8 +10,15 @@ import { unstable_cache } from "next/cache";
  * wraps the *reduced* result in `unstable_cache` with a 6-hour revalidate —
  * only the small summary is persisted, never the full Lighthouse JSON, and
  * PSI is hit at most once per form factor per 6 h regardless of dashboard
- * traffic. No API key is required; set `PAGESPEED_API_KEY` to raise the
- * per-IP quota if the keyless limit (~1 req/s) ever bites.
+ * traffic.
+ *
+ * Set `PAGESPEED_API_KEY`. Keyless PSI shares one small global anonymous
+ * "Queries per day" bucket across every unauthenticated caller, so it is
+ * routinely exhausted (`Quota exceeded … 'Queries per day'` on both form
+ * factors). An API key from your own Google Cloud project — PageSpeed
+ * Insights API enabled, no billing needed — gives that project its own
+ * 25,000/day. When both form factors fail, `buildSummary` throws so the
+ * error isn't cached for the full window.
  */
 
 /** Which URL PSI analyses. Override per-env; defaults to the production site. */
@@ -180,6 +187,16 @@ async function buildSummary(): Promise<PageSpeedSummary> {
     runPageSpeed("mobile"),
     runPageSpeed("desktop"),
   ]);
+
+  // If BOTH form factors failed (PSI outage, quota exceeded, bad key…), throw
+  // so `unstable_cache` doesn't pin an all-error summary for the full 6 h —
+  // the next dashboard load retries instead. A one-sided failure still caches:
+  // re-fetching wouldn't fix the failed side within the window anyway.
+  if (mobile.status === "rejected" && desktop.status === "rejected") {
+    throw mobile.reason instanceof Error
+      ? mobile.reason
+      : new Error("Error al consultar PageSpeed");
+  }
 
   const unwrap = (r: PromiseSettledResult<PageSpeedStrategyResult>) =>
     r.status === "fulfilled"

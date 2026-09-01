@@ -72,6 +72,7 @@ Van en `.env.local` para desarrollo y en **Vercel → Settings → Environment V
 | `NEXT_PUBLIC_GA_ID` | Opcional | ID de medición de Google Analytics 4 (`G-XXXXXXXXXX`) |
 | `NEXT_PUBLIC_META_PIXEL_ID` | Opcional | ID del Meta (Facebook) Pixel (numérico) |
 | `FORMSPREE_ENDPOINT` | Opcional | Endpoint de Formspree al que `/api/contact` reenvía (por defecto el ID actual) |
+| `PAGESPEED_API_KEY` | Recomendada | API key de Google (PageSpeed Insights API habilitada) para la tarjeta PSI del monitoreo. Sin ella se usa la cuota anónima compartida, que se agota seguido. |
 
 Sin las variables de Meta, la sección "Síguenos en redes" simplemente no se renderiza.
 Sin `NEXT_PUBLIC_GA_ID` / `NEXT_PUBLIC_META_PIXEL_ID` no se carga ningún script de
