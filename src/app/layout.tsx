@@ -10,6 +10,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Orbitron } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import MonitoringClient from "@/components/monitoring/MonitoringClient";
 import EngagementTracker from "@/components/monitoring/EngagementTracker";
 import ThirdPartyAnalytics from "@/components/analytics/ThirdPartyAnalytics";
@@ -175,6 +176,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <ThirdPartyAnalytics />
         {children}
         <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   );
