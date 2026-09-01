@@ -12,6 +12,7 @@ import { Geist, Geist_Mono, Orbitron } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import MonitoringClient from "@/components/monitoring/MonitoringClient";
 import EngagementTracker from "@/components/monitoring/EngagementTracker";
+import ThirdPartyAnalytics from "@/components/analytics/ThirdPartyAnalytics";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -171,6 +172,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         />
         <MonitoringClient />
         <EngagementTracker />
+        <ThirdPartyAnalytics />
         {children}
         <Analytics />
       </body>

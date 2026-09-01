@@ -5,6 +5,11 @@ const supabaseHostname = process.env.NEXT_PUBLIC_SUPABASE_URL
   : undefined;
 const cloudinaryCloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
 
+// Third-party analytics: the CSP only widens for these hosts when the
+// corresponding id is configured (see src/components/analytics/ThirdPartyAnalytics.tsx).
+const gaEnabled = Boolean(process.env.NEXT_PUBLIC_GA_ID);
+const metaPixelEnabled = Boolean(process.env.NEXT_PUBLIC_META_PIXEL_ID);
+
 const nextConfig: NextConfig = {
   // Don't advertise the framework in a response header.
   poweredByHeader: false,
@@ -88,16 +93,41 @@ const nextConfig: NextConfig = {
     ];
 
     if (process.env.NODE_ENV === "production") {
+      const scriptSrc = [
+        "script-src 'self' 'unsafe-inline'",
+        gaEnabled && "https://www.googletagmanager.com",
+        metaPixelEnabled && "https://connect.facebook.net",
+      ]
+        .filter(Boolean)
+        .join(" ");
+
+      const imgSrc = [
+        "img-src 'self' data: https://res.cloudinary.com https://*.fbcdn.net",
+        supabaseHostname && `https://${supabaseHostname}`,
+        gaEnabled && "https://*.google-analytics.com https://*.googletagmanager.com",
+        metaPixelEnabled && "https://www.facebook.com",
+      ]
+        .filter(Boolean)
+        .join(" ");
+
+      const connectSrc = [
+        "connect-src 'self'",
+        supabaseHostname && `https://${supabaseHostname}`,
+        gaEnabled &&
+          "https://*.google-analytics.com https://*.analytics.google.com https://www.googletagmanager.com",
+        metaPixelEnabled && "https://www.facebook.com",
+      ]
+        .filter(Boolean)
+        .join(" ");
+
       const csp = [
         "default-src 'self'",
-        "script-src 'self' 'unsafe-inline'",
+        scriptSrc,
         "style-src 'self' 'unsafe-inline'",
-        `img-src 'self' data: https://res.cloudinary.com https://*.fbcdn.net${
-          supabaseHostname ? ` https://${supabaseHostname}` : ""
-        }`,
+        imgSrc,
         "media-src 'self' https://res.cloudinary.com",
         "font-src 'self'",
-        `connect-src 'self'${supabaseHostname ? ` https://${supabaseHostname}` : ""}`,
+        connectSrc,
         "frame-src https://www.google.com",
         "object-src 'none'",
         "base-uri 'self'",

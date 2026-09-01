@@ -69,8 +69,13 @@ Van en `.env.local` para desarrollo y en **Vercel → Settings → Environment V
 | `META_PAGE_ID` | Opcional | ID de la Página de Facebook (feed de la home) |
 | `META_PAGE_ACCESS_TOKEN` | Opcional | Page Access Token de larga duración |
 | `META_IG_BUSINESS_ID` | Opcional | Cuenta de Instagram Business vinculada |
+| `NEXT_PUBLIC_GA_ID` | Opcional | ID de medición de Google Analytics 4 (`G-XXXXXXXXXX`) |
+| `NEXT_PUBLIC_META_PIXEL_ID` | Opcional | ID del Meta (Facebook) Pixel (numérico) |
+| `FORMSPREE_ENDPOINT` | Opcional | Endpoint de Formspree al que `/api/contact` reenvía (por defecto el ID actual) |
 
 Sin las variables de Meta, la sección "Síguenos en redes" simplemente no se renderiza.
+Sin `NEXT_PUBLIC_GA_ID` / `NEXT_PUBLIC_META_PIXEL_ID` no se carga ningún script de
+analítica de terceros, y el CSP no se abre para esos dominios.
 
 ## Equipos y roles
 
