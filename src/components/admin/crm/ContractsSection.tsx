@@ -1,12 +1,13 @@
 "use client";
 
 /**
- * "Contratos" tab: two views — the client contracts list (term, included
+ * "Servicios" tab: two views — the client services list (term, included
  * hours, SLA, recurring billing) with a detail modal, and the service
- * catalog those contracts draw their line items from.
+ * catalog those entries draw their line items from. The underlying entity is
+ * still `crm_contracts`; only the user-facing wording is "servicio".
  */
 
-import { useActionState, useMemo, useState } from "react";
+import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import { Plus, Search, Trash2 } from "lucide-react";
 import {
   createContractAction,
@@ -28,8 +29,21 @@ import {
 import { formatCurrencyMXN } from "@/lib/crm/format";
 import type { CrmActionState } from "@/lib/crm/clients";
 import type { ClientMonthUsage } from "@/lib/it/time-entries";
+import type { ServicePackage } from "@/lib/services/catalog";
 import ConfirmDialog from "@/components/admin/ConfirmDialog";
 import ContractDetailModal from "./ContractDetailModal";
+
+/** Landing-catalog pricing for one offering. */
+type ServicePricing = { title: string; slug: string; packages: ServicePackage[] };
+
+/** Values used to pre-fill the "Nuevo servicio" form from a landing package. */
+type ServiceFormPrefill = { name: string; unit: string; defaultRate: number; description: string };
+
+const usdFmt = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+  maximumFractionDigits: 0,
+});
 
 const FIELD =
   "rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder-gray-500 outline-none focus:border-sky-400/40";
@@ -45,11 +59,14 @@ const STATUS_CLASS: Record<ContractStatus, string> = {
 export default function ContractsSection({
   contracts,
   services,
+  servicePricing = [],
   clients,
   usageByClient = {},
 }: {
   contracts: CrmContract[];
   services: CrmService[];
+  /** Read-only pricing from the public landing catalog. */
+  servicePricing?: ServicePricing[];
   clients: { id: string; name: string }[];
   /** Minutes logged this month per client id (see `getMonthlyUsageByClient`). */
   usageByClient?: Record<string, ClientMonthUsage>;
@@ -78,7 +95,7 @@ export default function ContractsSection({
         <div className="flex rounded-lg border border-white/10 p-0.5 text-xs">
           {(
             [
-              { id: "contratos", label: "Contratos" },
+              { id: "contratos", label: "Servicios" },
               { id: "catalogo", label: "Catálogo" },
             ] as const
           ).map(({ id, label }) => (
@@ -103,7 +120,7 @@ export default function ContractsSection({
                 type="text"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Buscar contrato…"
+                placeholder="Buscar servicio…"
                 className="w-full rounded-full border border-white/10 bg-white/5 py-2 pl-9 pr-4 text-sm text-white placeholder-gray-500 outline-none focus:border-sky-400/40 sm:w-52"
               />
             </div>
@@ -112,7 +129,7 @@ export default function ContractsSection({
               onClick={() => setShowNew((o) => !o)}
               className="flex cursor-pointer items-center gap-1.5 rounded-full bg-sky-500/20 px-4 py-2 text-sm font-semibold text-sky-200 hover:bg-sky-500/30"
             >
-              <Plus className="h-4 w-4" /> Nuevo contrato
+              <Plus className="h-4 w-4" /> Nuevo servicio
             </button>
           </div>
         )}
@@ -181,12 +198,12 @@ export default function ContractsSection({
               </button>
             ))}
             {filtered.length === 0 && (
-              <p className="py-6 text-center text-sm text-gray-400">No hay contratos que coincidan.</p>
+              <p className="py-6 text-center text-sm text-gray-400">No hay servicios que coincidan.</p>
             )}
           </div>
         </>
       ) : (
-        <ServiceCatalog services={services} />
+        <ServiceCatalog services={services} pricing={servicePricing} />
       )}
 
       {openId && (
@@ -201,7 +218,7 @@ export default function ContractsSection({
   );
 }
 
-/** Inline "Nuevo contrato" form. */
+/** Inline "Nuevo servicio" form (creates a `crm_contracts` row). */
 function NewContractForm({
   clients,
   onDone,
@@ -268,18 +285,36 @@ function NewContractForm({
           type="submit"
           className="cursor-pointer rounded-full bg-sky-500/20 px-4 py-2 text-sm font-semibold text-sky-200 hover:bg-sky-500/30"
         >
-          Crear contrato
+          Crear servicio
         </button>
       </div>
     </form>
   );
 }
 
-/** Service catalog list with inline add + per-row edit/toggle/delete. */
-function ServiceCatalog({ services }: { services: CrmService[] }) {
+/** Service catalog list with inline add + per-row edit/toggle/delete, plus the landing price reference. */
+function ServiceCatalog({ services, pricing = [] }: { services: CrmService[]; pricing?: ServicePricing[] }) {
   const [showAdd, setShowAdd] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [toDelete, setToDelete] = useState<CrmService | null>(null);
+  const [prefill, setPrefill] = useState<ServiceFormPrefill | null>(null);
+  const [prefillSeq, setPrefillSeq] = useState(0);
+  const addRef = useRef<HTMLDivElement>(null);
+
+  const applyPackage = (pkg: ServicePackage) => {
+    setPrefill({
+      name: pkg.name,
+      unit: pkg.period === "mes" ? "mes" : "proyecto",
+      defaultRate: pkg.priceMXN ?? 0,
+      description: pkg.blurb ?? "",
+    });
+    setPrefillSeq((n) => n + 1);
+    setShowAdd(true);
+  };
+
+  useEffect(() => {
+    if (showAdd && prefill) addRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [showAdd, prefill]);
 
   return (
     <div>
@@ -287,14 +322,28 @@ function ServiceCatalog({ services }: { services: CrmService[] }) {
         <p className="text-sm text-gray-400">{services.length} servicio(s) en el catálogo</p>
         <button
           type="button"
-          onClick={() => setShowAdd((o) => !o)}
+          onClick={() => {
+            setPrefill(null);
+            setShowAdd((o) => !o);
+          }}
           className="flex cursor-pointer items-center gap-1 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-gray-300 hover:border-sky-400/40 hover:text-white"
         >
           <Plus className="h-3.5 w-3.5" /> Nuevo servicio
         </button>
       </div>
 
-      {showAdd && <ServiceForm onDone={() => setShowAdd(false)} />}
+      <div ref={addRef}>
+        {showAdd && (
+          <ServiceForm
+            key={prefill ? `pf-${prefillSeq}` : "blank"}
+            prefill={prefill ?? undefined}
+            onDone={() => {
+              setShowAdd(false);
+              setPrefill(null);
+            }}
+          />
+        )}
+      </div>
 
       <div className="space-y-2">
         {services.map((s) =>
@@ -339,6 +388,57 @@ function ServiceCatalog({ services }: { services: CrmService[] }) {
         )}
       </div>
 
+      {pricing.some((s) => s.packages.length > 0) && (
+        <div className="mt-8 border-t border-white/10 pt-5">
+          <p className="mb-1 text-sm font-bold text-white">Precios de referencia</p>
+          <p className="mb-4 text-xs text-gray-500">
+            Paquetes y precios publicados en la landing (solo lectura). Úsalos como base para cotizaciones y
+            servicios contratados.
+          </p>
+          <div className="space-y-4">
+            {pricing
+              .filter((s) => s.packages.length > 0)
+              .map((s) => (
+                <div key={s.slug}>
+                  <p className="mb-2 text-xs font-bold uppercase tracking-wide text-gray-400">{s.title}</p>
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    {s.packages.map((pkg) => (
+                      <div
+                        key={pkg.name}
+                        className={`rounded-xl border bg-white/2 p-3 ${
+                          pkg.highlighted ? "border-sky-400/40" : "border-white/5"
+                        }`}
+                      >
+                        <div className="flex items-baseline justify-between gap-2">
+                          <p className="text-sm font-semibold text-white">{pkg.name}</p>
+                          <p className="shrink-0 text-sm font-bold text-sky-300">
+                            {pkg.priceMXN != null ? formatCurrencyMXN(pkg.priceMXN) : "A cotización"}
+                            {pkg.period ? ` / ${pkg.period}` : ""}
+                          </p>
+                        </div>
+                        {pkg.priceUSD != null && (
+                          <p className="text-[11px] text-gray-500">
+                            ≈ {usdFmt.format(pkg.priceUSD)}
+                            {pkg.period ? ` / ${pkg.period}` : ""}
+                          </p>
+                        )}
+                        {pkg.blurb && <p className="mt-1 text-xs text-gray-400">{pkg.blurb}</p>}
+                        <button
+                          type="button"
+                          onClick={() => applyPackage(pkg)}
+                          className="mt-2 flex cursor-pointer items-center gap-1 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] font-medium text-gray-300 hover:border-sky-400/40 hover:text-white"
+                        >
+                          <Plus className="h-3 w-3" /> Usar en el catálogo
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+          </div>
+        </div>
+      )}
+
       <ConfirmDialog
         open={toDelete !== null}
         title="Eliminar servicio"
@@ -352,7 +452,15 @@ function ServiceCatalog({ services }: { services: CrmService[] }) {
   );
 }
 
-function ServiceForm({ service, onDone }: { service?: CrmService; onDone: () => void }) {
+function ServiceForm({
+  service,
+  prefill,
+  onDone,
+}: {
+  service?: CrmService;
+  prefill?: ServiceFormPrefill;
+  onDone: () => void;
+}) {
   const [state, formAction] = useActionState<CrmActionState, FormData>(async (prev, formData) => {
     const result = service
       ? await updateServiceAction(prev, formData)
@@ -368,8 +476,14 @@ function ServiceForm({ service, onDone }: { service?: CrmService; onDone: () => 
     >
       {service && <input type="hidden" name="serviceId" value={service.id} />}
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-        <input name="name" required defaultValue={service?.name ?? ""} placeholder="Nombre del servicio" className={`sm:col-span-2 ${FIELD}`} />
-        <select name="unit" defaultValue={service?.unit ?? "hora"} className={FIELD}>
+        <input
+          name="name"
+          required
+          defaultValue={service?.name ?? prefill?.name ?? ""}
+          placeholder="Nombre del servicio"
+          className={`sm:col-span-2 ${FIELD}`}
+        />
+        <select name="unit" defaultValue={service?.unit ?? prefill?.unit ?? "hora"} className={FIELD}>
           {SERVICE_UNITS.map((u) => (
             <option key={u} value={u}>
               {UNIT_LABELS[u]}
@@ -381,11 +495,16 @@ function ServiceForm({ service, onDone }: { service?: CrmService; onDone: () => 
           type="number"
           min="0"
           step="0.01"
-          defaultValue={service?.defaultRate ?? 0}
+          defaultValue={service?.defaultRate ?? prefill?.defaultRate ?? 0}
           placeholder="Tarifa MXN"
           className={FIELD}
         />
-        <input name="description" defaultValue={service?.description ?? ""} placeholder="Descripción (opcional)" className={`sm:col-span-2 ${FIELD}`} />
+        <input
+          name="description"
+          defaultValue={service?.description ?? prefill?.description ?? ""}
+          placeholder="Descripción (opcional)"
+          className={`sm:col-span-2 ${FIELD}`}
+        />
       </div>
       {service && (
         <label className="flex items-center gap-2 text-xs text-gray-300">

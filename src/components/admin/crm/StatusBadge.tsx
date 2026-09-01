@@ -27,6 +27,19 @@ const STYLES: Record<string, string> = {
   // tareas
   por_hacer: "border-gray-400/30 bg-gray-500/10 text-gray-400",
   terminado: "border-emerald-400/30 bg-emerald-500/10 text-emerald-300",
+  // contratos
+  suspendido: "border-amber-400/30 bg-amber-500/10 text-amber-300",
+  vencido: "border-red-400/30 bg-red-500/10 text-red-300",
+  cancelado: "border-gray-400/30 bg-gray-500/10 text-gray-400",
+  // tickets de soporte
+  nuevo: "border-sky-400/30 bg-sky-500/10 text-sky-300",
+  abierto: "border-blue-400/30 bg-blue-500/10 text-blue-300",
+  en_espera: "border-amber-400/30 bg-amber-500/10 text-amber-300",
+  resuelto: "border-emerald-400/30 bg-emerald-500/10 text-emerald-300",
+  cerrado: "border-gray-400/30 bg-gray-500/10 text-gray-400",
+  // activos
+  en_reparacion: "border-amber-400/30 bg-amber-500/10 text-amber-300",
+  retirado: "border-gray-400/30 bg-gray-500/10 text-gray-400",
 };
 
 const LABELS: Record<string, string> = {
@@ -46,6 +59,16 @@ const LABELS: Record<string, string> = {
   rechazada: "Rechazada",
   por_hacer: "Por hacer",
   terminado: "Terminado",
+  suspendido: "Suspendido",
+  vencido: "Vencido",
+  cancelado: "Cancelado",
+  nuevo: "Nuevo",
+  abierto: "Abierto",
+  en_espera: "En espera",
+  resuelto: "Resuelto",
+  cerrado: "Cerrado",
+  en_reparacion: "En reparación",
+  retirado: "Retirado",
 };
 
 /**

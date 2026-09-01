@@ -1,9 +1,10 @@
 "use client";
 
 /**
- * Contract detail modal: the contract's terms (editable in place), its
- * catalog-service lines (add / remove), and delete. Fetches
- * `getContractDetail` on mount and refetches after each mutation.
+ * Client-service detail modal (backed by `crm_contracts`): the service's
+ * terms (editable in place), its catalog-service line items / "conceptos"
+ * (add / remove), and delete. Fetches `getContractDetail` on mount and
+ * refetches after each mutation.
  */
 
 import { useActionState, useEffect, useState } from "react";
@@ -82,7 +83,7 @@ export default function ContractDetailModal({
               <button
                 type="button"
                 onClick={() => setConfirmDelete(true)}
-                aria-label="Eliminar contrato"
+                aria-label="Eliminar servicio"
                 className="-m-1 cursor-pointer rounded-full p-2 text-gray-500 hover:bg-red-500/10 hover:text-red-400"
               >
                 <Trash2 className="h-4 w-4" />
@@ -100,7 +101,7 @@ export default function ContractDetailModal({
 
           {loading || !detail || !c ? (
             <div className="flex items-center justify-center gap-2 py-16 text-gray-400">
-              <Loader2 className="h-5 w-5 animate-spin" /> Cargando contrato…
+              <Loader2 className="h-5 w-5 animate-spin" /> Cargando servicio…
             </div>
           ) : (
             <div className="space-y-6">
@@ -138,19 +139,19 @@ export default function ContractDetailModal({
                     onClick={() => setEditing(true)}
                     className="col-span-2 mt-1 cursor-pointer text-left text-xs font-medium text-sky-300 hover:text-sky-200"
                   >
-                    Editar contrato
+                    Editar servicio
                   </button>
                 </div>
               )}
 
               <div>
                 <h3 className="mb-3 flex items-center justify-between text-sm font-bold uppercase tracking-wide text-gray-300">
-                  Servicios
+                  Conceptos
                 </h3>
                 <AddServiceLine contractId={c.id} services={services} onAdded={refresh} />
                 <div className="mt-3 space-y-2">
                   {detail.services.length === 0 && (
-                    <p className="text-sm text-gray-500">Sin servicios en este contrato.</p>
+                    <p className="text-sm text-gray-500">Sin conceptos en este servicio.</p>
                   )}
                   {detail.services.map((line) => {
                     const svc = services.find((s) => s.id === line.serviceId);
@@ -172,7 +173,7 @@ export default function ContractDetailModal({
                             await removeContractServiceAction(line.id);
                             refresh();
                           }}
-                          aria-label="Quitar servicio"
+                          aria-label="Quitar concepto"
                           className="cursor-pointer rounded-full p-1.5 text-gray-500 hover:bg-red-500/10 hover:text-red-400"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
@@ -188,7 +189,7 @@ export default function ContractDetailModal({
 
         <ConfirmDialog
           open={confirmDelete}
-          title="Eliminar contrato"
+          title="Eliminar servicio"
           body={c ? `Se eliminará ${c.title}.` : undefined}
           onConfirm={async () => {
             await deleteContractAction(contractId);

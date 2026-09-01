@@ -56,6 +56,22 @@ describe("ClientsSection", () => {
     expect(screen.queryByText("Beta Studio")).not.toBeInTheDocument();
   });
 
+  it("filters by search text across email and phone", async () => {
+    const user = userEvent.setup();
+    render(<ClientsSection clients={clients} />);
+
+    const search = screen.getByPlaceholderText("Buscar cliente…");
+
+    await user.type(search, "beto@beta.com");
+    expect(screen.getByText("Beta Studio")).toBeInTheDocument();
+    expect(screen.queryByText("Acme Corp")).not.toBeInTheDocument();
+
+    await user.clear(search);
+    await user.type(search, "0001");
+    expect(screen.getByText("Acme Corp")).toBeInTheDocument();
+    expect(screen.queryByText("Beta Studio")).not.toBeInTheDocument();
+  });
+
   it("shows an empty-state message when filter + search match nothing", async () => {
     const user = userEvent.setup();
     render(<ClientsSection clients={clients} />);

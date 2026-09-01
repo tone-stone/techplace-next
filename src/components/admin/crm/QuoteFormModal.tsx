@@ -21,15 +21,19 @@ const EMPTY_ITEM: DraftItem = { concept: "", quantity: "1", unitPrice: "" };
 /** Portaled modal form for `createQuoteAction`, with client-side line-item and total management. */
 export default function QuoteFormModal({
   clients,
+  lockedClientId,
   onClose,
 }: {
   clients: CrmClient[];
+  /** When set, the client picker is pre-filled with this client and disabled. */
+  lockedClientId?: string;
   onClose: () => void;
 }) {
-  const [clientId, setClientId] = useState("");
-  const [clientName, setClientName] = useState("");
-  const [clientCompany, setClientCompany] = useState("");
-  const [clientEmail, setClientEmail] = useState("");
+  const locked = lockedClientId ? clients.find((c) => c.id === lockedClientId) : undefined;
+  const [clientId, setClientId] = useState(locked?.id ?? "");
+  const [clientName, setClientName] = useState(locked?.name ?? "");
+  const [clientCompany, setClientCompany] = useState(locked?.company ?? "");
+  const [clientEmail, setClientEmail] = useState(locked?.email ?? "");
   const [includeTax, setIncludeTax] = useState(true);
   const [items, setItems] = useState<DraftItem[]>([{ ...EMPTY_ITEM }]);
 
@@ -107,7 +111,8 @@ export default function QuoteFormModal({
             <select
               value={clientId}
               onChange={(e) => handleSelectClient(e.target.value)}
-              className="mb-2 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm text-white outline-none focus:border-sky-400/40"
+              disabled={Boolean(lockedClientId)}
+              className="mb-2 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm text-white outline-none focus:border-sky-400/40 disabled:opacity-60"
             >
               <option value="">Prospecto (sin cliente en el CRM)</option>
               {clients.map((c) => (

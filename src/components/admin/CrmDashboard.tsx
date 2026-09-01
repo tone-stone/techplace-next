@@ -51,6 +51,10 @@ import type { ClientPayment, CrmClient } from "@/lib/crm/clients";
 import type { CrmContact } from "@/lib/crm/contacts";
 import type { CrmContract } from "@/lib/crm/contracts";
 import type { CrmService } from "@/lib/crm/services";
+import type { ServicePackage } from "@/lib/services/catalog";
+
+/** Landing-catalog pricing for one offering, passed through to the Servicios tab. */
+export type ServicePricing = { title: string; slug: string; packages: ServicePackage[] };
 import type { CollectionItem, ClientHealth } from "@/lib/crm/collections";
 import type { CrmProject } from "@/lib/crm/projects";
 import type { CrmInvoice } from "@/lib/crm/invoices";
@@ -105,7 +109,7 @@ const NAV_ITEMS: { id: Section; label: string; icon: typeof Users }[] = [
   { id: "facturacion", label: "Facturación", icon: Receipt },
   { id: "cobranza", label: "Cobranza", icon: HandCoins },
   { id: "cotizaciones", label: "Cotizaciones", icon: FileText },
-  { id: "contratos", label: "Contratos", icon: ScrollText },
+  { id: "contratos", label: "Servicios", icon: ScrollText },
   { id: "soporte", label: "Soporte", icon: LifeBuoy },
   { id: "activos", label: "Activos", icon: Server },
   { id: "tareas", label: "Tareas", icon: Kanban },
@@ -156,6 +160,8 @@ export default function CrmDashboard({
   contacts = [],
   contracts = [],
   services = [],
+  catalogServiceNames = [],
+  servicePricing = [],
   contractUsage = {},
   appSettings = null,
   envStatus = { resend: false, cron: false, fromEmail: false },
@@ -188,6 +194,10 @@ export default function CrmDashboard({
   contacts?: CrmContact[];
   contracts?: CrmContract[];
   services?: CrmService[];
+  /** Offering names from the public landing catalog, suggested in the client form. */
+  catalogServiceNames?: string[];
+  /** Landing-catalog pricing (packages per offering), shown in the Servicios tab. */
+  servicePricing?: ServicePricing[];
   contractUsage?: Record<string, ClientMonthUsage>;
   appSettings?: AppSettings | null;
   envStatus?: EnvStatus;
@@ -369,7 +379,26 @@ export default function CrmDashboard({
             <OverviewSection clients={clients} projects={projects} payments={payments} />
           )}
           {section === "clientes" && allowed.includes("clientes") && (
-            <ClientsSection clients={clients} health={clientHealth} />
+            <ClientsSection
+              clients={clients}
+              health={clientHealth}
+              projects={projects}
+              quotes={quotes}
+              invoices={invoices}
+              tasks={tasks}
+              contracts={contracts}
+              tickets={tickets}
+              assets={assets}
+              serviceOptions={[
+                ...new Set([
+                  ...catalogServiceNames,
+                  ...services.filter((s) => s.active).map((s) => s.name),
+                ]),
+              ]}
+              canWriteBilling={canWriteBilling(role)}
+              canReadBilling={canReadBilling(role)}
+              canUseSupport={canUseSupport(role)}
+            />
           )}
           {section === "proyectos" && allowed.includes("proyectos") && (
             <ProjectsSection projects={projects} clients={clients} />
@@ -392,6 +421,7 @@ export default function CrmDashboard({
             <ContractsSection
               contracts={contracts}
               services={services}
+              servicePricing={servicePricing}
               usageByClient={contractUsage}
               clients={clients.map((c) => ({ id: c.id, name: c.company }))}
             />

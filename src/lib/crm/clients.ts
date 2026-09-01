@@ -37,6 +37,48 @@ export type CrmClient = {
   createdAt: string;
 };
 
+/**
+ * Tax + billing profile for a client (CFDI 4.0 receptor fields plus a
+ * postal address for invoice PDFs). Lives on the same `crm_clients` row but
+ * is only loaded for the client detail view, never the list, and is filled
+ * in from its own panel once a lead becomes a paying client.
+ */
+export type ClientBilling = {
+  taxName: string | null;
+  rfc: string | null;
+  taxRegime: string | null;
+  cfdiUse: string | null;
+  taxZip: string | null;
+  billingEmail: string | null;
+  paymentForm: string | null;
+  paymentMethod: "PUE" | "PPD" | null;
+  paymentTermsDays: number | null;
+  currency: string;
+  addressStreet: string | null;
+  addressExt: string | null;
+  addressInt: string | null;
+  addressNeighborhood: string | null;
+  addressCity: string | null;
+  addressState: string | null;
+  addressCountry: string;
+  website: string | null;
+};
+
+/**
+ * General (non-fiscal) profile fields for a client — contact's job title,
+ * industry, lead source, company size, WhatsApp, city and a reference
+ * address. All optional; edited from the same client form as name/company.
+ */
+export type ClientProfile = {
+  jobTitle: string | null;
+  industry: string | null;
+  source: string | null;
+  companySize: string | null;
+  whatsapp: string | null;
+  city: string | null;
+  address: string | null;
+};
+
 export type ClientPlan = {
   id: string;
   clientId: string;
@@ -63,6 +105,8 @@ export type ClientPayment = {
 
 export type ClientDetail = {
   client: CrmClient;
+  billing: ClientBilling;
+  profile: ClientProfile;
   contacts: CrmContact[];
   history: ClientHistoryEntry[];
   plans: ClientPlan[];
@@ -93,6 +137,84 @@ function mapClient(row: {
     service: row.service,
     notes: row.notes,
     createdAt: row.created_at,
+  };
+}
+
+/** Pulls the tax/billing columns off a raw `crm_clients` row into a `ClientBilling`. */
+function mapBilling(row: {
+  tax_name: string | null;
+  rfc: string | null;
+  tax_regime: string | null;
+  cfdi_use: string | null;
+  tax_zip: string | null;
+  billing_email: string | null;
+  payment_form: string | null;
+  payment_method: string | null;
+  payment_terms_days: number | null;
+  currency: string | null;
+  address_street: string | null;
+  address_ext: string | null;
+  address_int: string | null;
+  address_neighborhood: string | null;
+  address_city: string | null;
+  address_state: string | null;
+  address_country: string | null;
+  website: string | null;
+}): ClientBilling {
+  return {
+    taxName: row.tax_name,
+    rfc: row.rfc,
+    taxRegime: row.tax_regime,
+    cfdiUse: row.cfdi_use,
+    taxZip: row.tax_zip,
+    billingEmail: row.billing_email,
+    paymentForm: row.payment_form,
+    paymentMethod: (row.payment_method as "PUE" | "PPD" | null) ?? null,
+    paymentTermsDays: row.payment_terms_days,
+    currency: row.currency ?? "MXN",
+    addressStreet: row.address_street,
+    addressExt: row.address_ext,
+    addressInt: row.address_int,
+    addressNeighborhood: row.address_neighborhood,
+    addressCity: row.address_city,
+    addressState: row.address_state,
+    addressCountry: row.address_country ?? "México",
+    website: row.website,
+  };
+}
+
+/** Pulls the general (non-fiscal) profile columns off a raw `crm_clients` row. */
+function mapProfile(row: {
+  job_title: string | null;
+  industry: string | null;
+  source: string | null;
+  company_size: string | null;
+  whatsapp: string | null;
+  city: string | null;
+  address: string | null;
+}): ClientProfile {
+  return {
+    jobTitle: row.job_title,
+    industry: row.industry,
+    source: row.source,
+    companySize: row.company_size,
+    whatsapp: row.whatsapp,
+    city: row.city,
+    address: row.address,
+  };
+}
+
+/** Snake-case `crm_clients` columns for the optional profile fields on the client form. */
+function profileColumns(formData: FormData) {
+  const val = (k: string) => String(formData.get(k) ?? "").trim() || null;
+  return {
+    job_title: val("jobTitle"),
+    industry: val("industry"),
+    source: val("source"),
+    company_size: val("companySize"),
+    whatsapp: val("whatsapp"),
+    city: val("city"),
+    address: val("address"),
   };
 }
 
@@ -194,6 +316,8 @@ export async function getClientDetail(clientId: string): Promise<ClientDetail | 
 
   return {
     client: mapClient(client),
+    billing: mapBilling(client),
+    profile: mapProfile(client),
     contacts,
     history: (history ?? []).map(mapHistory),
     plans: (plans ?? []).map(mapPlan),
@@ -214,6 +338,7 @@ export async function createClientAction(
   const email = String(formData.get("email") ?? "").trim();
   const phone = String(formData.get("phone") ?? "").trim();
   const service = String(formData.get("service") ?? "").trim();
+  const notes = String(formData.get("notes") ?? "").trim();
 
   if (!name || !company) {
     return { error: "Nombre y empresa son obligatorios" };
@@ -228,6 +353,8 @@ export async function createClientAction(
       email: email || null,
       phone: phone || null,
       service: service || null,
+      notes: notes || null,
+      ...profileColumns(formData),
       created_by: check.userId,
     })
     .select("id")
@@ -236,6 +363,113 @@ export async function createClientAction(
   if (error || !data) return { error: error?.message ?? "No se pudo crear el cliente" };
 
   await addHistory(supabase, data.id, "otro", "Cliente creado", check.userId);
+  revalidatePath("/admin");
+  return { success: true };
+}
+
+/** `useActionState` action backing the "Editar cliente" form on the client detail modal. */
+export async function updateClientAction(
+  _prevState: CrmActionState,
+  formData: FormData
+): Promise<CrmActionState> {
+  const check = await requireCrmCore();
+  if (!check.ok) return { error: check.error };
+
+  const clientId = String(formData.get("clientId") ?? "");
+  const name = String(formData.get("name") ?? "").trim();
+  const company = String(formData.get("company") ?? "").trim();
+  const email = String(formData.get("email") ?? "").trim();
+  const phone = String(formData.get("phone") ?? "").trim();
+  const service = String(formData.get("service") ?? "").trim();
+  const notes = String(formData.get("notes") ?? "").trim();
+
+  if (!clientId) return { error: "Cliente no encontrado" };
+  if (!name || !company) {
+    return { error: "Nombre y empresa son obligatorios" };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("crm_clients")
+    .update({
+      name,
+      company,
+      email: email || null,
+      phone: phone || null,
+      service: service || null,
+      notes: notes || null,
+      ...profileColumns(formData),
+    })
+    .eq("id", clientId);
+
+  if (error) return { error: error.message };
+
+  await addHistory(supabase, clientId, "otro", "Datos del cliente actualizados", check.userId);
+  revalidatePath("/admin");
+  return { success: true };
+}
+
+const RFC_RE = /^[A-ZÑ&]{3,4}\d{6}[A-Z\d]{2,3}$/i;
+
+/**
+ * `useActionState` action backing the "Datos fiscales y facturación" panel.
+ * All fields are optional; RFC and CP are format-checked only when present so
+ * a half-filled profile can still be saved.
+ */
+export async function updateClientBillingAction(
+  _prevState: CrmActionState,
+  formData: FormData
+): Promise<CrmActionState> {
+  const check = await requireCrmCore();
+  if (!check.ok) return { error: check.error };
+
+  const clientId = String(formData.get("clientId") ?? "");
+  if (!clientId) return { error: "Cliente no encontrado" };
+
+  const str = (key: string) => String(formData.get(key) ?? "").trim();
+  const rfc = str("rfc").toUpperCase();
+  const taxZip = str("taxZip");
+  const paymentMethod = str("paymentMethod");
+  const termsRaw = str("paymentTermsDays");
+
+  if (rfc && !RFC_RE.test(rfc)) return { error: "El RFC no tiene un formato válido" };
+  if (taxZip && !/^\d{5}$/.test(taxZip)) return { error: "El código postal debe tener 5 dígitos" };
+  if (paymentMethod && paymentMethod !== "PUE" && paymentMethod !== "PPD") {
+    return { error: "Método de pago inválido" };
+  }
+  const paymentTermsDays = termsRaw ? Number(termsRaw) : null;
+  if (paymentTermsDays !== null && (!Number.isInteger(paymentTermsDays) || paymentTermsDays < 0)) {
+    return { error: "Los días de crédito deben ser un entero mayor o igual a 0" };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("crm_clients")
+    .update({
+      tax_name: str("taxName") || null,
+      rfc: rfc || null,
+      tax_regime: str("taxRegime") || null,
+      cfdi_use: str("cfdiUse") || null,
+      tax_zip: taxZip || null,
+      billing_email: str("billingEmail") || null,
+      payment_form: str("paymentForm") || null,
+      payment_method: paymentMethod || null,
+      payment_terms_days: paymentTermsDays,
+      currency: str("currency") || "MXN",
+      address_street: str("addressStreet") || null,
+      address_ext: str("addressExt") || null,
+      address_int: str("addressInt") || null,
+      address_neighborhood: str("addressNeighborhood") || null,
+      address_city: str("addressCity") || null,
+      address_state: str("addressState") || null,
+      address_country: str("addressCountry") || "México",
+      website: str("website") || null,
+    })
+    .eq("id", clientId);
+
+  if (error) return { error: error.message };
+
+  await addHistory(supabase, clientId, "otro", "Datos fiscales y de facturación actualizados", check.userId);
   revalidatePath("/admin");
   return { success: true };
 }

@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * "Contactos" panel inside `ClientDetailModal`: lists the people at a client
+ * "Contactos" panel inside `ClientWorkspace`: lists the people at a client
  * company, with an inline add form, per-row edit, "hacer principal", and
  * soft-delete. The primary contact's name/email/phone is mirrored onto the
  * `crm_clients` row server-side (see `src/lib/crm/contacts.ts`), so the client

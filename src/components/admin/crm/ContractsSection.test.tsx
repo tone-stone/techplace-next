@@ -63,11 +63,11 @@ describe("ContractsSection", () => {
     expect(screen.getByText("Retainer mensual")).toBeInTheDocument();
   });
 
-  it("opens the new-contract form", async () => {
+  it("opens the new-service form", async () => {
     const user = userEvent.setup();
     render(<ContractsSection contracts={contracts} services={services} clients={clients} />);
 
-    await user.click(screen.getByRole("button", { name: /nuevo contrato/i }));
+    await user.click(screen.getByRole("button", { name: /nuevo servicio/i }));
     expect(screen.getByPlaceholderText("Título (Soporte IT 2026)")).toBeInTheDocument();
   });
 });

@@ -16,6 +16,7 @@ import { getAllPayments, getClients } from "@/lib/crm/clients";
 import { getAllContacts } from "@/lib/crm/contacts";
 import { getContracts } from "@/lib/crm/contracts";
 import { getServices } from "@/lib/crm/services";
+import { SERVICES } from "@/lib/services/catalog";
 import { getClientHealthMap, getUpcomingCollections } from "@/lib/crm/collections";
 import { getProjectNames, getProjects } from "@/lib/crm/projects";
 import { getInvoices } from "@/lib/crm/invoices";
@@ -176,6 +177,12 @@ export default async function AdminPage() {
       contacts={contactsAll}
       contracts={contracts}
       services={services}
+      catalogServiceNames={SERVICES.map((s) => s.title)}
+      servicePricing={SERVICES.map((s) => ({
+        title: s.title,
+        slug: s.slug,
+        packages: s.packages ?? [],
+      }))}
       contractUsage={contractUsage}
       appSettings={appSettings}
       envStatus={envStatus}

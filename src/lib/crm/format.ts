@@ -9,3 +9,15 @@ export function formatCurrencyMXN(value: number): string {
     maximumFractionDigits: 0,
   }).format(value);
 }
+
+/** Up to two uppercase initials from a name, for avatar bubbles. Falls back to "?". */
+export function initialsOf(name: string): string {
+  return (
+    name
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((w) => w[0]?.toUpperCase() ?? "")
+      .join("") || "?"
+  );
+}
