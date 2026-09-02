@@ -17,6 +17,7 @@ export type CollectionItem = {
   planName: string | null;
   amount: number;
   dueDate: string;
+  method: string | null;
   daysLeft: number;
   status: "pendiente" | "vencido";
 };
@@ -24,6 +25,8 @@ export type CollectionItem = {
 export type ClientHealth = {
   hasActivePlan: boolean;
   nextDueDate: string | null;
+  /** Amount of the plan whose charge falls on `nextDueDate` (the next one due). */
+  nextChargeAmount: number | null;
   overdueAmount: number;
 };
 
@@ -54,6 +57,7 @@ type RawCollectionRow = {
   client_id: string;
   amount: number | string;
   due_date: string;
+  method: string | null;
   status: "pendiente" | "vencido";
   crm_plans: { name: string } | { name: string }[] | null;
   crm_clients:
@@ -61,18 +65,20 @@ type RawCollectionRow = {
     | null;
 };
 
-/** Every outstanding payment (pendiente / vencido), enriched for display, due date first. */
+/** Every outstanding payment (pendiente / vencido) of a live client, enriched for display, due date first. */
 export async function getUpcomingCollections(): Promise<CollectionItem[]> {
   return withTiming("crm.getUpcomingCollections", async () => {
     const supabase = await createClient();
     const { data } = await supabase
       .from("crm_payments")
       .select(
-        `id, client_id, amount, due_date, status,
+        `id, client_id, amount, due_date, method, status,
          crm_plans(name),
-         crm_clients(company, crm_contacts(name, is_primary, deleted_at))`
+         crm_clients!inner(company, deleted_at, crm_contacts(name, is_primary, deleted_at))`
       )
       .in("status", ["pendiente", "vencido"])
+      .is("deleted_at", null)
+      .is("crm_clients.deleted_at", null)
       .order("due_date", { ascending: true });
 
     const now = new Date();
@@ -88,6 +94,7 @@ export async function getUpcomingCollections(): Promise<CollectionItem[]> {
         planName: plan?.name ?? null,
         amount: Number(r.amount),
         dueDate: r.due_date,
+        method: r.method,
         daysLeft: daysUntil(r.due_date, now),
         status: r.status,
       };
@@ -108,21 +115,99 @@ type RawScheduledRow = {
     | null;
 };
 
-/** Every active plan with its next charge date, soonest first. */
-export async function getScheduledCharges(): Promise<ScheduledCharge[]> {
-  return withTiming("crm.getScheduledCharges", async () => {
+/** One recurring plan (crm_plans) for the Servicios module, with the client's name. */
+export type PlanRow = {
+  id: string;
+  clientId: string;
+  company: string;
+  name: string;
+  amount: number;
+  billingCycle: string;
+  cutoffDay: number;
+  nextDueDate: string;
+  status: "activo" | "pausado" | "cancelado";
+  /** Mirror service (crm_contracts) auto-created with the plan, if any. */
+  contractId: string | null;
+};
+
+type RawPlanRow = {
+  id: string;
+  client_id: string;
+  name: string;
+  amount: number | string;
+  billing_cycle: string;
+  cutoff_day: number;
+  next_due_date: string;
+  status: string;
+  contract_id: string | null;
+  crm_clients: { company: string } | { company: string }[] | null;
+};
+
+/** Every non-deleted recurring plan, next charge first — feeds the Servicios tab. */
+export async function getPlans(): Promise<PlanRow[]> {
+  return withTiming("crm.getPlans", async () => {
     const supabase = await createClient();
     const { data } = await supabase
       .from("crm_plans")
       .select(
-        `id, client_id, name, amount, billing_cycle, next_due_date,
-         crm_clients(company, crm_contacts(name, is_primary, deleted_at))`
+        `id, client_id, name, amount, billing_cycle, cutoff_day, next_due_date, status, contract_id,
+         crm_clients!inner(company, deleted_at)`
       )
-      .eq("status", "activo")
+      .is("deleted_at", null)
+      .is("crm_clients.deleted_at", null)
       .order("next_due_date", { ascending: true });
 
+    return ((data ?? []) as unknown as RawPlanRow[]).map((r) => ({
+      id: r.id,
+      clientId: r.client_id,
+      company: one(r.crm_clients)?.company ?? "—",
+      name: r.name,
+      amount: Number(r.amount),
+      billingCycle: r.billing_cycle,
+      cutoffDay: r.cutoff_day,
+      nextDueDate: r.next_due_date,
+      status: (["activo", "pausado", "cancelado"].includes(r.status) ? r.status : "activo") as PlanRow["status"],
+      contractId: r.contract_id ?? null,
+    }));
+  });
+}
+
+/**
+ * Every active plan with its next charge date, soonest first — but only for
+ * clients with nothing outstanding. If a client already has any `pendiente` /
+ * `vencido` payment, that charge is the real thing to collect (it shows in the
+ * other Cobranza views), so the plan's projection is dropped here to avoid
+ * listing the same client twice — whether or not the open payment is linked to
+ * the plan.
+ */
+export async function getScheduledCharges(): Promise<ScheduledCharge[]> {
+  return withTiming("crm.getScheduledCharges", async () => {
+    const supabase = await createClient();
+    const [{ data }, { data: openPayments }] = await Promise.all([
+      supabase
+        .from("crm_plans")
+        .select(
+          `id, client_id, name, amount, billing_cycle, next_due_date,
+           crm_clients!inner(company, deleted_at, crm_contacts(name, is_primary, deleted_at))`
+        )
+        .eq("status", "activo")
+        .is("deleted_at", null)
+        .is("crm_clients.deleted_at", null)
+        .order("next_due_date", { ascending: true }),
+      supabase
+        .from("crm_payments")
+        .select("client_id, crm_clients!inner(deleted_at)")
+        .in("status", ["pendiente", "vencido"])
+        .is("deleted_at", null)
+        .is("crm_clients.deleted_at", null),
+    ]);
+
+    const clientsWithOpenCharge = new Set((openPayments ?? []).map((p) => p.client_id as string));
+
     const now = new Date();
-    return ((data ?? []) as unknown as RawScheduledRow[]).map((r) => {
+    return ((data ?? []) as unknown as RawScheduledRow[])
+      .filter((r) => !clientsWithOpenCharge.has(r.client_id))
+      .map((r) => {
       const client = one(r.crm_clients);
       const primary = client?.crm_contacts?.find((c) => c.is_primary && !c.deleted_at) ?? null;
       return {
@@ -145,19 +230,35 @@ export async function getClientHealthMap(): Promise<Record<string, ClientHealth>
   return withTiming("crm.getClientHealthMap", async () => {
     const supabase = await createClient();
     const [{ data: plans }, { data: payments }] = await Promise.all([
-      supabase.from("crm_plans").select("client_id, next_due_date").eq("status", "activo"),
-      supabase.from("crm_payments").select("client_id, amount").eq("status", "vencido"),
+      supabase
+        .from("crm_plans")
+        .select("client_id, next_due_date, amount, crm_clients!inner(deleted_at)")
+        .eq("status", "activo")
+        .is("deleted_at", null)
+        .is("crm_clients.deleted_at", null),
+      supabase
+        .from("crm_payments")
+        .select("client_id, amount, crm_clients!inner(deleted_at)")
+        .eq("status", "vencido")
+        .is("deleted_at", null)
+        .is("crm_clients.deleted_at", null),
     ]);
 
     const map: Record<string, ClientHealth> = {};
     const get = (id: string) =>
-      (map[id] ??= { hasActivePlan: false, nextDueDate: null, overdueAmount: 0 });
+      (map[id] ??= {
+        hasActivePlan: false,
+        nextDueDate: null,
+        nextChargeAmount: null,
+        overdueAmount: 0,
+      });
 
     for (const p of plans ?? []) {
       const h = get(p.client_id);
       h.hasActivePlan = true;
       if (p.next_due_date && (!h.nextDueDate || p.next_due_date < h.nextDueDate)) {
         h.nextDueDate = p.next_due_date;
+        h.nextChargeAmount = Number(p.amount);
       }
     }
     for (const p of payments ?? []) {

@@ -12,7 +12,7 @@ import { CheckCircle2, Settings, XCircle } from "lucide-react";
 import { updateAppSettingsAction, type AppSettings } from "@/lib/settings";
 import type { CrmActionState } from "@/lib/crm/clients";
 
-export type EnvStatus = { resend: boolean; cron: boolean; fromEmail: boolean };
+export type EnvStatus = { resend: boolean; cron: boolean; fromEmail: boolean; twilio: boolean };
 
 const FIELD =
   "w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder-gray-500 outline-none focus:border-sky-400/40";
@@ -74,17 +74,79 @@ export default function SettingsSection({
             </span>
           </label>
 
-          <label className="block sm:max-w-xs">
-            <span className="text-xs text-gray-400">Días de anticipación del recordatorio</span>
-            <input
-              name="billingReminderLeadDays"
-              type="number"
-              min="0"
-              max="60"
-              defaultValue={settings.billingReminderLeadDays}
-              className={`mt-1 ${FIELD}`}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <label className="block">
+              <span className="text-xs text-gray-400">Días de anticipación del recordatorio de cobro</span>
+              <input
+                name="billingReminderLeadDays"
+                type="number"
+                min="0"
+                max="60"
+                defaultValue={settings.billingReminderLeadDays}
+                className={`mt-1 ${FIELD}`}
+              />
+            </label>
+            <label className="block">
+              <span className="text-xs text-gray-400">Días de anticipación de la agenda diaria</span>
+              <input
+                name="agendaReminderLeadDays"
+                type="number"
+                min="0"
+                max="30"
+                defaultValue={settings.agendaReminderLeadDays}
+                className={`mt-1 ${FIELD}`}
+              />
+            </label>
+          </div>
+
+          <label className="block">
+            <span className="text-xs text-gray-400">
+              Correos que reciben los avisos internos (resumen de cobranza, agenda, cotización aceptada)
+            </span>
+            <textarea
+              name="notifyInternalEmail"
+              rows={2}
+              defaultValue={settings.notifyInternalEmail}
+              placeholder="tonnestone@gmail.com, avilla@voltlabagency.com"
+              className={`mt-1 resize-y ${FIELD}`}
             />
+            <span className="mt-1 block text-[11px] text-gray-500">
+              Se suman a los perfiles dios/admin. Separa con coma o salto de línea. Para que lleguen a
+              Gmail/Outlook, el dominio de <span className="font-mono">BILLING_FROM_EMAIL</span> debe estar
+              verificado en Resend.
+            </span>
           </label>
+
+          <div className="rounded-xl border border-white/10 bg-black/20 p-4">
+            <label className="flex items-center gap-2 text-sm text-gray-200">
+              <input
+                type="checkbox"
+                name="notifyWhatsappEnabled"
+                defaultChecked={settings.notifyWhatsappEnabled}
+                className="h-4 w-4"
+              />
+              Enviar también por WhatsApp (además del correo)
+            </label>
+            <p className="mt-1 text-[11px] text-gray-500">
+              Requiere las variables <span className="font-mono">TWILIO_*</span> configuradas en Vercel.
+              Aplica a recordatorios de cobro, cotizaciones y la agenda.
+            </p>
+            <label className="mt-3 block">
+              <span className="text-xs text-gray-400">
+                Números internos para alertas por WhatsApp (resumen de cobranza, cotización aceptada, agenda)
+              </span>
+              <textarea
+                name="notifyInternalWhatsapp"
+                rows={2}
+                defaultValue={settings.notifyInternalWhatsapp}
+                placeholder="+52 664 123 4567, 6641234568"
+                className={`mt-1 resize-y ${FIELD}`}
+              />
+              <span className="mt-1 block text-[11px] text-gray-500">
+                Separa con coma o salto de línea. Un número de 10 dígitos se asume de México (+52).
+              </span>
+            </label>
+          </div>
 
           {state && "error" in state && <p className="text-sm text-red-400">{state.error}</p>}
           {state && "success" in state && (
@@ -101,16 +163,18 @@ export default function SettingsSection({
       </div>
 
       <div className="tp-dark-card-crm rounded-2xl p-5 sm:p-6">
-        <h2 className="mb-1 text-lg font-bold text-white">Automatización de cobranza</h2>
+        <h2 className="mb-1 text-lg font-bold text-white">Automatización y notificaciones</h2>
         <p className="mb-4 text-xs text-gray-500">
           Estas variables se configuran en Vercel → Settings → Environment Variables (y luego Redeploy).
-          El CRM funciona sin ellas; solo no corre el cron ni se envían correos.
+          El CRM funciona sin ellas; solo no corren los crons ni se envían mensajes. Crons:{" "}
+          <span className="font-mono">/api/cron/cobranza</span> y{" "}
+          <span className="font-mono">/api/cron/agenda</span>.
         </p>
         <div className="space-y-2">
           <StatusRow
             ok={env.cron}
             label="CRON_SECRET"
-            hint="falta — el cron diario responde 401 y no genera cargos"
+            hint="falta — los crons diarios responden 401 y no generan cargos ni avisos"
           />
           <StatusRow
             ok={env.resend}
@@ -121,6 +185,11 @@ export default function SettingsSection({
             ok={env.fromEmail}
             label="BILLING_FROM_EMAIL"
             hint="opcional — sin ella se usa un remitente por defecto"
+          />
+          <StatusRow
+            ok={env.twilio}
+            label="TWILIO_ACCOUNT_SID / TWILIO_AUTH_TOKEN / TWILIO_WHATSAPP_FROM"
+            hint="faltan — el envío por WhatsApp se omite aunque esté activado arriba"
           />
         </div>
       </div>

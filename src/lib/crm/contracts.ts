@@ -12,13 +12,16 @@ import { createClient } from "@/lib/supabase/server";
 import { withTiming } from "@/lib/monitoring/timing";
 import { requireCrmCore } from "./auth";
 import { softDelete } from "./soft-delete";
+import { addHistory } from "./history";
 import {
   CONTRACT_STATUSES,
+  SERVICE_UNITS,
   mapContract,
   mapContractService,
   type BillingCycle,
   type ContractDetail,
   type ContractStatus,
+  type ServiceUnit,
 } from "./contract-types";
 import type { CrmActionState } from "./clients";
 
@@ -68,6 +71,8 @@ export async function getContractDetail(contractId: string): Promise<ContractDet
 function readContractForm(formData: FormData) {
   const statusRaw = String(formData.get("status") ?? "borrador").trim();
   const cycleRaw = String(formData.get("billingCycle") ?? "").trim();
+  const typeRaw = String(formData.get("serviceType") ?? "").trim();
+  const billingCycle = BILLING_CYCLES.includes(cycleRaw as BillingCycle) ? (cycleRaw as BillingCycle) : null;
   return {
     clientId: String(formData.get("clientId") ?? "").trim(),
     title: String(formData.get("title") ?? "").trim(),
@@ -79,9 +84,42 @@ function readContractForm(formData: FormData) {
     includedHours: numOrNull(formData.get("includedHours")),
     slaHours: numOrNull(formData.get("slaHours")),
     billingAmount: numOrNull(formData.get("billingAmount")),
-    billingCycle: BILLING_CYCLES.includes(cycleRaw as BillingCycle) ? (cycleRaw as BillingCycle) : null,
+    billingCycle,
     notes: String(formData.get("notes") ?? "").trim() || null,
+    /** "Tipo de servicio" para el catálogo; si no llega, se infiere del ciclo. */
+    serviceType: SERVICE_UNITS.includes(typeRaw as ServiceUnit)
+      ? (typeRaw as ServiceUnit)
+      : billingCycle
+        ? "mes"
+        : "proyecto",
   };
+}
+
+/**
+ * Ensures the service catalog (`crm_services`) has an entry for `name`, so a
+ * service contracted from the Servicios tab becomes reusable. No-op if a
+ * non-deleted catalog row with the same name (case-insensitive) already exists.
+ */
+async function ensureCatalogService(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  opts: { name: string; unit: ServiceUnit; defaultRate: number | null; description: string | null; userId: string }
+): Promise<void> {
+  const escaped = opts.name.replace(/[%_\\]/g, "\\$&");
+  const { data: existing } = await supabase
+    .from("crm_services")
+    .select("id")
+    .ilike("name", escaped)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (existing) return;
+
+  await supabase.from("crm_services").insert({
+    name: opts.name,
+    description: opts.description,
+    unit: opts.unit,
+    default_rate: opts.defaultRate ?? 0,
+    created_by: opts.userId,
+  });
 }
 
 export async function createContractAction(
@@ -110,6 +148,96 @@ export async function createContractAction(
   });
   if (error) return { error: error.message };
 
+  // Mirror the new service into the catalog (with its tipo de servicio), so it
+  // can be reused as a contract line elsewhere. Best-effort: a catalog failure
+  // doesn't fail the contract creation.
+  await ensureCatalogService(supabase, {
+    name: f.title,
+    unit: f.serviceType,
+    defaultRate: f.billingAmount,
+    description: f.notes,
+    userId: check.userId,
+  });
+
+  revalidatePath("/admin");
+  return { success: true };
+}
+
+/**
+ * Assigns a catalog service to a client from the Servicios → Catálogo tab:
+ * creates a `crm_contracts` row (title/amount/cycle taken from the service)
+ * plus a `crm_contract_services` line linking them, and — when the client is
+ * new — creates the client first. This is the "cliente y servicios van
+ * ligados" flow.
+ */
+export async function assignServiceToClientAction(
+  _prevState: CrmActionState,
+  formData: FormData
+): Promise<CrmActionState> {
+  const check = await requireCrmCore();
+  if (!check.ok) return { error: check.error };
+
+  const serviceId = String(formData.get("serviceId") ?? "").trim();
+  let clientId = String(formData.get("clientId") ?? "").trim();
+  if (clientId === "__new__") clientId = "";
+  const newCompany = String(formData.get("newClientCompany") ?? "").trim();
+  const newName = String(formData.get("newClientName") ?? "").trim();
+  const statusRaw = String(formData.get("status") ?? "activo").trim();
+  const status = CONTRACT_STATUSES.includes(statusRaw as ContractStatus)
+    ? (statusRaw as ContractStatus)
+    : "activo";
+
+  if (!serviceId) return { error: "Falta el servicio" };
+  if (!clientId && !newCompany) {
+    return { error: "Elige un cliente o escribe el nombre de uno nuevo" };
+  }
+
+  const supabase = await createClient();
+
+  const { data: service } = await supabase
+    .from("crm_services")
+    .select("name, description, unit, default_rate")
+    .eq("id", serviceId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (!service) return { error: "No se encontró el servicio en el catálogo" };
+
+  if (!clientId) {
+    const { data: created, error: clientErr } = await supabase
+      .from("crm_clients")
+      .insert({ name: newName || newCompany, company: newCompany, status: "activo", created_by: check.userId })
+      .select("id")
+      .single();
+    if (clientErr || !created) return { error: clientErr?.message ?? "No se pudo crear el cliente" };
+    clientId = created.id;
+    await addHistory(supabase, clientId, "otro", "Cliente creado", check.userId);
+  }
+
+  const rate = Number(service.default_rate) || 0;
+  const { data: contract, error: contractErr } = await supabase
+    .from("crm_contracts")
+    .insert({
+      client_id: clientId,
+      title: service.name,
+      status,
+      billing_amount: rate || null,
+      billing_cycle: service.unit === "mes" ? "mensual" : null,
+      notes: service.description,
+      created_by: check.userId,
+    })
+    .select("id")
+    .single();
+  if (contractErr || !contract) return { error: contractErr?.message ?? "No se pudo crear el servicio del cliente" };
+
+  const { error: lineErr } = await supabase.from("crm_contract_services").insert({
+    contract_id: contract.id,
+    service_id: serviceId,
+    quantity: 1,
+    rate: rate || null,
+  });
+  if (lineErr) return { error: lineErr.message };
+
+  await addHistory(supabase, clientId, "otro", `Servicio "${service.name}" contratado`, check.userId);
   revalidatePath("/admin");
   return { success: true };
 }

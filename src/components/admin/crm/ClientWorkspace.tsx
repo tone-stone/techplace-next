@@ -20,6 +20,7 @@ import {
   CalendarClock,
   CheckCircle2,
   FileText,
+  HandCoins,
   Landmark,
   LifeBuoy,
   ListChecks,
@@ -33,7 +34,6 @@ import {
   ScrollText,
   Server,
   Trash2,
-  TrendingDown,
   Wallet,
   X,
 } from "lucide-react";
@@ -41,32 +41,34 @@ import {
   addHistoryEntryAction,
   createPlanAction,
   deleteClientAction,
+  deletePaymentAction,
+  deletePlanAction,
   getClientDetail,
   markPaymentPaidAction,
   recordPaymentAction,
   updateClientBillingAction,
   updateClientStatusAction,
+  updatePaymentAction,
+  updatePlanAction,
   type ClientBilling,
   type ClientDetail,
   type ClientStatus,
   type CrmActionState,
   type CrmClient,
+  type PaymentStatus,
 } from "@/lib/crm/clients";
 import { createProjectAction, type CrmProject } from "@/lib/crm/projects";
 import type { CrmQuote } from "@/lib/crm/quotes";
 import { createInvoiceAction, createInvoiceFromPaymentAction, type CrmInvoice } from "@/lib/crm/invoices";
 import { createTaskAction, type CrmTask } from "@/lib/crm/tasks";
-import type { CrmContract } from "@/lib/crm/contracts";
-import { createExpenseAction, deleteExpenseAction } from "@/lib/crm/expenses";
-import {
-  EXPENSE_CATEGORIES,
-  EXPENSE_CATEGORY_LABELS,
-  type CrmExpense,
-} from "@/lib/crm/expense-types";
+import { assignServiceToClientAction, type CrmContract } from "@/lib/crm/contracts";
+import { UNIT_LABELS, type CrmService } from "@/lib/crm/contract-types";
+import { PLAN_MIRROR_NOTE } from "@/lib/crm/plan-mirror";
+import { buildClientLedger } from "@/lib/crm/ledger";
 import type { ItTicket } from "@/lib/it/ticket-types";
 import type { ItAsset } from "@/lib/it/asset-types";
 import { formatCurrencyMXN, initialsOf } from "@/lib/crm/format";
-import { getDueDateUrgency } from "@/lib/crm/plan-status";
+import { daysUntil, getDueDateUrgency } from "@/lib/crm/plan-status";
 import ConfirmDialog from "@/components/admin/ConfirmDialog";
 import StatusBadge from "./StatusBadge";
 import ClientForm from "./ClientForm";
@@ -82,7 +84,6 @@ export type ClientRelated = {
   contracts: CrmContract[];
   tickets: ItTicket[];
   assets: ItAsset[];
-  expenses: CrmExpense[];
 };
 
 const CLIENT_STATUS_OPTIONS: ClientStatus[] = ["lead", "negociacion", "activo", "inactivo"];
@@ -112,12 +113,35 @@ function urgencyLabel(urgency: ReturnType<typeof getDueDateUrgency>) {
   return "Al día";
 }
 
+/** Badge color class for a payment status, used in the account-statement ledger. */
+function cobroStatusClass(status: PaymentStatus) {
+  if (status === "pagado") return "border-emerald-400/30 bg-emerald-500/10 text-emerald-300";
+  if (status === "vencido") return "border-red-400/30 bg-red-500/10 text-red-300";
+  return "border-amber-400/30 bg-amber-500/10 text-amber-300";
+}
+
+/** Spanish label for a payment status. */
+function cobroStatusLabel(status: PaymentStatus) {
+  if (status === "pagado") return "Pagado";
+  if (status === "vencido") return "Vencido";
+  return "Pendiente";
+}
+
+/** Relative-days phrase for a due date (e.g. "en 5 d", "vence hoy", "3 d de atraso"). */
+function relativeDueLabel(dueDate: string) {
+  const d = daysUntil(dueDate);
+  if (d < 0) return `${Math.abs(d)} d de atraso`;
+  if (d === 0) return "vence hoy";
+  return `en ${d} d`;
+}
+
 /** Section shell: back button, delete action, and the client's full breakdown. */
 export default function ClientWorkspace({
   clientId,
   related,
   clients,
   serviceOptions,
+  catalogServices = [],
   canWriteBilling,
   canReadBilling,
   canUseSupport,
@@ -128,6 +152,8 @@ export default function ClientWorkspace({
   /** Only used to feed `QuoteFormModal`; a one-element list (this client) is enough. */
   clients: CrmClient[];
   serviceOptions: string[];
+  /** Active catalog services, for the "Añadir servicio" picker in the Servicios panel. */
+  catalogServices?: CrmService[];
   canWriteBilling: boolean;
   canReadBilling: boolean;
   canUseSupport: boolean;
@@ -180,6 +206,7 @@ export default function ClientWorkspace({
           detail={detail}
           clients={clients}
           serviceOptions={serviceOptions}
+          catalogServices={catalogServices}
           canWriteBilling={canWriteBilling}
           canReadBilling={canReadBilling}
           canUseSupport={canUseSupport}
@@ -240,6 +267,7 @@ function ClientDetailContent({
   detail,
   clients,
   serviceOptions,
+  catalogServices,
   canWriteBilling,
   canReadBilling,
   canUseSupport,
@@ -249,6 +277,7 @@ function ClientDetailContent({
   detail: ClientDetail;
   clients: CrmClient[];
   serviceOptions: string[];
+  catalogServices: CrmService[];
   canWriteBilling: boolean;
   canReadBilling: boolean;
   canUseSupport: boolean;
@@ -267,12 +296,13 @@ function ClientDetailContent({
     onChanged();
   };
 
+  // A plan's mirror service shows via PlansPanel — hide it from the services list.
+  const planContractIds = new Set(
+    detail.plans.map((p) => p.contractId).filter((id): id is string => !!id)
+  );
+
   const activeProjects = related.projects.filter((p) => p.status !== "completado").length;
   const openQuotes = related.quotes.filter((q) => q.status === "borrador" || q.status === "enviada").length;
-  const overdue = payments.filter((p) => p.status === "vencido").reduce((s, p) => s + p.amount, 0);
-  const cobrado = payments.filter((p) => p.status === "pagado").reduce((s, p) => s + p.amount, 0);
-  const gastado = related.expenses.reduce((s, e) => s + e.amount, 0);
-  const neto = cobrado - gastado;
 
   return (
     <div className="space-y-8">
@@ -329,23 +359,9 @@ function ClientDetailContent({
           ) : null;
         })()}
 
-        <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+        <div className="mt-4 grid grid-cols-2 gap-2">
           <DetailKpi icon={Briefcase} label="Proyectos activos" value={String(activeProjects)} tone="blue" />
           <DetailKpi icon={FileText} label="Cotizaciones abiertas" value={String(openQuotes)} tone="fuchsia" />
-          <DetailKpi
-            icon={AlertTriangle}
-            label="Saldo vencido"
-            value={overdue > 0 ? formatCurrencyMXN(overdue) : "Al día"}
-            tone={overdue > 0 ? "rose" : "emerald"}
-          />
-          <DetailKpi icon={Wallet} label="Cobrado" value={formatCurrencyMXN(cobrado)} tone="emerald" />
-          <DetailKpi icon={TrendingDown} label="Egresos" value={formatCurrencyMXN(gastado)} tone="rose" />
-          <DetailKpi
-            icon={Wallet}
-            label="Neto"
-            value={formatCurrencyMXN(neto)}
-            tone={neto < 0 ? "rose" : "emerald"}
-          />
         </div>
 
         {editing ? (
@@ -391,6 +407,7 @@ function ClientDetailContent({
         )}
       </div>
 
+      <AccountStatementPanel payments={payments} plans={plans} invoices={related.invoices} />
       <ContactsPanel clientId={client.id} contacts={contacts} onChanged={onChanged} />
       <BillingPanel clientId={client.id} billing={billing} onChanged={onChanged} />
       <PlansPanel clientId={client.id} plans={plans} onChanged={onChanged} />
@@ -402,17 +419,11 @@ function ClientDetailContent({
         canWriteBilling={canWriteBilling}
         onChanged={onChanged}
       />
-      <ExpensesPanel
-        clientId={client.id}
-        plans={plans}
-        payments={payments}
-        expenses={related.expenses}
-        cobrado={cobrado}
-        onChanged={onChanged}
-      />
       <RelatedPanels
         clientId={client.id}
         clients={clients}
+        catalogServices={catalogServices}
+        planContractIds={planContractIds}
         canWriteBilling={canWriteBilling}
         canReadBilling={canReadBilling}
         canUseSupport={canUseSupport}
@@ -420,6 +431,185 @@ function ClientDetailContent({
         onChanged={onChanged}
       />
       <HistoryPanel clientId={client.id} history={history} onChanged={onChanged} />
+    </div>
+  );
+}
+
+/** "Septiembre 2026" from a YYYY-MM-DD (or ISO) date string. */
+function monthLabel(dateStr: string) {
+  const s = new Date(`${dateStr.slice(0, 10)}T00:00:00`).toLocaleDateString("es-MX", {
+    month: "long",
+    year: "numeric",
+  });
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+/**
+ * "Estado de cuenta": what this client has paid and what they owe next, in one
+ * card. Two figures (Cobrado histórico / Por cobrar), a plain-language line —
+ * "<mes> saldado · sigue <monto> el <fecha>" — and a newest-first stream of
+ * movimientos: cobros (with folio + estado) and cada servicio contratado
+ * (nombre, monto, fecha). Egresos are company-level and intentionally absent
+ * here. Read-only; everything derives from data the workspace already holds.
+ */
+function AccountStatementPanel({
+  payments,
+  plans,
+  invoices,
+}: {
+  payments: ClientDetail["payments"];
+  plans: ClientDetail["plans"];
+  invoices: CrmInvoice[];
+}) {
+  const paidItems = payments.filter((p) => p.status === "pagado");
+  const cobrado = paidItems.reduce((s, p) => s + p.amount, 0);
+
+  const pendingItems = payments
+    .filter((p) => p.status === "pendiente" || p.status === "vencido")
+    .sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+  const pendingSum = pendingItems.reduce((s, p) => s + p.amount, 0);
+  const overdueSum = pendingItems
+    .filter((p) => p.status === "vencido")
+    .reduce((s, p) => s + p.amount, 0);
+
+  const activePlan =
+    [...plans]
+      .filter((p) => p.status === "activo")
+      .sort((a, b) => a.nextDueDate.localeCompare(b.nextDueDate))[0] ?? null;
+
+  // "Lo que sigue": the nearest real pending charge, else the active plan's next run.
+  const next = pendingItems[0]
+    ? {
+        amount: pendingItems[0].amount,
+        date: pendingItems[0].dueDate,
+        label: pendingItems[0].planId
+          ? (plans.find((pl) => pl.id === pendingItems[0].planId)?.name ?? "Cobro")
+          : "Cobro suelto",
+      }
+    : activePlan
+      ? { amount: activePlan.amount, date: activePlan.nextDueDate, label: activePlan.name }
+      : null;
+
+  const porCobrar = pendingSum + (pendingItems.length === 0 && activePlan ? activePlan.amount : 0);
+
+  const lastPaid = paidItems
+    .map((p) => ({ ...p, when: p.paidDate ?? p.dueDate }))
+    .sort((a, b) => b.when.localeCompare(a.when))[0];
+  const lastPaidInvoice = lastPaid ? invoices.find((i) => i.paymentId === lastPaid.id) : undefined;
+
+  // Label for the month right after the last covered period — used to prompt
+  // for the next charge when there's no plan or pending payment yet.
+  const afterLastPeriod = lastPaid
+    ? (() => {
+        const d = new Date(`${lastPaid.dueDate.slice(0, 10)}T00:00:00`);
+        return monthLabel(new Date(d.getFullYear(), d.getMonth() + 1, 1).toISOString());
+      })()
+    : "";
+
+  const ledger = buildClientLedger(payments, plans, invoices);
+
+  return (
+    <div>
+      <div className="mb-3">
+        <SectionHeading icon={Wallet} title="Estado de cuenta" tone="emerald" />
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        <DetailKpi icon={Wallet} label="Cobrado (histórico)" value={formatCurrencyMXN(cobrado)} tone="emerald" />
+        <DetailKpi
+          icon={HandCoins}
+          label="Por cobrar"
+          value={porCobrar > 0 ? formatCurrencyMXN(porCobrar) : "Nada pendiente"}
+          tone={overdueSum > 0 ? "rose" : porCobrar > 0 ? "fuchsia" : "emerald"}
+        />
+      </div>
+
+      <div className="mt-3 space-y-1.5 rounded-xl border border-white/5 bg-white/2 p-3 text-sm">
+        {lastPaid ? (
+          <p className="flex flex-wrap items-center gap-1.5 text-gray-200">
+            <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-300" />
+            <span className="font-semibold text-white">{monthLabel(lastPaid.dueDate)}</span> saldado —{" "}
+            {formatCurrencyMXN(lastPaid.amount)} pagado el {lastPaid.when}
+            {lastPaidInvoice ? ` · factura ${lastPaidInvoice.number}` : ""}
+          </p>
+        ) : (
+          <p className="text-gray-400">Todavía no hay cobros liquidados.</p>
+        )}
+
+        {overdueSum > 0 && (
+          <p className="flex flex-wrap items-center gap-1.5 text-rose-300">
+            <AlertTriangle className="h-4 w-4 shrink-0" />
+            Saldo vencido: <span className="font-semibold">{formatCurrencyMXN(overdueSum)}</span>
+          </p>
+        )}
+
+        {next ? (
+          <p className="flex flex-wrap items-center gap-1.5 text-gray-200">
+            <CalendarClock className="h-4 w-4 shrink-0 text-fuchsia-300" />
+            Sigue: <span className="font-semibold text-white">{formatCurrencyMXN(next.amount)}</span> ·{" "}
+            {next.label} · vence {monthLabel(next.date)} ({next.date}, {relativeDueLabel(next.date)})
+          </p>
+        ) : (
+          <p className="flex flex-wrap items-center gap-1.5 text-amber-300/90">
+            <CalendarClock className="h-4 w-4 shrink-0" />
+            {lastPaid
+              ? `Falta registrar el cobro de ${afterLastPeriod}: créalo en "Planes" (recurrente) o en "Pagos".`
+              : "Sin plan activo ni cobros programados."}
+          </p>
+        )}
+      </div>
+
+      <div className="mt-4">
+        <p className="mb-2 text-xs font-bold uppercase tracking-wide text-gray-400">Movimientos</p>
+        {ledger.length === 0 ? (
+          <p className="text-sm text-gray-500">Sin cobros ni servicios registrados todavía.</p>
+        ) : (
+          <div className="space-y-2">
+            {ledger.map((entry) => (
+              <div
+                key={`${entry.kind}-${entry.id}`}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-white/5 bg-white/2 p-3"
+              >
+                <div className="min-w-0">
+                  <p className="flex flex-wrap items-center gap-2 font-medium text-white">
+                    {entry.label}
+                    {entry.kind === "servicio" && (
+                      <span className="rounded-full border border-cyan-400/30 bg-cyan-500/10 px-2 py-0.5 text-[10px] font-medium text-cyan-300">
+                        servicio
+                      </span>
+                    )}
+                  </p>
+                  <p className="text-xs text-gray-400">
+                    {entry.date}
+                    {entry.invoiceNumber ? ` · factura ${entry.invoiceNumber}` : ""}
+                    {entry.detail ? ` · ${entry.detail}` : ""}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  {entry.kind === "cobro" && entry.status && (
+                    <span
+                      className={`rounded-full border px-2 py-0.5 text-[11px] font-medium ${cobroStatusClass(
+                        entry.status
+                      )}`}
+                    >
+                      {cobroStatusLabel(entry.status)}
+                    </span>
+                  )}
+                  <span
+                    className={
+                      entry.kind === "cobro"
+                        ? "font-semibold text-emerald-300"
+                        : "font-semibold text-cyan-200"
+                    }
+                  >
+                    {entry.kind === "cobro" ? `+${formatCurrencyMXN(entry.amount)}` : formatCurrencyMXN(entry.amount)}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -453,6 +643,8 @@ const CLOSED_TICKET_STATUSES = new Set(["resuelto", "cerrado"]);
 function RelatedPanels({
   clientId,
   clients,
+  catalogServices,
+  planContractIds,
   canWriteBilling,
   canReadBilling,
   canUseSupport,
@@ -461,6 +653,9 @@ function RelatedPanels({
 }: {
   clientId: string;
   clients: CrmClient[];
+  catalogServices: CrmService[];
+  /** ids of contracts that mirror a plan — hidden from the services list. */
+  planContractIds: Set<string>;
   canWriteBilling: boolean;
   canReadBilling: boolean;
   canUseSupport: boolean;
@@ -682,35 +877,14 @@ function RelatedPanels({
       </div>
 
       {canReadBilling && (
-        <div>
-          <div className="mb-3">
-            <SectionHeading icon={ScrollText} title={`Servicios (${contracts.length})`} tone="cyan" />
-          </div>
-          {contracts.length === 0 ? (
-            <p className="text-sm text-gray-500">Sin servicios contratados para este cliente.</p>
-          ) : (
-            <div className="space-y-2">
-              {contracts.map((c) => (
-                <div
-                  key={c.id}
-                  className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-white/5 bg-white/2 p-3"
-                >
-                  <div>
-                    <p className="font-medium text-white">{c.title}</p>
-                    <p className="text-xs text-gray-400">
-                      {c.billingAmount != null
-                        ? `${formatCurrencyMXN(c.billingAmount)}${c.billingCycle ? ` / ${c.billingCycle}` : ""}`
-                        : "Sin monto"}
-                      {c.includedHours != null ? ` · ${c.includedHours} h incluidas` : ""}
-                      {c.endDate ? ` · vence ${c.endDate}` : ""}
-                    </p>
-                  </div>
-                  <StatusBadge status={c.status} />
-                </div>
-              ))}
-            </div>
+        <ClientServicesPanel
+          clientId={clientId}
+          contracts={contracts.filter(
+            (c) => !planContractIds.has(c.id) && !(c.notes?.startsWith(PLAN_MIRROR_NOTE) ?? false)
           )}
-        </div>
+          catalogServices={catalogServices}
+          onChanged={afterCreate}
+        />
       )}
 
       {canUseSupport && (
@@ -777,6 +951,7 @@ function RelatedPanels({
       {quoteOpen && (
         <QuoteFormModal
           clients={clients}
+          catalogServices={catalogServices}
           lockedClientId={clientId}
           onClose={() => {
             setQuoteOpen(false);
@@ -786,6 +961,131 @@ function RelatedPanels({
         />
       )}
     </>
+  );
+}
+
+/**
+ * The client's contracted services (`crm_contracts`) plus a picker to add one
+ * from the catalog. Adding always goes through a confirm dialog first, then
+ * `assignServiceToClientAction` (which creates the contract + catalog line).
+ */
+function ClientServicesPanel({
+  clientId,
+  contracts,
+  catalogServices,
+  onChanged,
+}: {
+  clientId: string;
+  contracts: CrmContract[];
+  catalogServices: CrmService[];
+  onChanged: () => void;
+}) {
+  const active = catalogServices.filter((s) => s.active);
+  const [open, setOpen] = useState(false);
+  const [selectedId, setSelectedId] = useState("");
+  const [confirmService, setConfirmService] = useState<CrmService | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const askConfirm = () => {
+    const svc = active.find((s) => s.id === selectedId);
+    if (svc) setConfirmService(svc);
+  };
+
+  const doAssign = async () => {
+    if (!confirmService) return;
+    setBusy(true);
+    setError(null);
+    const fd = new FormData();
+    fd.set("serviceId", confirmService.id);
+    fd.set("clientId", clientId);
+    fd.set("status", "activo");
+    const res = await assignServiceToClientAction(null, fd);
+    setBusy(false);
+    setConfirmService(null);
+    if (res && "error" in res) {
+      setError(res.error);
+      return;
+    }
+    setOpen(false);
+    setSelectedId("");
+    onChanged();
+  };
+
+  return (
+    <div>
+      <div className="mb-3 flex items-center justify-between">
+        <SectionHeading icon={ScrollText} title={`Servicios (${contracts.length})`} tone="cyan" />
+        {active.length > 0 && <PanelToggle open={open} onClick={() => setOpen((o) => !o)} label="Añadir" />}
+      </div>
+
+      {open && (
+        <div className="mb-4 space-y-2 rounded-xl border border-white/10 bg-white/5 p-4">
+          <select
+            value={selectedId}
+            onChange={(e) => setSelectedId(e.target.value)}
+            className={RELATED_FIELD}
+          >
+            <option value="">Elige un servicio del catálogo…</option>
+            {active.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name} — {formatCurrencyMXN(s.defaultRate)} · {UNIT_LABELS[s.unit]}
+              </option>
+            ))}
+          </select>
+          {error && <p className="text-xs text-red-400">{error}</p>}
+          <button
+            type="button"
+            disabled={!selectedId || busy}
+            onClick={askConfirm}
+            className="w-full cursor-pointer rounded-lg bg-cyan-500/20 py-2 text-sm font-semibold text-cyan-200 hover:bg-cyan-500/30 disabled:opacity-50"
+          >
+            Añadir servicio
+          </button>
+        </div>
+      )}
+
+      {contracts.length === 0 ? (
+        <p className="text-sm text-gray-500">Sin servicios contratados para este cliente.</p>
+      ) : (
+        <div className="space-y-2">
+          {contracts.map((c) => (
+            <div
+              key={c.id}
+              className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-white/5 bg-white/2 p-3"
+            >
+              <div>
+                <p className="font-medium text-white">{c.title}</p>
+                <p className="text-xs text-gray-400">
+                  {c.billingAmount != null
+                    ? `${formatCurrencyMXN(c.billingAmount)}${c.billingCycle ? ` / ${c.billingCycle}` : ""}`
+                    : "Sin monto"}
+                  {c.includedHours != null ? ` · ${c.includedHours} h incluidas` : ""}
+                  {c.endDate ? ` · vence ${c.endDate}` : ""}
+                </p>
+              </div>
+              <StatusBadge status={c.status} />
+            </div>
+          ))}
+        </div>
+      )}
+
+      <ConfirmDialog
+        open={confirmService !== null}
+        tone="info"
+        title="Añadir servicio al cliente"
+        body={
+          confirmService
+            ? `Se contratará "${confirmService.name}" como servicio activo (${formatCurrencyMXN(
+                confirmService.defaultRate
+              )} · ${UNIT_LABELS[confirmService.unit]}).`
+            : undefined
+        }
+        confirmLabel="Añadir"
+        onConfirm={doAssign}
+        onClose={() => setConfirmService(null)}
+      />
+    </div>
   );
 }
 
@@ -1151,6 +1451,8 @@ function PlansPanel({
   onChanged: () => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [toDelete, setToDelete] = useState<ClientDetail["plans"][number] | null>(null);
   const [state, formAction] = useActionState<CrmActionState, FormData>(async (prevState, formData) => {
     const result = await createPlanAction(prevState, formData);
     if (result && "success" in result) {
@@ -1237,28 +1539,174 @@ function PlansPanel({
         <p className="text-sm text-gray-500">Este cliente no tiene planes registrados.</p>
       ) : (
         <div className="space-y-2">
-          {plans.map((plan) => {
-            const urgency = getDueDateUrgency(plan.nextDueDate);
-            return (
+          {plans.map((plan) =>
+            editingId === plan.id ? (
+              <PlanEditForm
+                key={plan.id}
+                plan={plan}
+                clientId={clientId}
+                onDone={() => {
+                  setEditingId(null);
+                  onChanged();
+                }}
+                onCancel={() => setEditingId(null)}
+              />
+            ) : (
               <div
                 key={plan.id}
                 className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-white/5 bg-white/2 p-3"
               >
                 <div>
-                  <p className="font-medium text-white">{plan.name}</p>
+                  <p className="font-medium text-white">
+                    {plan.name}
+                    {plan.status !== "activo" && (
+                      <span className="ml-2 rounded-full border border-white/15 bg-white/5 px-1.5 py-0.5 text-[10px] font-medium text-gray-400">
+                        {plan.status}
+                      </span>
+                    )}
+                  </p>
                   <p className="text-xs text-gray-400">
                     {formatCurrencyMXN(plan.amount)} / {plan.billingCycle} · corte día {plan.cutoffDay}
                   </p>
                 </div>
-                <span className={`rounded-full border px-2.5 py-1 text-xs font-medium ${urgencyBadgeClass(urgency)}`}>
-                  {urgencyLabel(urgency)} · vence {plan.nextDueDate}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`rounded-full border px-2.5 py-1 text-xs font-medium ${urgencyBadgeClass(
+                      getDueDateUrgency(plan.nextDueDate)
+                    )}`}
+                  >
+                    {urgencyLabel(getDueDateUrgency(plan.nextDueDate))} · vence {plan.nextDueDate}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setEditingId(plan.id)}
+                    aria-label={`Editar plan ${plan.name}`}
+                    className="cursor-pointer rounded-full border border-white/10 p-1.5 text-gray-400 hover:border-sky-400/40 hover:text-white"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setToDelete(plan)}
+                    aria-label={`Eliminar plan ${plan.name}`}
+                    className="cursor-pointer rounded-full border border-white/10 p-1.5 text-gray-500 hover:border-red-400/40 hover:bg-red-500/10 hover:text-red-400"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
               </div>
-            );
-          })}
+            )
+          )}
         </div>
       )}
+
+      <ConfirmDialog
+        open={toDelete !== null}
+        title="Eliminar plan"
+        body={
+          toDelete
+            ? `Se eliminará el plan "${toDelete.name}". Dejará de generar cobros (recuperable).`
+            : undefined
+        }
+        onConfirm={async () => {
+          if (toDelete) {
+            await deletePlanAction(toDelete.id, clientId);
+            onChanged();
+          }
+        }}
+        onClose={() => setToDelete(null)}
+      />
     </div>
+  );
+}
+
+/**
+ * Inline edit for one plan: nombre, monto, ciclo, día de corte, próximo
+ * vencimiento y estado. Corrige errores de captura (p. ej. un año equivocado).
+ */
+function PlanEditForm({
+  plan,
+  clientId,
+  onDone,
+  onCancel,
+}: {
+  plan: ClientDetail["plans"][number];
+  clientId: string;
+  onDone: () => void;
+  onCancel: () => void;
+}) {
+  const [state, formAction] = useActionState<CrmActionState, FormData>(async (prev, fd) => {
+    const res = await updatePlanAction(prev, fd);
+    if (res && "success" in res) onDone();
+    return res;
+  }, null);
+
+  return (
+    <form action={formAction} className="space-y-2 rounded-xl border border-sky-400/30 bg-white/5 p-4">
+      <input type="hidden" name="planId" value={plan.id} />
+      <input type="hidden" name="clientId" value={clientId} />
+      <input name="name" required defaultValue={plan.name} placeholder="Nombre del plan" className={RELATED_FIELD} />
+      <div className="grid grid-cols-2 gap-2">
+        <input
+          name="amount"
+          type="number"
+          min="0"
+          step="0.01"
+          required
+          defaultValue={plan.amount}
+          placeholder="Monto MXN"
+          className={RELATED_FIELD}
+        />
+        <select name="billingCycle" defaultValue={plan.billingCycle} className={RELATED_FIELD}>
+          <option value="mensual">Mensual</option>
+          <option value="trimestral">Trimestral</option>
+          <option value="anual">Anual</option>
+        </select>
+        <label className="text-xs text-gray-400">
+          Día de corte
+          <input
+            name="cutoffDay"
+            type="number"
+            min="1"
+            max="31"
+            required
+            defaultValue={plan.cutoffDay}
+            className={`mt-1 ${RELATED_FIELD}`}
+          />
+        </label>
+        <label className="text-xs text-gray-400">
+          Próximo vencimiento
+          <input
+            name="nextDueDate"
+            type="date"
+            required
+            defaultValue={plan.nextDueDate}
+            className={`mt-1 ${RELATED_FIELD}`}
+          />
+        </label>
+        <select name="status" defaultValue={plan.status} className={`col-span-2 ${RELATED_FIELD}`}>
+          <option value="activo">Activo</option>
+          <option value="pausado">Pausado</option>
+          <option value="cancelado">Cancelado</option>
+        </select>
+      </div>
+      {state && "error" in state && <p className="text-xs text-red-400">{state.error}</p>}
+      <div className="flex justify-end gap-2">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="cursor-pointer rounded-full border border-white/10 px-4 py-2 text-sm text-gray-300 hover:border-white/20"
+        >
+          Cancelar
+        </button>
+        <button
+          type="submit"
+          className="cursor-pointer rounded-full bg-sky-500/20 px-4 py-2 text-sm font-semibold text-sky-200 hover:bg-sky-500/30"
+        >
+          Guardar cambios
+        </button>
+      </div>
+    </form>
   );
 }
 
@@ -1294,6 +1742,8 @@ function PaymentsPanel({
   const [markingId, setMarkingId] = useState<string | null>(null);
   const [invoicingId, setInvoicingId] = useState<string | null>(null);
   const [invoiceError, setInvoiceError] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [toDelete, setToDelete] = useState<ClientDetail["payments"][number] | null>(null);
 
   const handleMarkPaid = async (paymentId: string) => {
     setMarkingId(paymentId);
@@ -1386,10 +1836,18 @@ function PaymentsPanel({
         <p className="text-sm text-gray-500">Este cliente no tiene pagos registrados.</p>
       ) : (
         <div className="space-y-2">
-          {payments.map((payment) => {
-            const urgency = getDueDateUrgency(payment.dueDate);
-            const invoice = invoices.find((i) => i.paymentId === payment.id);
-            return (
+          {payments.map((payment) =>
+            editingId === payment.id ? (
+              <PaymentEditForm
+                key={payment.id}
+                payment={payment}
+                onDone={() => {
+                  setEditingId(null);
+                  onChanged();
+                }}
+                onCancel={() => setEditingId(null)}
+              />
+            ) : (
               <div
                 key={payment.id}
                 className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-white/5 bg-white/2 p-3"
@@ -1407,9 +1865,11 @@ function PaymentsPanel({
                   ) : (
                     <>
                       <span
-                        className={`rounded-full border px-2.5 py-1 text-xs font-medium ${urgencyBadgeClass(urgency)}`}
+                        className={`rounded-full border px-2.5 py-1 text-xs font-medium ${urgencyBadgeClass(
+                          getDueDateUrgency(payment.dueDate)
+                        )}`}
                       >
-                        {urgencyLabel(urgency)}
+                        {urgencyLabel(getDueDateUrgency(payment.dueDate))}
                       </span>
                       <button
                         type="button"
@@ -1422,9 +1882,10 @@ function PaymentsPanel({
                     </>
                   )}
 
-                  {invoice ? (
+                  {invoices.find((i) => i.paymentId === payment.id) ? (
                     <span className="flex items-center gap-1 rounded-full border border-teal-400/30 bg-teal-500/10 px-2.5 py-1 text-xs font-medium text-teal-300">
-                      <Receipt className="h-3.5 w-3.5" /> {invoice.number}
+                      <Receipt className="h-3.5 w-3.5" />{" "}
+                      {invoices.find((i) => i.paymentId === payment.id)!.number}
                     </span>
                   ) : (
                     canWriteBilling && (
@@ -1438,165 +1899,115 @@ function PaymentsPanel({
                       </button>
                     )
                   )}
+
+                  {canWriteBilling && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setEditingId(payment.id)}
+                        aria-label="Editar pago"
+                        className="cursor-pointer rounded-full border border-white/10 p-1.5 text-gray-400 hover:border-sky-400/40 hover:text-white"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setToDelete(payment)}
+                        aria-label="Eliminar pago"
+                        className="cursor-pointer rounded-full border border-white/10 p-1.5 text-gray-400 hover:border-red-400/40 hover:bg-red-500/10 hover:text-red-300"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
-
-/**
- * The client's egresos with a running net (cobrado − gastado), an inline
- * "Nuevo egreso" form (optionally tied to a plan or the cobro it offsets),
- * and delete.
- */
-function ExpensesPanel({
-  clientId,
-  plans,
-  payments,
-  expenses,
-  cobrado,
-  onChanged,
-}: {
-  clientId: string;
-  plans: ClientDetail["plans"];
-  payments: ClientDetail["payments"];
-  expenses: CrmExpense[];
-  cobrado: number;
-  onChanged: () => void;
-}) {
-  const router = useRouter();
-  const [open, setOpen] = useState(false);
-  const [toDelete, setToDelete] = useState<CrmExpense | null>(null);
-  const [state, formAction] = useActionState<CrmActionState, FormData>(async (prev, fd) => {
-    const res = await createExpenseAction(prev, fd);
-    if (res && "success" in res) {
-      setOpen(false);
-      router.refresh();
-      onChanged();
-    }
-    return res;
-  }, null);
-
-  const gastado = expenses.reduce((s, e) => s + e.amount, 0);
-  const neto = cobrado - gastado;
-
-  return (
-    <div>
-      <div className="mb-3 flex items-center justify-between">
-        <SectionHeading icon={TrendingDown} title={`Egresos (${expenses.length})`} tone="rose" />
-        <PanelToggle open={open} onClick={() => setOpen((o) => !o)} label="Nuevo" />
-      </div>
-
-      <p className="mb-3 text-xs text-gray-400">
-        Cobrado <span className="text-emerald-300">{formatCurrencyMXN(cobrado)}</span> − Egresos{" "}
-        <span className="text-rose-300">{formatCurrencyMXN(gastado)}</span> = Neto{" "}
-        <span className={neto < 0 ? "font-semibold text-rose-300" : "font-semibold text-emerald-300"}>
-          {formatCurrencyMXN(neto)}
-        </span>
-      </p>
-
-      {open && (
-        <form action={formAction} className="mb-4 space-y-2 rounded-xl border border-white/10 bg-white/5 p-4">
-          <input type="hidden" name="clientId" value={clientId} />
-          <input name="concept" required placeholder="Concepto (Hosting sitio web)" className={RELATED_FIELD} />
-          <div className="grid grid-cols-2 gap-2">
-            <input
-              name="amount"
-              type="number"
-              min="0"
-              step="0.01"
-              required
-              placeholder="Monto MXN"
-              className={RELATED_FIELD}
-            />
-            <input name="expenseDate" type="date" className={RELATED_FIELD} />
-            <select name="category" defaultValue="hosting" className={RELATED_FIELD}>
-              {EXPENSE_CATEGORIES.map((c) => (
-                <option key={c} value={c}>
-                  {EXPENSE_CATEGORY_LABELS[c]}
-                </option>
-              ))}
-            </select>
-            <input name="vendor" placeholder="Proveedor" className={RELATED_FIELD} />
-            {plans.length > 0 && (
-              <select name="planId" defaultValue="" className={RELATED_FIELD}>
-                <option value="">Sin plan</option>
-                {plans.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
-            )}
-            <select name="paymentId" defaultValue="" className={RELATED_FIELD}>
-              <option value="">Sin cobro asociado</option>
-              {payments.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {formatCurrencyMXN(p.amount)} · {p.dueDate}
-                </option>
-              ))}
-            </select>
-          </div>
-          {state && "error" in state && <p className="text-xs text-red-400">{state.error}</p>}
-          <button
-            type="submit"
-            className="w-full cursor-pointer rounded-lg bg-rose-500/20 py-2 text-sm font-semibold text-rose-200 hover:bg-rose-500/30"
-          >
-            Guardar egreso
-          </button>
-        </form>
-      )}
-
-      {expenses.length === 0 ? (
-        <p className="text-sm text-gray-500">Sin egresos para este cliente.</p>
-      ) : (
-        <div className="space-y-2">
-          {expenses.map((e) => (
-            <div
-              key={e.id}
-              className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-white/5 bg-white/2 p-3"
-            >
-              <div>
-                <p className="font-medium text-white">{e.concept}</p>
-                <p className="text-xs text-gray-400">
-                  {EXPENSE_CATEGORY_LABELS[e.category] ?? e.category} · {e.expenseDate}
-                  {e.vendor ? ` · ${e.vendor}` : ""}
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="font-semibold text-rose-300">−{formatCurrencyMXN(e.amount)}</span>
-                <button
-                  type="button"
-                  onClick={() => setToDelete(e)}
-                  aria-label="Eliminar egreso"
-                  className="cursor-pointer rounded-full p-1.5 text-gray-500 hover:bg-red-500/10 hover:text-red-400"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            </div>
-          ))}
+            )
+          )}
         </div>
       )}
 
       <ConfirmDialog
         open={toDelete !== null}
-        title="Eliminar egreso"
-        body={toDelete ? `Se eliminará "${toDelete.concept}".` : undefined}
+        title="Eliminar pago"
+        body={
+          toDelete
+            ? `Se eliminará el pago de ${formatCurrencyMXN(toDelete.amount)} (vence ${toDelete.dueDate}). Recuperable.`
+            : undefined
+        }
         onConfirm={async () => {
           if (toDelete) {
-            await deleteExpenseAction(toDelete.id, clientId);
-            router.refresh();
+            await deletePaymentAction(toDelete.id, clientId);
             onChanged();
           }
         }}
         onClose={() => setToDelete(null)}
       />
     </div>
+  );
+}
+
+/** Inline edit for one payment row: amount, due date, method, status. dios/admin only. */
+function PaymentEditForm({
+  payment,
+  onDone,
+  onCancel,
+}: {
+  payment: ClientDetail["payments"][number];
+  onDone: () => void;
+  onCancel: () => void;
+}) {
+  const [state, formAction] = useActionState<CrmActionState, FormData>(async (prev, fd) => {
+    const res = await updatePaymentAction(prev, fd);
+    if (res && "success" in res) onDone();
+    return res;
+  }, null);
+
+  return (
+    <form action={formAction} className="space-y-2 rounded-xl border border-sky-400/30 bg-white/5 p-4">
+      <input type="hidden" name="paymentId" value={payment.id} />
+      <input type="hidden" name="clientId" value={payment.clientId} />
+      <div className="grid grid-cols-2 gap-2">
+        <input
+          name="amount"
+          type="number"
+          min="0"
+          step="0.01"
+          required
+          defaultValue={payment.amount}
+          placeholder="Monto MXN"
+          className={RELATED_FIELD}
+        />
+        <input name="dueDate" type="date" required defaultValue={payment.dueDate} className={RELATED_FIELD} />
+        <input
+          name="method"
+          defaultValue={payment.method ?? ""}
+          placeholder="Método (transferencia, tarjeta…)"
+          className={RELATED_FIELD}
+        />
+        <select name="status" defaultValue={payment.status} className={RELATED_FIELD}>
+          <option value="pendiente">Pendiente</option>
+          <option value="vencido">Vencido</option>
+          <option value="pagado">Pagado</option>
+        </select>
+      </div>
+      {state && "error" in state && <p className="text-xs text-red-400">{state.error}</p>}
+      <div className="flex justify-end gap-2">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="cursor-pointer rounded-full border border-white/10 px-4 py-2 text-sm text-gray-300 hover:border-white/20"
+        >
+          Cancelar
+        </button>
+        <button
+          type="submit"
+          className="cursor-pointer rounded-full bg-sky-500/20 px-4 py-2 text-sm font-semibold text-sky-200 hover:bg-sky-500/30"
+        >
+          Guardar cambios
+        </button>
+      </div>
+    </form>
   );
 }
 

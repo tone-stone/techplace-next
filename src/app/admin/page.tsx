@@ -17,7 +17,7 @@ import { getAllContacts } from "@/lib/crm/contacts";
 import { getContracts } from "@/lib/crm/contracts";
 import { getServices } from "@/lib/crm/services";
 import { SERVICES } from "@/lib/services/catalog";
-import { getClientHealthMap, getScheduledCharges, getUpcomingCollections } from "@/lib/crm/collections";
+import { getClientHealthMap, getPlans, getScheduledCharges, getUpcomingCollections } from "@/lib/crm/collections";
 import { getExpenses } from "@/lib/crm/expenses";
 import { getProjectNames, getProjects } from "@/lib/crm/projects";
 import { getInvoices } from "@/lib/crm/invoices";
@@ -89,6 +89,7 @@ export default async function AdminPage() {
     quotes,
     collections,
     scheduledCharges,
+    plans,
     expenses,
     clientHealth,
     contracts,
@@ -112,6 +113,7 @@ export default async function AdminPage() {
     crmCore ? getQuotes() : Promise.resolve([]),
     billing ? getUpcomingCollections() : Promise.resolve([]),
     billing ? getScheduledCharges() : Promise.resolve([]),
+    billing ? getPlans() : Promise.resolve([]),
     billing ? getExpenses() : Promise.resolve([]),
     billing ? getClientHealthMap() : Promise.resolve({}),
     billing ? getContracts() : Promise.resolve([]),
@@ -157,6 +159,10 @@ export default async function AdminPage() {
     resend: !!process.env.RESEND_API_KEY,
     cron: !!process.env.CRON_SECRET,
     fromEmail: !!process.env.BILLING_FROM_EMAIL,
+    twilio:
+      !!process.env.TWILIO_ACCOUNT_SID &&
+      !!process.env.TWILIO_AUTH_TOKEN &&
+      !!process.env.TWILIO_WHATSAPP_FROM,
   };
 
   return (
@@ -177,6 +183,7 @@ export default async function AdminPage() {
       quotes={quotes}
       collections={collections}
       scheduledCharges={scheduledCharges}
+      plans={plans}
       expenses={expenses}
       clientHealth={clientHealth}
       assets={assets}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import ContractsSection from "./ContractsSection";
 import type { CrmContract } from "@/lib/crm/contracts";
@@ -63,11 +63,44 @@ describe("ContractsSection", () => {
     expect(screen.getByText("Retainer mensual")).toBeInTheDocument();
   });
 
-  it("opens the new-service form", async () => {
+  it("opens the new-service form with a 'tipo de servicio' picker for the catalog", async () => {
     const user = userEvent.setup();
     render(<ContractsSection contracts={contracts} services={services} clients={clients} />);
 
     await user.click(screen.getByRole("button", { name: /nuevo servicio/i }));
     expect(screen.getByPlaceholderText("Título (Soporte IT 2026)")).toBeInTheDocument();
+    const typeSelect = screen.getByRole("combobox", { name: /tipo de servicio/i });
+    expect(typeSelect).toHaveValue("mes");
+    expect(within(typeSelect).getByRole("option", { name: "Por proyecto" })).toBeInTheDocument();
+  });
+
+  it("lets a catalog service be contracted to an existing or new client", async () => {
+    const user = userEvent.setup();
+    render(<ContractsSection contracts={contracts} services={services} clients={clients} />);
+
+    await user.click(screen.getByRole("button", { name: /catálogo/i }));
+    await user.click(screen.getAllByRole("button", { name: /añadir a cliente/i })[0]);
+
+    const clientSelect = screen.getAllByRole("combobox")[0];
+    expect(within(clientSelect).getByRole("option", { name: "Acme Corp" })).toBeInTheDocument();
+    expect(within(clientSelect).getByRole("option", { name: "+ Cliente nuevo…" })).toBeInTheDocument();
+
+    // Picking "nuevo" reveals the new-client fields.
+    await user.selectOptions(clientSelect, "__new__");
+    expect(screen.getByPlaceholderText(/empresa \/ nombre del cliente/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Contratar" })).toBeInTheDocument();
+  });
+
+  it("asks for confirmation before contracting a service to a client", async () => {
+    const user = userEvent.setup();
+    render(<ContractsSection contracts={contracts} services={services} clients={clients} />);
+
+    await user.click(screen.getByRole("button", { name: /catálogo/i }));
+    await user.click(screen.getAllByRole("button", { name: /añadir a cliente/i })[0]);
+    // Default target is the first client (Acme Corp) — no new-client fields needed.
+    await user.click(screen.getByRole("button", { name: "Contratar" }));
+
+    expect(screen.getByRole("dialog", { name: /añadir servicio al cliente/i })).toBeInTheDocument();
+    expect(screen.getByText(/se contratará .*para acme corp/i)).toBeInTheDocument();
   });
 });

@@ -6,11 +6,20 @@ const settings = {
   orgName: "TechPlace",
   billingFromEmail: "cobranza@techplacetj.com",
   billingReminderLeadDays: 3,
+  notifyWhatsappEnabled: false,
+  notifyInternalWhatsapp: "",
+  notifyInternalEmail: "",
+  agendaReminderLeadDays: 2,
 };
 
 describe("SettingsSection", () => {
   it("pre-fills the org settings form", () => {
-    render(<SettingsSection settings={settings} env={{ resend: true, cron: true, fromEmail: true }} />);
+    render(
+      <SettingsSection
+        settings={settings}
+        env={{ resend: true, cron: true, fromEmail: true, twilio: true }}
+      />
+    );
     expect(screen.getByDisplayValue("TechPlace")).toBeInTheDocument();
     expect(screen.getByDisplayValue("cobranza@techplacetj.com")).toBeInTheDocument();
     expect(screen.getByDisplayValue("3")).toBeInTheDocument();
@@ -20,7 +29,7 @@ describe("SettingsSection", () => {
     render(
       <SettingsSection
         settings={settings}
-        env={{ resend: false, cron: true, fromEmail: false }}
+        env={{ resend: false, cron: true, fromEmail: false, twilio: false }}
       />
     );
     expect(screen.getByText("CRON_SECRET")).toBeInTheDocument();

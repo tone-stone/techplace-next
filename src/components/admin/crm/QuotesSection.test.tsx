@@ -33,6 +33,9 @@ const quotes: CrmQuote[] = [
     total: 11600,
     notes: null,
     validUntil: "2026-12-31",
+    issuedDate: "2026-08-01",
+    terms: null,
+    planId: null,
     createdAt: "2026-08-01T00:00:00Z",
   },
   {
@@ -49,6 +52,9 @@ const quotes: CrmQuote[] = [
     total: 5000,
     notes: null,
     validUntil: null,
+    issuedDate: "2026-08-05",
+    terms: null,
+    planId: null,
     createdAt: "2026-08-05T00:00:00Z",
   },
 ];

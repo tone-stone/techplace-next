@@ -7,10 +7,11 @@
  * and sections appear is decided per `role` (see `visibleSections`).
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import {
   Activity,
+  ArrowLeft,
   Briefcase,
   ChevronRight,
   FileText,
@@ -56,7 +57,7 @@ import type { ServicePackage } from "@/lib/services/catalog";
 
 /** Landing-catalog pricing for one offering, passed through to the Servicios tab. */
 export type ServicePricing = { title: string; slug: string; packages: ServicePackage[] };
-import type { CollectionItem, ClientHealth, ScheduledCharge } from "@/lib/crm/collections";
+import type { CollectionItem, ClientHealth, PlanRow, ScheduledCharge } from "@/lib/crm/collections";
 import type { CrmExpense } from "@/lib/crm/expenses";
 import type { CrmProject } from "@/lib/crm/projects";
 import type { CrmInvoice } from "@/lib/crm/invoices";
@@ -160,6 +161,7 @@ export default function CrmDashboard({
   quotes = [],
   collections = [],
   scheduledCharges = [],
+  plans = [],
   expenses = [],
   clientHealth = {},
   assets = [],
@@ -171,7 +173,7 @@ export default function CrmDashboard({
   servicePricing = [],
   contractUsage = {},
   appSettings = null,
-  envStatus = { resend: false, cron: false, fromEmail: false },
+  envStatus = { resend: false, cron: false, fromEmail: false, twilio: false },
   tasks,
   recentErrors = [],
   errorStats = { daily: [], last24h: 0, last7d: 0 },
@@ -196,6 +198,7 @@ export default function CrmDashboard({
   quotes?: CrmQuote[];
   collections?: CollectionItem[];
   scheduledCharges?: ScheduledCharge[];
+  plans?: PlanRow[];
   expenses?: CrmExpense[];
   clientHealth?: Record<string, ClientHealth>;
   assets?: ItAsset[];
@@ -221,12 +224,52 @@ export default function CrmDashboard({
   const allowed = visibleSections(role);
   const navItems = NAV_ITEMS.filter((n) => allowed.includes(n.id));
   const [section, setSection] = useState<Section>(navItems[0]?.id ?? "tareas");
+  const [history, setHistory] = useState<Section[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  /** True when `id` is a section this role may open. */
+  const isReachable = (id: string): id is Section =>
+    id === "configuracion" ? canManageSettings(role) : navItems.some((n) => n.id === id);
+
+  // Restore the section from the URL hash on load, so a refresh stays put.
+  useEffect(() => {
+    const fromHash = window.location.hash.slice(1);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (fromHash && isReachable(fromHash)) setSection(fromHash);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Keep the hash in sync with the active section (no history entry).
+  useEffect(() => {
+    window.history.replaceState(null, "", `#${section}`);
+  }, [section]);
+
+  /** Navigate to a section, remembering where we came from (for the back button). */
+  const go = (next: Section) => {
+    setSidebarOpen(false);
+    if (next === section) return;
+    setHistory((h) => [...h, section]);
+    setSection(next);
+  };
+
+  /** Step back to the previously visited section. */
+  const goBack = () => {
+    setHistory((h) => {
+      const prev = h[h.length - 1];
+      if (prev) setSection(prev);
+      return h.slice(0, -1);
+    });
+  };
 
   const currentLabel =
     section === "configuracion"
       ? "Configuración"
       : (navItems.find((n) => n.id === section)?.label ?? navItems[0]?.label ?? "Panel");
+
+  const CurrentIcon =
+    section === "configuracion"
+      ? Settings
+      : (navItems.find((n) => n.id === section)?.icon ?? LayoutDashboard);
 
   const navButtonClass = (active: boolean) =>
     `flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${
@@ -256,10 +299,8 @@ export default function CrmDashboard({
           <button
             key={item.id}
             type="button"
-            onClick={() => {
-              setSection(item.id);
-              setSidebarOpen(false);
-            }}
+            onClick={() => go(item.id)}
+            aria-current={section === item.id ? "page" : undefined}
             className={navButtonClass(section === item.id)}
           >
             <item.icon className="h-4 w-4" />
@@ -272,10 +313,7 @@ export default function CrmDashboard({
         {canManageSettings(role) && (
           <button
             type="button"
-            onClick={() => {
-              setSection("configuracion");
-              setSidebarOpen(false);
-            }}
+            onClick={() => go("configuracion")}
             aria-current={section === "configuracion" ? "page" : undefined}
             className={navButtonClass(section === "configuracion")}
           >
@@ -336,7 +374,13 @@ export default function CrmDashboard({
               className="h-7 w-7 rounded-full lg:hidden"
             />
             <nav aria-label="Ruta" className="flex min-w-0 items-center gap-1.5 text-sm lg:hidden">
-              <span className="shrink-0 text-gray-500">CRM</span>
+              <button
+                type="button"
+                onClick={() => go(navItems[0]?.id ?? "tareas")}
+                className="shrink-0 cursor-pointer text-gray-500 hover:text-gray-300"
+              >
+                CRM
+              </button>
               <ChevronRight className="h-3.5 w-3.5 shrink-0 text-gray-600" />
               <span className="truncate font-bold text-white">{currentLabel}</span>
             </nav>
@@ -361,7 +405,7 @@ export default function CrmDashboard({
               <button
                 key={item.id}
                 type="button"
-                onClick={() => setSection(item.id)}
+                onClick={() => go(item.id)}
                 aria-current={section === item.id ? "page" : undefined}
                 className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
                   section === item.id
@@ -377,15 +421,52 @@ export default function CrmDashboard({
         </header>
 
         <main className="mx-auto w-full max-w-6xl flex-1 space-y-6 px-4 py-6 sm:space-y-8 sm:px-6 sm:py-10">
-          <div className="flex items-center gap-2">
-            <LayoutDashboard className="h-5 w-5 shrink-0 text-sky-300 sm:h-6 sm:w-6" />
-            <h1 className="font-heading text-xl font-extrabold tracking-tight sm:text-3xl">
-              {currentLabel}
-            </h1>
+          <div>
+            <nav
+              aria-label="Ruta de navegación"
+              className="mb-2 flex items-center gap-1.5 text-xs text-gray-500"
+            >
+              {history.length > 0 && (
+                <button
+                  type="button"
+                  onClick={goBack}
+                  aria-label="Regresar"
+                  title="Regresar"
+                  className="-ml-1 flex cursor-pointer items-center rounded-full p-1 text-gray-400 transition-colors hover:bg-white/10 hover:text-white"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => go(navItems[0]?.id ?? "tareas")}
+                className="cursor-pointer transition-colors hover:text-gray-300"
+              >
+                CRM
+              </button>
+              <ChevronRight className="h-3 w-3 shrink-0 text-gray-600" />
+              <span className="font-medium text-gray-300">{currentLabel}</span>
+            </nav>
+            <div className="flex items-center gap-2">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-sky-500/15 text-sky-300 sm:h-9 sm:w-9">
+                <CurrentIcon className="h-4 w-4 sm:h-5 sm:w-5" />
+              </span>
+              <h1 className="font-heading text-xl font-extrabold tracking-tight sm:text-3xl">
+                {currentLabel}
+              </h1>
+            </div>
           </div>
 
           {section === "resumen" && allowed.includes("resumen") && (
-            <OverviewSection clients={clients} projects={projects} payments={payments} />
+            <OverviewSection
+              clients={clients}
+              projects={projects}
+              payments={payments}
+              expenses={expenses}
+              scheduledCharges={scheduledCharges}
+              tasks={tasks}
+              tickets={tickets}
+            />
           )}
           {section === "clientes" && allowed.includes("clientes") && (
             <ClientsSection
@@ -398,7 +479,8 @@ export default function CrmDashboard({
               contracts={contracts}
               tickets={tickets}
               assets={assets}
-              expenses={expenses}
+              plans={plans}
+              catalogServices={services}
               serviceOptions={[
                 ...new Set([
                   ...catalogServiceNames,
@@ -422,21 +504,28 @@ export default function CrmDashboard({
             />
           )}
           {section === "cobranza" && allowed.includes("cobranza") && (
-            <CobranzaSection collections={collections} scheduledCharges={scheduledCharges} />
+            <CobranzaSection
+              collections={collections}
+              scheduledCharges={scheduledCharges}
+              clients={clients.map((c) => ({ id: c.id, name: c.company }))}
+              invoices={invoices}
+            />
           )}
           {section === "egresos" && allowed.includes("egresos") && (
             <ExpensesSection
               expenses={expenses}
               clients={clients.map((c) => ({ id: c.id, name: c.company }))}
+              payments={payments.map((p) => ({ id: p.id, dueDate: p.dueDate, amount: p.amount }))}
             />
           )}
           {section === "cotizaciones" && allowed.includes("cotizaciones") && (
-            <QuotesSection quotes={quotes} clients={clients} />
+            <QuotesSection quotes={quotes} clients={clients} catalogServices={services} />
           )}
           {section === "contratos" && allowed.includes("contratos") && (
             <ContractsSection
               contracts={contracts}
               services={services}
+              plans={plans}
               servicePricing={servicePricing}
               usageByClient={contractUsage}
               clients={clients.map((c) => ({ id: c.id, name: c.company }))}

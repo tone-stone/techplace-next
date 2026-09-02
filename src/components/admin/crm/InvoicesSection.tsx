@@ -7,7 +7,7 @@
  */
 
 import { useActionState, useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { FileDown, Plus, Trash2 } from "lucide-react";
 import { formatCurrencyMXN } from "@/lib/crm/format";
 import {
   createInvoiceAction,
@@ -16,9 +16,11 @@ import {
   type CrmInvoice,
   type InvoiceStatus,
 } from "@/lib/crm/invoices";
+import { downloadInvoiceTicketPdf } from "@/lib/crm/invoice-pdf";
 import type { CrmActionState, CrmClient } from "@/lib/crm/clients";
 import type { CrmProject } from "@/lib/crm/projects";
 import ConfirmDialog from "@/components/admin/ConfirmDialog";
+import InvoiceDetailModal from "./InvoiceDetailModal";
 import StatusBadge from "./StatusBadge";
 
 const STATUS_OPTIONS: InvoiceStatus[] = ["borrador", "enviada", "pagada", "vencida"];
@@ -38,7 +40,12 @@ export default function InvoicesSection({
 }) {
   const [showNewForm, setShowNewForm] = useState(false);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [openId, setOpenId] = useState<string | null>(null);
   const [toDelete, setToDelete] = useState<CrmInvoice | null>(null);
+
+  const projectName = (id: string | null) =>
+    id ? (projects.find((p) => p.id === id)?.name ?? null) : null;
+  const openInvoice = invoices.find((i) => i.id === openId) ?? null;
 
   const totalPending = invoices
     .filter((i) => i.status === "enviada" || i.status === "vencida")
@@ -86,13 +93,21 @@ export default function InvoicesSection({
               <th className="pb-3 font-medium">Vence</th>
               <th className="pb-3 font-medium">Estado</th>
               <th className="pb-3 text-right font-medium">Monto</th>
-              {!readOnly && <th className="pb-3" />}
+              <th className="pb-3" />
             </tr>
           </thead>
           <tbody className="divide-y divide-white/5">
             {invoices.map((invoice) => (
               <tr key={invoice.id}>
-                <td className="py-3 font-medium text-white">{invoice.number}</td>
+                <td className="py-3">
+                  <button
+                    type="button"
+                    onClick={() => setOpenId(invoice.id)}
+                    className="cursor-pointer font-medium text-sky-300 underline-offset-2 hover:underline"
+                  >
+                    {invoice.number}
+                  </button>
+                </td>
                 <td className="py-3 text-gray-300">{clientName(invoice.clientId)}</td>
                 <td className="py-3 text-gray-400">{invoice.issuedDate}</td>
                 <td className="py-3 text-gray-400">{invoice.dueDate}</td>
@@ -122,18 +137,40 @@ export default function InvoicesSection({
                 <td className="py-3 text-right font-semibold text-white">
                   {formatCurrencyMXN(invoice.amount)}
                 </td>
-                {!readOnly && (
-                  <td className="py-3 pl-3 text-right">
+                <td className="py-3 pl-3 text-right">
+                  <div className="flex items-center justify-end gap-1">
                     <button
                       type="button"
-                      onClick={() => setToDelete(invoice)}
-                      aria-label="Eliminar factura"
-                      className="cursor-pointer rounded p-1 text-gray-500 transition-colors hover:bg-red-500/10 hover:text-red-400"
+                      onClick={() =>
+                        downloadInvoiceTicketPdf({
+                          number: invoice.number,
+                          issuedDate: invoice.issuedDate,
+                          dueDate: invoice.dueDate,
+                          amount: invoice.amount,
+                          status: invoice.status,
+                          company: clientName(invoice.clientId),
+                          contactName: null,
+                          concept: invoice.notes ?? "Cobro",
+                          method: null,
+                        })
+                      }
+                      aria-label={`Descargar PDF de ${invoice.number}`}
+                      className="flex cursor-pointer items-center gap-1 rounded-full border border-teal-400/30 bg-teal-500/10 px-2 py-1 text-xs font-medium text-teal-300 hover:bg-teal-500/20"
                     >
-                      <Trash2 className="h-3.5 w-3.5" />
+                      <FileDown className="h-3.5 w-3.5" /> PDF
                     </button>
-                  </td>
-                )}
+                    {!readOnly && (
+                      <button
+                        type="button"
+                        onClick={() => setToDelete(invoice)}
+                        aria-label="Eliminar factura"
+                        className="cursor-pointer rounded p-1 text-gray-500 transition-colors hover:bg-red-500/10 hover:text-red-400"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </td>
               </tr>
             ))}
           </tbody>
@@ -153,6 +190,16 @@ export default function InvoicesSection({
         }}
         onClose={() => setToDelete(null)}
       />
+
+      {openInvoice && (
+        <InvoiceDetailModal
+          invoice={openInvoice}
+          clientName={clientName(openInvoice.clientId)}
+          projectName={projectName(openInvoice.projectId)}
+          readOnly={readOnly}
+          onClose={() => setOpenId(null)}
+        />
+      )}
     </div>
   );
 }

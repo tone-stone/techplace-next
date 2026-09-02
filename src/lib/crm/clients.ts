@@ -12,10 +12,11 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { withTiming } from "@/lib/monitoring/timing";
-import { requireCrmCore } from "./auth";
+import { requireBillingWrite, requireCrmCore } from "./auth";
 import { softDelete } from "./soft-delete";
 import { addHistory, mapHistory, type ClientHistoryEntry, type HistoryEntryType } from "./history";
 import { getContactsByClient, type CrmContact } from "./contacts";
+import { PLAN_MIRROR_NOTE } from "./plan-mirror";
 
 export type { HistoryEntryType, ClientHistoryEntry } from "./history";
 export type { CrmContact } from "./contacts";
@@ -88,6 +89,10 @@ export type ClientPlan = {
   cutoffDay: number;
   nextDueDate: string;
   status: PlanStatus;
+  /** Mirror service (crm_contracts) auto-created with the plan, if any. */
+  contractId: string | null;
+  /** When the service was contracted (ISO timestamp). */
+  createdAt: string;
 };
 
 export type ClientPayment = {
@@ -228,6 +233,8 @@ function mapPlan(row: {
   cutoff_day: number;
   next_due_date: string;
   status: string;
+  contract_id: string | null;
+  created_at: string;
 }): ClientPlan {
   return {
     id: row.id,
@@ -238,6 +245,8 @@ function mapPlan(row: {
     cutoffDay: row.cutoff_day,
     nextDueDate: row.next_due_date,
     status: row.status as PlanStatus,
+    contractId: row.contract_id ?? null,
+    createdAt: row.created_at,
   };
 }
 
@@ -281,11 +290,16 @@ export async function getClients(): Promise<CrmClient[]> {
   });
 }
 
-/** Fetches every payment across all clients, ordered by due date. */
+/** Fetches every payment of a live (non-deleted) client, ordered by due date. */
 export async function getAllPayments(): Promise<ClientPayment[]> {
   return withTiming("crm.getAllPayments", async () => {
     const supabase = await createClient();
-    const { data } = await supabase.from("crm_payments").select("*").order("due_date", { ascending: true });
+    const { data } = await supabase
+      .from("crm_payments")
+      .select("*, crm_clients!inner(deleted_at)")
+      .is("deleted_at", null)
+      .is("crm_clients.deleted_at", null)
+      .order("due_date", { ascending: true });
     return (data ?? []).map(mapPayment);
   });
 }
@@ -299,18 +313,34 @@ export async function getAllPayments(): Promise<ClientPayment[]> {
 export async function getClientDetail(clientId: string): Promise<ClientDetail | null> {
   const supabase = await createClient();
 
-  const [{ data: client }, contacts, { data: history }, { data: plans }, { data: payments }] =
-    await Promise.all([
-      supabase.from("crm_clients").select("*").eq("id", clientId).single(),
-      getContactsByClient(clientId),
-      supabase
-        .from("crm_client_history")
-        .select("*")
-        .eq("client_id", clientId)
-        .order("created_at", { ascending: false }),
-      supabase.from("crm_plans").select("*").eq("client_id", clientId).order("next_due_date", { ascending: true }),
-      supabase.from("crm_payments").select("*").eq("client_id", clientId).order("due_date", { ascending: false }),
-    ]);
+  const [{ data: client }, contacts, { data: history }, plansRes, paymentsRes] = await Promise.all([
+    supabase.from("crm_clients").select("*").eq("id", clientId).single(),
+    getContactsByClient(clientId),
+    supabase
+      .from("crm_client_history")
+      .select("*")
+      .eq("client_id", clientId)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("crm_plans")
+      .select("*")
+      .eq("client_id", clientId)
+      .is("deleted_at", null)
+      .order("next_due_date", { ascending: true }),
+    supabase
+      .from("crm_payments")
+      .select("*")
+      .eq("client_id", clientId)
+      .is("deleted_at", null)
+      .order("due_date", { ascending: false }),
+  ]);
+
+  // Surface a failed plans/payments read instead of silently showing an empty
+  // list — the usual cause is a migration (0030/0031) not yet applied.
+  if (plansRes.error) console.error("[getClientDetail] crm_plans:", plansRes.error.message);
+  if (paymentsRes.error) console.error("[getClientDetail] crm_payments:", paymentsRes.error.message);
+  const plans = plansRes.data;
+  const payments = paymentsRes.data;
 
   if (!client) return null;
 
@@ -510,19 +540,179 @@ export async function addHistoryEntryAction(
   return { success: true };
 }
 
+type PlanInput = {
+  clientId: string;
+  name: string;
+  amount: number;
+  billingCycle: BillingCycle;
+  cutoffDay: number;
+  nextDueDate: string;
+};
+
+/**
+ * Inserts a `crm_plans` row and its mirror service (`crm_contracts`), links
+ * them, and logs the client history. Shared by `createPlanAction` and the
+ * accepted-quote → plan flow. Tarifa plana → sin horas incluidas ni SLA.
+ */
+async function insertPlanWithMirror(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  p: PlanInput,
+  userId: string,
+  originNote = ""
+): Promise<{ ok: true; planId: string } | { ok: false; error: string }> {
+  if (!p.clientId || !p.name || !p.nextDueDate || !(p.amount > 0)) {
+    return { ok: false, error: "Completa nombre, monto y fecha de vencimiento del plan" };
+  }
+  if (p.cutoffDay < 1 || p.cutoffDay > 31) {
+    return { ok: false, error: "El día de corte debe estar entre 1 y 31" };
+  }
+
+  const { data: plan, error } = await supabase
+    .from("crm_plans")
+    .insert({
+      client_id: p.clientId,
+      name: p.name,
+      amount: p.amount,
+      billing_cycle: p.billingCycle,
+      cutoff_day: p.cutoffDay,
+      next_due_date: p.nextDueDate,
+    })
+    .select("id")
+    .single();
+  if (error || !plan) return { ok: false, error: error?.message ?? "No se pudo crear el plan" };
+
+  const today = new Date().toISOString().slice(0, 10);
+  const { data: contract } = await supabase
+    .from("crm_contracts")
+    .insert({
+      client_id: p.clientId,
+      title: p.name,
+      status: "activo",
+      start_date: today,
+      billing_amount: p.amount,
+      billing_cycle: p.billingCycle,
+      notes: PLAN_MIRROR_NOTE,
+      created_by: userId,
+    })
+    .select("id")
+    .single();
+  if (contract) {
+    await supabase.from("crm_plans").update({ contract_id: contract.id }).eq("id", plan.id);
+  }
+
+  await addHistory(
+    supabase,
+    p.clientId,
+    "plan",
+    `Plan "${p.name}" creado — corte día ${p.cutoffDay}, vence ${p.nextDueDate}${originNote}`,
+    userId
+  );
+  revalidatePath("/admin");
+  return { ok: true, planId: plan.id };
+}
+
 /** `useActionState` action backing the "Nuevo plan" form on the client detail modal. */
 export async function createPlanAction(_prevState: CrmActionState, formData: FormData): Promise<CrmActionState> {
   const check = await requireCrmCore();
   if (!check.ok) return { error: check.error };
 
+  const supabase = await createClient();
+  const res = await insertPlanWithMirror(
+    supabase,
+    {
+      clientId: String(formData.get("clientId") ?? ""),
+      name: String(formData.get("name") ?? "").trim(),
+      amount: Number(formData.get("amount") ?? 0),
+      billingCycle: String(formData.get("billingCycle") ?? "mensual") as BillingCycle,
+      cutoffDay: Number(formData.get("cutoffDay") ?? 1),
+      nextDueDate: String(formData.get("nextDueDate") ?? ""),
+    },
+    check.userId
+  );
+  return res.ok ? { success: true } : { error: res.error };
+}
+
+/**
+ * Turns an accepted quote into a recurring plan (+ its mirror service). Backed
+ * by a confirm dialog in the quotes UI; the amount/name are prefilled from the
+ * quote but the billing cycle, cutoff day and first due date come from the form.
+ */
+export async function createPlanFromQuoteAction(
+  _prevState: CrmActionState,
+  formData: FormData
+): Promise<CrmActionState> {
+  const check = await requireCrmCore();
+  if (!check.ok) return { error: check.error };
+
+  const quoteId = String(formData.get("quoteId") ?? "").trim();
+  if (!quoteId) return { error: "Cotización no encontrada" };
+
+  const supabase = await createClient();
+  const { data: quote } = await supabase
+    .from("crm_quotes")
+    .select("client_id, number, total, plan_id")
+    .eq("id", quoteId)
+    .maybeSingle();
+  if (!quote) return { error: "No se encontró la cotización" };
+  if (!quote.client_id) return { error: "La cotización no tiene cliente; asígnale uno primero" };
+  if (quote.plan_id) return { error: "Esta cotización ya generó un plan" };
+
+  const nameRaw = String(formData.get("name") ?? "").trim();
+  const amountRaw = Number(formData.get("amount") ?? 0);
+
+  const res = await insertPlanWithMirror(
+    supabase,
+    {
+      clientId: quote.client_id,
+      name: nameRaw || `Plan ${quote.number}`,
+      amount: amountRaw > 0 ? amountRaw : Number(quote.total),
+      billingCycle: String(formData.get("billingCycle") ?? "mensual") as BillingCycle,
+      cutoffDay: Number(formData.get("cutoffDay") ?? 1),
+      nextDueDate: String(formData.get("nextDueDate") ?? ""),
+    },
+    check.userId,
+    ` (desde cotización ${quote.number})`
+  );
+  if (!res.ok) return { error: res.error };
+
+  await supabase.from("crm_quotes").update({ plan_id: res.planId }).eq("id", quoteId);
+  await addHistory(
+    supabase,
+    quote.client_id,
+    "cotizacion",
+    `Cotización ${quote.number} convertida en plan recurrente`,
+    check.userId
+  );
+  revalidatePath("/admin");
+  return { success: true };
+}
+
+/**
+ * `useActionState` action backing the inline "Editar plan" form: nombre, monto,
+ * ciclo, día de corte, próximo vencimiento y estado. Si el plan tiene servicio
+ * espejo (`crm_contracts`), le propaga nombre / monto / ciclo / estado.
+ */
+export async function updatePlanAction(
+  _prevState: CrmActionState,
+  formData: FormData
+): Promise<CrmActionState> {
+  const check = await requireCrmCore();
+  if (!check.ok) return { error: check.error };
+
+  const planId = String(formData.get("planId") ?? "");
   const clientId = String(formData.get("clientId") ?? "");
   const name = String(formData.get("name") ?? "").trim();
   const amount = Number(formData.get("amount") ?? 0);
   const billingCycle = String(formData.get("billingCycle") ?? "mensual") as BillingCycle;
   const cutoffDay = Number(formData.get("cutoffDay") ?? 1);
   const nextDueDate = String(formData.get("nextDueDate") ?? "");
+  const statusRaw = String(formData.get("status") ?? "activo");
+  const status = (["activo", "pausado", "cancelado"] as const).includes(statusRaw as PlanStatus)
+    ? (statusRaw as PlanStatus)
+    : "activo";
 
-  if (!clientId || !name || !nextDueDate || !amount) {
+  if (!planId || !clientId) return { error: "Plan no encontrado" };
+  if (!name || !nextDueDate || !(amount > 0)) {
     return { error: "Completa nombre, monto y fecha de vencimiento del plan" };
   }
   if (cutoffDay < 1 || cutoffDay > 31) {
@@ -530,24 +720,105 @@ export async function createPlanAction(_prevState: CrmActionState, formData: For
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.from("crm_plans").insert({
-    client_id: clientId,
-    name,
-    amount,
-    billing_cycle: billingCycle,
-    cutoff_day: cutoffDay,
-    next_due_date: nextDueDate,
-  });
-
+  const { error } = await supabase
+    .from("crm_plans")
+    .update({
+      name,
+      amount,
+      billing_cycle: billingCycle,
+      cutoff_day: cutoffDay,
+      next_due_date: nextDueDate,
+      status,
+    })
+    .eq("id", planId)
+    .is("deleted_at", null);
   if (error) return { error: error.message };
+
+  // Sync the mirror service. If the link column exists (migration 0032) but is
+  // empty — the pair was created before the column — adopt the orphan mirror
+  // contract (matched by the note) so the "Servicios" list stops showing it
+  // twice from now on.
+  const { data: linked } = await supabase
+    .from("crm_plans")
+    .select("contract_id")
+    .eq("id", planId)
+    .maybeSingle();
+
+  const contractStatus =
+    status === "activo" ? "activo" : status === "pausado" ? "suspendido" : "cancelado";
+
+  let contractId = linked?.contract_id ?? null;
+  if (linked && !contractId) {
+    const { data: linkedIds } = await supabase
+      .from("crm_plans")
+      .select("contract_id")
+      .not("contract_id", "is", null);
+    const taken = new Set((linkedIds ?? []).map((r) => r.contract_id as string));
+    const { data: orphans } = await supabase
+      .from("crm_contracts")
+      .select("id")
+      .eq("client_id", clientId)
+      .eq("notes", PLAN_MIRROR_NOTE)
+      .is("deleted_at", null);
+    const adopt = (orphans ?? []).find((c) => !taken.has(c.id));
+    if (adopt) {
+      await supabase.from("crm_plans").update({ contract_id: adopt.id }).eq("id", planId);
+      contractId = adopt.id;
+    }
+  }
+
+  if (contractId) {
+    await supabase
+      .from("crm_contracts")
+      .update({ title: name, billing_amount: amount, billing_cycle: billingCycle, status: contractStatus })
+      .eq("id", contractId);
+  }
 
   await addHistory(
     supabase,
     clientId,
     "plan",
-    `Plan "${name}" creado — corte día ${cutoffDay}, vence ${nextDueDate}`,
+    `Plan "${name}" actualizado — ${status}, corte día ${cutoffDay}, vence ${nextDueDate}`,
     check.userId
   );
+  revalidatePath("/admin");
+  return { success: true };
+}
+
+/**
+ * Soft-deletes a recurring plan (recoverable; logged to `deletion_log`), plus
+ * its mirror service (crm_contracts) so both halves of the linked pair go
+ * away together. Existing `crm_payments` keep their `plan_id`.
+ */
+export async function deletePlanAction(planId: string, clientId: string): Promise<CrmActionState> {
+  const check = await requireCrmCore();
+  if (!check.ok) return { error: check.error };
+
+  const supabase = await createClient();
+  const { data: plan } = await supabase
+    .from("crm_plans")
+    .select("contract_id")
+    .eq("id", planId)
+    .maybeSingle();
+
+  const result = await softDelete({
+    table: "crm_plans",
+    id: planId,
+    actorId: check.userId,
+    actorEmail: check.email,
+  });
+  if (!result.ok) return { error: result.error };
+
+  if (plan?.contract_id) {
+    await softDelete({
+      table: "crm_contracts",
+      id: plan.contract_id,
+      actorId: check.userId,
+      actorEmail: check.email,
+    });
+  }
+
+  await addHistory(supabase, clientId, "plan", "Plan y su servicio eliminados", check.userId);
   revalidatePath("/admin");
   return { success: true };
 }
@@ -618,6 +889,79 @@ export async function markPaymentPaidAction(paymentId: string, clientId: string)
   return { success: true };
 }
 
+/**
+ * `useActionState` action backing the inline "Editar cobro" form in Cobranza:
+ * updates a payment's amount, due date, method and status (dios/admin only, to
+ * match `crm_payments` RLS). `paidDate` is derived from `status` so a cobro
+ * flipped to "pagado" here also stamps its paid date.
+ */
+export async function updatePaymentAction(
+  _prevState: CrmActionState,
+  formData: FormData
+): Promise<CrmActionState> {
+  const check = await requireBillingWrite();
+  if (!check.ok) return { error: check.error };
+
+  const paymentId = String(formData.get("paymentId") ?? "");
+  const clientId = String(formData.get("clientId") ?? "");
+  const amount = Number(formData.get("amount") ?? 0);
+  const dueDate = String(formData.get("dueDate") ?? "");
+  const method = String(formData.get("method") ?? "").trim();
+  const status = String(formData.get("status") ?? "") as PaymentStatus;
+
+  if (!paymentId || !clientId) return { error: "Cobro no encontrado" };
+  if (!dueDate || !(amount > 0)) {
+    return { error: "Completa el monto y la fecha de vencimiento del cobro" };
+  }
+  if (!["pendiente", "pagado", "vencido"].includes(status)) {
+    return { error: "Estado de cobro inválido" };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("crm_payments")
+    .update({
+      amount,
+      due_date: dueDate,
+      method: method || null,
+      status,
+      paid_date: status === "pagado" ? new Date().toISOString().slice(0, 10) : null,
+    })
+    .eq("id", paymentId)
+    .is("deleted_at", null);
+
+  if (error) return { error: error.message };
+
+  await addHistory(
+    supabase,
+    clientId,
+    "pago",
+    `Cobro actualizado: $${amount.toLocaleString("es-MX")}, vence ${dueDate} (${status})`,
+    check.userId
+  );
+  revalidatePath("/admin");
+  return { success: true };
+}
+
+/** Soft-deletes a payment (recoverable; logged to `deletion_log`). dios/admin only. */
+export async function deletePaymentAction(paymentId: string, clientId: string): Promise<CrmActionState> {
+  const check = await requireBillingWrite();
+  if (!check.ok) return { error: check.error };
+
+  const result = await softDelete({
+    table: "crm_payments",
+    id: paymentId,
+    actorId: check.userId,
+    actorEmail: check.email,
+  });
+  if (!result.ok) return { error: result.error };
+
+  const supabase = await createClient();
+  await addHistory(supabase, clientId, "pago", "Cobro eliminado", check.userId);
+  revalidatePath("/admin");
+  return { success: true };
+}
+
 /** Soft-deletes a client (recoverable; logged to `deletion_log`). */
 export async function deleteClientAction(clientId: string): Promise<CrmActionState> {
   const check = await requireCrmCore();
@@ -633,6 +977,14 @@ export async function deleteClientAction(clientId: string): Promise<CrmActionSta
     actorEmail: check.email,
   });
   if (!result.ok) return { error: result.error };
+
+  // Cascade the soft-delete to the client's recurring plans and payments so
+  // they don't linger as orphans inflating the dashboard aggregates.
+  const stamp = { deleted_at: new Date().toISOString(), deleted_by: check.userId };
+  await Promise.all([
+    supabase.from("crm_plans").update(stamp).eq("client_id", clientId).is("deleted_at", null),
+    supabase.from("crm_payments").update(stamp).eq("client_id", clientId).is("deleted_at", null),
+  ]);
 
   revalidatePath("/admin");
   return { success: true };

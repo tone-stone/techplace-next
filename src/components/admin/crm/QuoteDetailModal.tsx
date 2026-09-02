@@ -6,8 +6,8 @@
  * imports `downloadQuotePdf` so jsPDF only loads on demand.
  */
 
-import { useEffect, useState } from "react";
-import { FileDown, Loader2, Trash2, X } from "lucide-react";
+import { useActionState, useEffect, useRef, useState } from "react";
+import { CalendarClock, Eye, EyeOff, FileDown, Loader2, Pencil, Trash2, X } from "lucide-react";
 import {
   deleteQuoteAction,
   getQuoteDetail,
@@ -15,19 +15,27 @@ import {
   type QuoteDetail,
   type QuoteStatus,
 } from "@/lib/crm/quotes";
+import { createPlanFromQuoteAction, type CrmActionState, type CrmClient } from "@/lib/crm/clients";
+import type { CrmService } from "@/lib/crm/services";
 import { formatCurrencyMXN } from "@/lib/crm/format";
 import ConfirmDialog from "@/components/admin/ConfirmDialog";
 import StatusBadge from "./StatusBadge";
 import ModalPortal from "./ModalPortal";
+import QuoteFormModal from "./QuoteFormModal";
+import QuotePreview from "./QuotePreview";
 
 const STATUS_OPTIONS: QuoteStatus[] = ["borrador", "enviada", "aceptada", "rechazada"];
 
 /** Portaled modal: loads the quote's detail and lets its status be updated or the PDF downloaded. */
 export default function QuoteDetailModal({
   quoteId,
+  clients = [],
+  catalogServices = [],
   onClose,
 }: {
   quoteId: string;
+  clients?: CrmClient[];
+  catalogServices?: CrmService[];
   onClose: () => void;
 }) {
   const [detail, setDetail] = useState<QuoteDetail | null>(null);
@@ -35,6 +43,8 @@ export default function QuoteDetailModal({
   const [savingStatus, setSavingStatus] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
 
   const refresh = async () => {
     const data = await getQuoteDetail(quoteId);
@@ -72,6 +82,20 @@ export default function QuoteDetailModal({
     setDownloading(false);
   };
 
+  if (editing && detail) {
+    return (
+      <QuoteFormModal
+        quote={detail}
+        clients={clients}
+        catalogServices={catalogServices}
+        onClose={() => {
+          setEditing(false);
+          refresh();
+        }}
+      />
+    );
+  }
+
   return (
     <ModalPortal>
     <div
@@ -96,14 +120,32 @@ export default function QuoteDetailModal({
         )}
         <div className="absolute right-4 top-4 flex items-center gap-1">
           {detail && (
-            <button
-              type="button"
-              onClick={() => setConfirmDelete(true)}
-              aria-label="Eliminar cotización"
-              className="-m-1 cursor-pointer rounded-full p-2 text-gray-500 transition-colors hover:bg-red-500/10 hover:text-red-400"
-            >
-              <Trash2 className="h-4 w-4" />
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={() => setShowPreview((v) => !v)}
+                aria-label={showPreview ? "Ver detalle" : "Previsualizar"}
+                className="-m-1 cursor-pointer rounded-full p-2 text-gray-500 transition-colors hover:bg-white/10 hover:text-white"
+              >
+                {showPreview ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+              <button
+                type="button"
+                onClick={() => setEditing(true)}
+                aria-label="Editar cotización"
+                className="-m-1 cursor-pointer rounded-full p-2 text-gray-500 transition-colors hover:bg-sky-500/10 hover:text-sky-300"
+              >
+                <Pencil className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmDelete(true)}
+                aria-label="Eliminar cotización"
+                className="-m-1 cursor-pointer rounded-full p-2 text-gray-500 transition-colors hover:bg-red-500/10 hover:text-red-400"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            </>
           )}
         <button
           type="button"
@@ -118,6 +160,37 @@ export default function QuoteDetailModal({
         {loading || !detail ? (
           <div className="flex items-center justify-center gap-2 py-16 text-gray-400">
             <Loader2 className="h-5 w-5 animate-spin" /> Cargando cotización…
+          </div>
+        ) : showPreview ? (
+          <div className="space-y-4">
+            <QuotePreview
+              data={{
+                number: detail.quote.number,
+                status: detail.quote.status,
+                clientName: detail.quote.clientName,
+                clientCompany: detail.quote.clientCompany,
+                clientEmail: detail.quote.clientEmail,
+                issuedDate: detail.quote.issuedDate,
+                validUntil: detail.quote.validUntil,
+                items: detail.items.map((i) => ({
+                  concept: i.concept,
+                  quantity: i.quantity,
+                  unitPrice: i.unitPrice,
+                })),
+                taxRate: detail.quote.taxRate,
+                notes: detail.quote.notes,
+                terms: detail.quote.terms,
+              }}
+            />
+            <button
+              type="button"
+              onClick={handleDownload}
+              disabled={downloading}
+              className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-full bg-sky-500/20 py-2.5 text-sm font-semibold text-sky-200 hover:bg-sky-500/30 disabled:opacity-50"
+            >
+              {downloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
+              Descargar PDF
+            </button>
           </div>
         ) : (
           <div className="space-y-6">
@@ -189,6 +262,20 @@ export default function QuoteDetailModal({
               </div>
             </div>
 
+            {detail.quote.status === "aceptada" && detail.quote.clientId && !detail.quote.planId && (
+              <QuoteToPlan
+                quoteId={detail.quote.id}
+                defaultName={`Plan ${detail.quote.number}`}
+                defaultAmount={detail.quote.total}
+                onDone={refresh}
+              />
+            )}
+            {detail.quote.planId && (
+              <p className="rounded-xl border border-emerald-400/20 bg-emerald-500/5 p-3 text-xs text-emerald-300">
+                Esta cotización ya generó un plan recurrente para el cliente.
+              </p>
+            )}
+
             <button
               type="button"
               onClick={handleDownload}
@@ -203,5 +290,106 @@ export default function QuoteDetailModal({
       </div>
     </div>
     </ModalPortal>
+  );
+}
+
+const QTP_FIELD =
+  "w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder-gray-500 outline-none focus:border-sky-400/40";
+
+/** YYYY-MM-DD for the last day of the current month. */
+function endOfThisMonth(): string {
+  const n = new Date();
+  const d = new Date(n.getFullYear(), n.getMonth() + 1, 0);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/**
+ * Inline "convert this accepted quote into a recurring plan" form. Amount and
+ * name come prefilled from the quote; cycle / cutoff day / first due date are
+ * chosen here. Always confirms before creating (also builds the mirror service).
+ */
+function QuoteToPlan({
+  quoteId,
+  defaultName,
+  defaultAmount,
+  onDone,
+}: {
+  quoteId: string;
+  defaultName: string;
+  defaultAmount: number;
+  onDone: () => void;
+}) {
+  const formRef = useRef<HTMLFormElement>(null);
+  const [confirming, setConfirming] = useState(false);
+  const [state, formAction] = useActionState<CrmActionState, FormData>(async (prev, fd) => {
+    const res = await createPlanFromQuoteAction(prev, fd);
+    if (res && "success" in res) onDone();
+    return res;
+  }, null);
+
+  return (
+    <form
+      ref={formRef}
+      action={formAction}
+      className="space-y-2 rounded-xl border border-sky-400/30 bg-white/5 p-4"
+    >
+      <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-gray-300">
+        <CalendarClock className="h-3.5 w-3.5" /> Convertir en plan recurrente
+      </p>
+      <input type="hidden" name="quoteId" value={quoteId} />
+      <input name="name" defaultValue={defaultName} placeholder="Nombre del plan" className={QTP_FIELD} />
+      <div className="grid grid-cols-2 gap-2">
+        <input
+          name="amount"
+          type="number"
+          min="0"
+          step="0.01"
+          defaultValue={defaultAmount}
+          placeholder="Monto MXN"
+          className={QTP_FIELD}
+        />
+        <select name="billingCycle" defaultValue="mensual" className={QTP_FIELD}>
+          <option value="mensual">Mensual</option>
+          <option value="trimestral">Trimestral</option>
+          <option value="anual">Anual</option>
+        </select>
+        <label className="text-xs text-gray-400">
+          Día de corte
+          <input
+            name="cutoffDay"
+            type="number"
+            min="1"
+            max="31"
+            defaultValue={new Date().getDate()}
+            className={`mt-1 ${QTP_FIELD}`}
+          />
+        </label>
+        <label className="text-xs text-gray-400">
+          Primer vencimiento
+          <input name="nextDueDate" type="date" defaultValue={endOfThisMonth()} className={`mt-1 ${QTP_FIELD}`} />
+        </label>
+      </div>
+      {state && "error" in state && <p className="text-xs text-red-400">{state.error}</p>}
+      <button
+        type="button"
+        onClick={() => setConfirming(true)}
+        className="w-full cursor-pointer rounded-lg bg-sky-500/20 py-2 text-sm font-semibold text-sky-200 hover:bg-sky-500/30"
+      >
+        Crear plan
+      </button>
+
+      <ConfirmDialog
+        open={confirming}
+        tone="info"
+        title="Crear plan desde la cotización"
+        body="Se creará un plan de cobro recurrente y su servicio para el cliente, con los datos de arriba."
+        confirmLabel="Crear plan"
+        onConfirm={() => {
+          setConfirming(false);
+          formRef.current?.requestSubmit();
+        }}
+        onClose={() => setConfirming(false)}
+      />
+    </form>
   );
 }

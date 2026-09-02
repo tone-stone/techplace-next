@@ -11,6 +11,7 @@ import { formatCurrencyMXN } from "@/lib/crm/format";
 import { getDueDateUrgency } from "@/lib/crm/plan-status";
 import type { CrmQuote } from "@/lib/crm/quotes";
 import type { CrmClient } from "@/lib/crm/clients";
+import type { CrmService } from "@/lib/crm/services";
 import StatusBadge from "./StatusBadge";
 import QuoteFormModal from "./QuoteFormModal";
 import QuoteDetailModal from "./QuoteDetailModal";
@@ -25,9 +26,11 @@ function urgencyBadgeClass(urgency: ReturnType<typeof getDueDateUrgency>) {
 export default function QuotesSection({
   quotes,
   clients,
+  catalogServices = [],
 }: {
   quotes: CrmQuote[];
   clients: CrmClient[];
+  catalogServices?: CrmService[];
 }) {
   const [showNewForm, setShowNewForm] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -95,8 +98,21 @@ export default function QuotesSection({
         )}
       </div>
 
-      {showNewForm && <QuoteFormModal clients={clients} onClose={() => setShowNewForm(false)} />}
-      {selectedId && <QuoteDetailModal quoteId={selectedId} onClose={() => setSelectedId(null)} />}
+      {showNewForm && (
+        <QuoteFormModal
+          clients={clients}
+          catalogServices={catalogServices}
+          onClose={() => setShowNewForm(false)}
+        />
+      )}
+      {selectedId && (
+        <QuoteDetailModal
+          quoteId={selectedId}
+          clients={clients}
+          catalogServices={catalogServices}
+          onClose={() => setSelectedId(null)}
+        />
+      )}
     </div>
   );
 }

@@ -8,8 +8,9 @@
  */
 
 import { useActionState, useEffect, useMemo, useRef, useState } from "react";
-import { Plus, Search, Trash2 } from "lucide-react";
+import { Plus, Search, Trash2, UserPlus } from "lucide-react";
 import {
+  assignServiceToClientAction,
   createContractAction,
   type CrmContract,
 } from "@/lib/crm/contracts";
@@ -27,6 +28,8 @@ import {
   type ContractStatus,
 } from "@/lib/crm/contract-types";
 import { formatCurrencyMXN } from "@/lib/crm/format";
+import type { PlanRow } from "@/lib/crm/collections";
+import { PLAN_MIRROR_NOTE } from "@/lib/crm/plan-mirror";
 import type { CrmActionState } from "@/lib/crm/clients";
 import type { ClientMonthUsage } from "@/lib/it/time-entries";
 import type { ServicePackage } from "@/lib/services/catalog";
@@ -59,12 +62,15 @@ const STATUS_CLASS: Record<ContractStatus, string> = {
 export default function ContractsSection({
   contracts,
   services,
+  plans = [],
   servicePricing = [],
   clients,
   usageByClient = {},
 }: {
   contracts: CrmContract[];
   services: CrmService[];
+  /** Recurring plans (`crm_plans`) — shown read-only; managed from the client. */
+  plans?: PlanRow[];
   /** Read-only pricing from the public landing catalog. */
   servicePricing?: ServicePricing[];
   clients: { id: string; name: string }[];
@@ -79,15 +85,35 @@ export default function ContractsSection({
 
   const nameOf = (id: string) => clients.find((c) => c.id === id)?.name ?? "—";
 
+  // Contracts that are a plan's mirror show under "Planes recurrentes", not the
+  // main list — otherwise the same service appears twice. Match by the stored
+  // link, or (for pairs created before the link column existed) by the note.
+  const planContractIds = useMemo(
+    () => new Set(plans.map((p) => p.contractId).filter((id): id is string => !!id)),
+    [plans]
+  );
+  const isPlanMirror = (c: CrmContract) =>
+    planContractIds.has(c.id) || (c.notes?.startsWith(PLAN_MIRROR_NOTE) ?? false);
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return contracts.filter((c) => {
+      if (isPlanMirror(c)) return false;
       if (clientFilter !== "todos" && c.clientId !== clientFilter) return false;
       if (q && !c.title.toLowerCase().includes(q) && !nameOf(c.clientId).toLowerCase().includes(q)) return false;
       return true;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [contracts, query, clientFilter, clients]);
+  }, [contracts, query, clientFilter, clients, planContractIds]);
+
+  const shownPlans = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return plans.filter((p) => {
+      if (clientFilter !== "todos" && p.clientId !== clientFilter) return false;
+      if (q && !p.name.toLowerCase().includes(q) && !p.company.toLowerCase().includes(q)) return false;
+      return true;
+    });
+  }, [plans, query, clientFilter]);
 
   return (
     <div className="tp-dark-card-crm rounded-2xl p-5 sm:p-6">
@@ -175,6 +201,44 @@ export default function ContractsSection({
             )}
           </div>
 
+          {shownPlans.length > 0 && (
+            <div className="mb-5">
+              <p className="mb-2 text-xs font-bold uppercase tracking-wide text-gray-400">
+                Planes recurrentes ({shownPlans.length})
+              </p>
+              <div className="space-y-2">
+                {shownPlans.map((p) => (
+                  <div
+                    key={p.id}
+                    className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/5 bg-white/2 p-4"
+                  >
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="font-semibold text-white">{p.name}</p>
+                        <span className="rounded-full border border-cyan-400/30 bg-cyan-500/10 px-2 py-0.5 text-[10px] font-medium text-cyan-300">
+                          plan
+                        </span>
+                        {p.status !== "activo" && (
+                          <span className="rounded-full border border-white/15 bg-white/5 px-2 py-0.5 text-[10px] font-medium text-gray-400">
+                            {p.status}
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-0.5 text-xs text-gray-400">{p.company}</p>
+                      <p className="mt-1 text-xs text-gray-500">
+                        {formatCurrencyMXN(p.amount)} / {p.billingCycle} · corte día {p.cutoffDay} · próximo cobro{" "}
+                        {p.nextDueDate}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <p className="mt-2 text-[11px] text-gray-500">
+                Los planes se crean y editan desde la ficha del cliente (sección Planes).
+              </p>
+            </div>
+          )}
+
           <div className="space-y-2">
             {filtered.map((c) => (
               <button
@@ -222,7 +286,7 @@ export default function ContractsSection({
           </div>
         </>
       ) : (
-        <ServiceCatalog services={services} pricing={servicePricing} />
+        <ServiceCatalog services={services} pricing={servicePricing} clients={clients} />
       )}
 
       {openId && (
@@ -292,6 +356,16 @@ function NewContractForm({
           <option value="trimestral">Trimestral</option>
           <option value="anual">Anual</option>
         </select>
+        <label className="text-xs text-gray-400 sm:col-span-2">
+          Tipo de servicio (se agrega al catálogo)
+          <select name="serviceType" defaultValue="mes" className={`mt-1 w-full ${FIELD}`}>
+            {SERVICE_UNITS.map((u) => (
+              <option key={u} value={u}>
+                {UNIT_LABELS[u]}
+              </option>
+            ))}
+          </select>
+        </label>
         <input name="notes" placeholder="Notas (opcional)" className={`sm:col-span-2 ${FIELD}`} />
       </div>
       {state && "error" in state && <p className="text-xs text-red-400">{state.error}</p>}
@@ -315,9 +389,18 @@ function NewContractForm({
 }
 
 /** Service catalog list with inline add + per-row edit/toggle/delete, plus the landing price reference. */
-function ServiceCatalog({ services, pricing = [] }: { services: CrmService[]; pricing?: ServicePricing[] }) {
+function ServiceCatalog({
+  services,
+  pricing = [],
+  clients,
+}: {
+  services: CrmService[];
+  pricing?: ServicePricing[];
+  clients: { id: string; name: string }[];
+}) {
   const [showAdd, setShowAdd] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [assigningId, setAssigningId] = useState<string | null>(null);
   const [toDelete, setToDelete] = useState<CrmService | null>(null);
   const [prefill, setPrefill] = useState<ServiceFormPrefill | null>(null);
   const [prefillSeq, setPrefillSeq] = useState(0);
@@ -372,36 +455,51 @@ function ServiceCatalog({ services, pricing = [] }: { services: CrmService[]; pr
           editingId === s.id ? (
             <ServiceForm key={s.id} service={s} onDone={() => setEditingId(null)} />
           ) : (
-            <div
-              key={s.id}
-              className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-white/5 bg-white/2 p-3"
-            >
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <p className={`font-medium ${s.active ? "text-white" : "text-gray-500 line-through"}`}>{s.name}</p>
-                  <span className="text-xs text-gray-400">
-                    {formatCurrencyMXN(s.defaultRate)} · {UNIT_LABELS[s.unit]}
-                  </span>
+            <div key={s.id} className="rounded-xl border border-white/5 bg-white/2 p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className={`font-medium ${s.active ? "text-white" : "text-gray-500 line-through"}`}>{s.name}</p>
+                    <span className="text-xs text-gray-400">
+                      {formatCurrencyMXN(s.defaultRate)} · {UNIT_LABELS[s.unit]}
+                    </span>
+                  </div>
+                  {s.description && <p className="text-xs text-gray-500">{s.description}</p>}
                 </div>
-                {s.description && <p className="text-xs text-gray-500">{s.description}</p>}
+                <div className="flex shrink-0 items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setAssigningId((cur) => (cur === s.id ? null : s.id))}
+                    className="flex cursor-pointer items-center gap-1 rounded-full border border-white/10 px-2.5 py-1 text-xs text-gray-300 hover:border-sky-400/40 hover:text-white"
+                  >
+                    <UserPlus className="h-3.5 w-3.5" /> Añadir a cliente
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditingId(s.id)}
+                    className="cursor-pointer rounded-full border border-white/10 px-2.5 py-1 text-xs text-gray-300 hover:border-sky-400/40 hover:text-white"
+                  >
+                    Editar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setToDelete(s)}
+                    aria-label={`Eliminar servicio ${s.name}`}
+                    className="cursor-pointer rounded-full p-1.5 text-gray-500 hover:bg-red-500/10 hover:text-red-400"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
               </div>
-              <div className="flex shrink-0 items-center gap-1">
-                <button
-                  type="button"
-                  onClick={() => setEditingId(s.id)}
-                  className="cursor-pointer rounded-full border border-white/10 px-2.5 py-1 text-xs text-gray-300 hover:border-sky-400/40 hover:text-white"
-                >
-                  Editar
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setToDelete(s)}
-                  aria-label={`Eliminar servicio ${s.name}`}
-                  className="cursor-pointer rounded-full p-1.5 text-gray-500 hover:bg-red-500/10 hover:text-red-400"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </button>
-              </div>
+
+              {assigningId === s.id && (
+                <AssignServiceForm
+                  service={s}
+                  clients={clients}
+                  onDone={() => setAssigningId(null)}
+                  onCancel={() => setAssigningId(null)}
+                />
+              )}
             </div>
           )
         )}
@@ -549,6 +647,124 @@ function ServiceForm({
           {service ? "Guardar" : "Agregar"}
         </button>
       </div>
+    </form>
+  );
+}
+
+/**
+ * Inline form to link a catalog service to a client — an existing one, or a
+ * brand-new one created on the spot. Backs `assignServiceToClientAction`,
+ * which creates the `crm_contracts` row + line.
+ */
+function AssignServiceForm({
+  service,
+  clients,
+  onDone,
+  onCancel,
+}: {
+  service: CrmService;
+  clients: { id: string; name: string }[];
+  onDone: () => void;
+  onCancel: () => void;
+}) {
+  const [target, setTarget] = useState<string>(clients[0]?.id ?? "__new__");
+  const [newCompany, setNewCompany] = useState("");
+  const [confirming, setConfirming] = useState(false);
+  const isNew = target === "__new__";
+  const formRef = useRef<HTMLFormElement>(null);
+  const [state, formAction] = useActionState<CrmActionState, FormData>(async (prev, fd) => {
+    const res = await assignServiceToClientAction(prev, fd);
+    if (res && "success" in res) onDone();
+    return res;
+  }, null);
+
+  const targetLabel = isNew
+    ? newCompany.trim() || "un cliente nuevo"
+    : (clients.find((c) => c.id === target)?.name ?? "el cliente");
+
+  const askConfirm = () => {
+    if (isNew && !newCompany.trim()) return;
+    setConfirming(true);
+  };
+
+  return (
+    <form
+      ref={formRef}
+      action={formAction}
+      className="mt-3 space-y-2 rounded-xl border border-sky-400/30 bg-white/5 p-3"
+    >
+      <input type="hidden" name="serviceId" value={service.id} />
+      <p className="text-xs text-gray-400">
+        Contratar <span className="font-semibold text-white">{service.name}</span> (
+        {formatCurrencyMXN(service.defaultRate)} · {UNIT_LABELS[service.unit]})
+      </p>
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        <select
+          name="clientId"
+          value={target}
+          onChange={(e) => setTarget(e.target.value)}
+          className={FIELD}
+        >
+          {clients.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
+          <option value="__new__">+ Cliente nuevo…</option>
+        </select>
+        <select name="status" defaultValue="activo" className={FIELD}>
+          {CONTRACT_STATUSES.map((s) => (
+            <option key={s} value={s}>
+              {CONTRACT_STATUS_LABELS[s]}
+            </option>
+          ))}
+        </select>
+        {isNew && (
+          <>
+            <input
+              name="newClientCompany"
+              required
+              value={newCompany}
+              onChange={(e) => setNewCompany(e.target.value)}
+              placeholder="Empresa / nombre del cliente"
+              className={FIELD}
+            />
+            <input name="newClientName" placeholder="Persona de contacto (opcional)" className={FIELD} />
+          </>
+        )}
+      </div>
+      {state && "error" in state && <p className="text-xs text-red-400">{state.error}</p>}
+      <div className="flex justify-end gap-2">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="cursor-pointer rounded-full border border-white/10 px-3 py-1 text-xs text-gray-300 hover:border-white/20"
+        >
+          Cancelar
+        </button>
+        <button
+          type="button"
+          onClick={askConfirm}
+          className="cursor-pointer rounded-full bg-sky-500/20 px-3 py-1 text-xs font-semibold text-sky-200 hover:bg-sky-500/30"
+        >
+          Contratar
+        </button>
+      </div>
+
+      <ConfirmDialog
+        open={confirming}
+        tone="info"
+        title="Añadir servicio al cliente"
+        body={`Se contratará "${service.name}" (${formatCurrencyMXN(service.defaultRate)} · ${
+          UNIT_LABELS[service.unit]
+        }) para ${targetLabel}.`}
+        confirmLabel="Contratar"
+        onConfirm={() => {
+          setConfirming(false);
+          formRef.current?.requestSubmit();
+        }}
+        onClose={() => setConfirming(false)}
+      />
     </form>
   );
 }

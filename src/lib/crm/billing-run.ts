@@ -10,14 +10,19 @@
  *     and stamps `last_billed_date` (idempotent — a second run the same day
  *     does nothing).
  *  2. Flips still-`pendiente` payments past their `due_date` to `vencido`.
- *  3. Emails the client's primary contact a reminder for payments inside the
- *     configured lead window, and for freshly overdue ones (once each).
- *  4. Emails dios/admin an internal digest of everything outstanding.
+ *  3. Notifies the client's primary contact (email, and WhatsApp when enabled)
+ *     for payments inside the configured lead window and freshly overdue ones
+ *     (once each — the stamp is set if any channel delivered).
+ *  4. Sends dios/admin an internal digest of everything outstanding (email +
+ *     optional internal WhatsApp).
  */
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendEmail } from "@/lib/email/client";
+import { sendWhatsApp } from "@/lib/whatsapp/client";
 import { collectionsDigestEmail, paymentReminderEmail, type CollectionRow } from "@/lib/email/templates";
+import { collectionsDigestWhatsApp, paymentReminderWhatsApp } from "@/lib/notify/messages";
+import { readNotifySettings } from "@/lib/notify/config";
 import { formatCurrencyMXN } from "./format";
 import { daysUntil } from "./plan-status";
 import type { BillingCycle } from "./clients";
@@ -50,8 +55,10 @@ export type BillingRunResult = {
   generated: number;
   markedOverdue: number;
   remindersSent: number;
-  remindersSkippedNoEmail: number;
+  whatsappRemindersSent: number;
+  remindersSkippedNoContact: number;
   digestSent: boolean;
+  digestWhatsAppSent: boolean;
   errors: string[];
 };
 
@@ -73,7 +80,13 @@ type OpenPaymentRow = {
   crm_clients:
     | {
         company: string;
-        crm_contacts: { name: string; email: string | null; is_primary: boolean; deleted_at: string | null }[];
+        crm_contacts: {
+          name: string;
+          email: string | null;
+          phone: string | null;
+          is_primary: boolean;
+          deleted_at: string | null;
+        }[];
       }
     | null;
 };
@@ -87,8 +100,12 @@ export async function runBillingCycle(now: Date = new Date()): Promise<BillingRu
   // --- 1. Generate charges from due active plans ----------------------------
   const { data: duePlans, error: plansErr } = await supabase
     .from("crm_plans")
-    .select("id, client_id, name, amount, billing_cycle, cutoff_day, next_due_date, last_billed_date")
+    .select(
+      "id, client_id, name, amount, billing_cycle, cutoff_day, next_due_date, last_billed_date, crm_clients!inner(deleted_at)"
+    )
     .eq("status", "activo")
+    .is("deleted_at", null)
+    .is("crm_clients.deleted_at", null)
     .lte("next_due_date", today);
   if (plansErr) errors.push(`plans: ${plansErr.message}`);
 
@@ -121,6 +138,30 @@ export async function runBillingCycle(now: Date = new Date()): Promise<BillingRu
       description: `Cargo de ${formatCurrencyMXN(Number(plan.amount))} generado automáticamente (plan "${plan.name}"), vence ${plan.next_due_date}`,
       created_by: null,
     });
+
+    // Recurring maintenance task for this period — one per (plan, period).
+    const { data: existingTask } = await supabase
+      .from("crm_tasks")
+      .select("id")
+      .eq("plan_id", plan.id)
+      .eq("due_date", plan.next_due_date)
+      .maybeSingle();
+    if (!existingTask) {
+      const periodLabel = new Date(`${plan.next_due_date}T00:00:00`).toLocaleDateString("es-MX", {
+        month: "long",
+        year: "numeric",
+      });
+      const { error: taskErr } = await supabase.from("crm_tasks").insert({
+        client_id: plan.client_id,
+        plan_id: plan.id,
+        title: `Mantenimiento ${periodLabel} — ${plan.name}`,
+        status: "por_hacer",
+        due_date: plan.next_due_date,
+        created_by: null,
+      });
+      if (taskErr) errors.push(`maintenance task (plan ${plan.id}): ${taskErr.message}`);
+    }
+
     generated++;
   }
 
@@ -130,19 +171,19 @@ export async function runBillingCycle(now: Date = new Date()): Promise<BillingRu
     .update({ status: "vencido" })
     .eq("status", "pendiente")
     .lt("due_date", today)
+    .is("deleted_at", null)
     .select("id");
   if (overdueErr) errors.push(`overdue: ${overdueErr.message}`);
   const markedOverdue = overdueRows?.length ?? 0;
 
   // --- 3. Settings ----------------------------------------------------------
-  const { data: settings } = await supabase
-    .from("app_settings")
-    .select("org_name, billing_from_email, billing_reminder_lead_days")
-    .eq("id", true)
-    .maybeSingle();
-  const orgName = settings?.org_name ?? "TechPlace";
-  const leadDays = settings?.billing_reminder_lead_days ?? 3;
-  const fromEmail = settings?.billing_from_email ?? undefined;
+  const notify = await readNotifySettings(async (cols) => {
+    const { data } = await supabase.from("app_settings").select(cols).eq("id", true).maybeSingle();
+    return (data as Record<string, unknown> | null) ?? null;
+  });
+  const orgName = notify.orgName;
+  const leadDays = notify.billingReminderLeadDays;
+  const fromEmail = notify.fromEmail;
   const horizon = toISODate(new Date(now.getTime() + leadDays * DAY_MS));
 
   // --- 4/5. One pass over every outstanding payment (reminders + digest) ---
@@ -151,14 +192,17 @@ export async function runBillingCycle(now: Date = new Date()): Promise<BillingRu
     .select(
       `id, plan_id, amount, due_date, status, reminder_sent_at, overdue_notified_at,
        crm_plans(name),
-       crm_clients(company, crm_contacts(name, email, is_primary, deleted_at))`
+       crm_clients!inner(company, deleted_at, crm_contacts(name, email, phone, is_primary, deleted_at))`
     )
     .in("status", ["pendiente", "vencido"])
+    .is("deleted_at", null)
+    .is("crm_clients.deleted_at", null)
     .order("due_date", { ascending: true });
   const open = (openRaw ?? []) as unknown as OpenPaymentRow[];
 
   let remindersSent = 0;
-  let remindersSkippedNoEmail = 0;
+  let whatsappRemindersSent = 0;
+  let remindersSkippedNoContact = 0;
   const missingEmail: CollectionRow[] = [];
   const dueThisWeek: CollectionRow[] = [];
   const overdue: CollectionRow[] = [];
@@ -190,23 +234,52 @@ export async function runBillingCycle(now: Date = new Date()): Promise<BillingRu
     const needsOverdueReminder = p.status === "vencido" && !p.overdue_notified_at;
     if (!needsPendingReminder && !needsOverdueReminder) continue;
 
-    if (!primary?.email) {
-      remindersSkippedNoEmail++;
+    const waAddress = notify.whatsappReady ? primary?.phone ?? null : null;
+    if (!primary?.email && !waAddress) {
+      remindersSkippedNoContact++;
       missingEmail.push(row);
       continue;
     }
 
-    const { subject, html } = paymentReminderEmail({
-      company: row.company,
-      contactName: row.contactName,
-      planName: row.planName,
-      amount: row.amount,
-      dueDate: row.dueDate,
-      daysLeft: row.daysLeft,
-    });
-    const sent = await sendEmail({ to: primary.email, subject, html, from: fromEmail });
-    if (sent.ok) {
-      remindersSent++;
+    let delivered = false;
+
+    if (primary?.email) {
+      const { subject, html } = paymentReminderEmail({
+        company: row.company,
+        contactName: row.contactName,
+        planName: row.planName,
+        amount: row.amount,
+        dueDate: row.dueDate,
+        daysLeft: row.daysLeft,
+      });
+      const sent = await sendEmail({ to: primary.email, subject, html, from: fromEmail });
+      if (sent.ok) {
+        remindersSent++;
+        delivered = true;
+      } else {
+        errors.push(`reminder ${p.id}: ${sent.error}`);
+      }
+    }
+
+    if (waAddress) {
+      const body = paymentReminderWhatsApp({
+        orgName,
+        contactName: row.contactName,
+        planName: row.planName,
+        amount: row.amount,
+        dueDate: row.dueDate,
+        daysLeft: row.daysLeft,
+      });
+      const wa = await sendWhatsApp({ to: waAddress, body });
+      if (wa.ok) {
+        if (wa.sent > 0) whatsappRemindersSent++;
+        delivered = true;
+      } else {
+        errors.push(`reminder wa ${p.id}: ${wa.error}`);
+      }
+    }
+
+    if (delivered) {
       await supabase
         .from("crm_payments")
         .update(
@@ -215,21 +288,27 @@ export async function runBillingCycle(now: Date = new Date()): Promise<BillingRu
             : { reminder_sent_at: now.toISOString() }
         )
         .eq("id", p.id);
-    } else {
-      errors.push(`reminder ${p.id}: ${sent.error}`);
     }
   }
 
   // --- 6. Internal digest --------------------------------------------------
   let digestSent = false;
+  let digestWhatsAppSent = false;
   const { data: staff } = await supabase
     .from("profiles")
     .select("email")
     .in("role", ["dios", "admin"])
     .is("deleted_at", null);
-  const recipients = (staff ?? []).map((s) => s.email).filter((e): e is string => !!e);
+  const recipients = [
+    ...new Set([
+      ...(staff ?? []).map((s) => s.email).filter((e): e is string => !!e),
+      ...notify.internalEmail,
+    ]),
+  ];
+  const hasNews =
+    generated || markedOverdue || overdue.length || dueThisWeek.length || missingEmail.length;
 
-  if (recipients.length > 0 && (generated || markedOverdue || overdue.length || dueThisWeek.length || missingEmail.length)) {
+  if (recipients.length > 0 && hasNews) {
     const { subject, html } = collectionsDigestEmail({
       orgName,
       generated,
@@ -243,5 +322,31 @@ export async function runBillingCycle(now: Date = new Date()): Promise<BillingRu
     else errors.push(`digest: ${sent.error}`);
   }
 
-  return { generated, markedOverdue, remindersSent, remindersSkippedNoEmail, digestSent, errors };
+  if (notify.whatsappReady && notify.internalWhatsApp.length > 0 && hasNews) {
+    const body = collectionsDigestWhatsApp({
+      orgName,
+      generated,
+      markedOverdue,
+      overdue: overdue.map((r) => ({ company: r.company, amount: r.amount, dueDate: r.dueDate })),
+      dueThisWeek: dueThisWeek.map((r) => ({
+        company: r.company,
+        amount: r.amount,
+        dueDate: r.dueDate,
+      })),
+    });
+    const wa = await sendWhatsApp({ to: notify.internalWhatsApp, body });
+    if (wa.ok) digestWhatsAppSent = wa.sent > 0;
+    else errors.push(`digest wa: ${wa.error}`);
+  }
+
+  return {
+    generated,
+    markedOverdue,
+    remindersSent,
+    whatsappRemindersSent,
+    remindersSkippedNoContact,
+    digestSent,
+    digestWhatsAppSent,
+    errors,
+  };
 }

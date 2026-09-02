@@ -1,10 +1,12 @@
 /**
- * HTML builders for the two cobranza emails: a per-payment reminder sent to the
- * client's primary contact, and a daily internal digest sent to dios/admin.
- * Plain inline-styled HTML — no framework, safe for any mail client.
+ * HTML builders for the transactional CRM emails: per-payment cobranza
+ * reminders, the daily internal cobranza digest, quote lifecycle notices, the
+ * daily internal agenda, and IT ticket updates. Plain inline-styled HTML — no
+ * framework, safe for any mail client.
  */
 
 import { formatCurrencyMXN } from "@/lib/crm/format";
+import type { AgendaItem } from "@/lib/notify/messages";
 
 export type CollectionRow = {
   company: string;
@@ -86,6 +88,65 @@ export function collectionsDigestEmail(opts: {
     subject: `Cobranza ${opts.orgName}: ${opts.overdue.length} vencido(s), ${opts.dueThisWeek.length} por vencer`,
     html,
   };
+}
+
+/** Sent to the client when a quote is marked "enviada". */
+export function quoteSentEmail(opts: {
+  orgName: string;
+  number: string;
+  contactName: string | null;
+  total: number;
+  validUntil: string | null;
+}): { subject: string; html: string } {
+  const html = shell("Nueva cotización", `
+    <p>${opts.contactName ? `Hola ${opts.contactName},` : "Hola,"}</p>
+    <p>Te compartimos la cotización <strong>${opts.number}</strong>.</p>
+    <ul style="font-size:14px;padding-left:18px">
+      <li>Total: <strong>${formatCurrencyMXN(opts.total)}</strong></li>
+      ${opts.validUntil ? `<li>Vigente hasta: ${opts.validUntil}</li>` : ""}
+    </ul>
+    <p>Quedamos atentos a tus comentarios.</p>
+    <p style="font-size:12px;color:#64748b">${opts.orgName}</p>`);
+  return { subject: `Cotización ${opts.number} — ${opts.orgName}`, html };
+}
+
+/** Internal alert when a client accepts a quote. */
+export function quoteAcceptedEmail(opts: {
+  orgName: string;
+  number: string;
+  clientName: string;
+  total: number;
+}): { subject: string; html: string } {
+  const html = shell("Cotización aceptada", `
+    <p style="font-size:14px"><strong>${opts.number}</strong> · ${opts.clientName}</p>
+    <p style="font-size:14px">Total: <strong>${formatCurrencyMXN(opts.total)}</strong></p>
+    <p style="font-size:13px;color:#64748b">Puedes convertirla en un plan recurrente desde el detalle de la cotización.</p>`);
+  return { subject: `Cotización aceptada: ${opts.number} (${opts.clientName})`, html };
+}
+
+/** Daily internal agenda: tasks / projects / support SLAs coming due. */
+export function agendaDigestEmail(opts: {
+  orgName: string;
+  items: AgendaItem[];
+}): { subject: string; html: string } {
+  const kindLabel = { tarea: "Tarea", proyecto: "Proyecto", soporte: "Soporte (SLA)" } as const;
+  const rows = opts.items
+    .map(
+      (i) =>
+        `<tr>
+          <td style="padding:4px 8px 4px 0;color:#64748b">${kindLabel[i.kind]}</td>
+          <td style="padding:4px 8px 4px 0">${i.title}</td>
+          <td style="padding:4px 8px 4px 0;color:#64748b">${i.company ?? ""}</td>
+          <td style="padding:4px 0;white-space:nowrap;${i.daysLeft < 0 ? "color:#dc2626" : ""}">${i.date}${
+            i.daysLeft < 0 ? " (vencido)" : i.daysLeft === 0 ? " (hoy)" : ` (${i.daysLeft}d)`
+          }</td>
+        </tr>`
+    )
+    .join("");
+  const html = shell("Agenda del día", `
+    <p style="font-size:14px">${opts.items.length} pendiente(s) próximos a vencer:</p>
+    <table style="width:100%;border-collapse:collapse;font-size:13px">${rows}</table>`);
+  return { subject: `Agenda ${opts.orgName}: ${opts.items.length} pendiente(s)`, html };
 }
 
 /** IT Service Desk: notification to a client's ticket contact (public reply, resolved…). */

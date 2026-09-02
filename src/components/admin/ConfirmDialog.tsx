@@ -1,31 +1,39 @@
 "use client";
 
 /**
- * Modal confirmation for destructive actions. Every delete in the dashboard
- * routes through this: it states what will be removed and reminds the user
- * it's recoverable from Monitoreo → Eliminaciones. Esc / backdrop / Cancelar
- * dismiss; the confirm button runs `onConfirm` and shows a pending state.
+ * Modal confirmation dialog. Two tones:
+ *  - `danger` (default): destructive actions. Every delete in the dashboard
+ *    routes through this — it states what will be removed and reminds the user
+ *    it's recoverable from Monitoreo → Eliminaciones.
+ *  - `info`: non-destructive confirmations (e.g. "add this service to the
+ *    client?"). No recovery note, neutral button.
+ * Esc / backdrop / Cancelar dismiss; the confirm button runs `onConfirm` and
+ * shows a pending state.
  */
 
 import { useEffect, useState } from "react";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, HelpCircle } from "lucide-react";
 
 export default function ConfirmDialog({
   open,
   title,
   body,
-  confirmLabel = "Eliminar",
+  tone = "danger",
+  confirmLabel,
   onConfirm,
   onClose,
 }: {
   open: boolean;
   title: string;
   body?: string;
+  tone?: "danger" | "info";
   confirmLabel?: string;
   onConfirm: () => Promise<void> | void;
   onClose: () => void;
 }) {
   const [pending, setPending] = useState(false);
+  const danger = tone === "danger";
+  const label = confirmLabel ?? (danger ? "Eliminar" : "Confirmar");
 
   useEffect(() => {
     if (!open) return;
@@ -37,6 +45,8 @@ export default function ConfirmDialog({
   }, [open, pending, onClose]);
 
   if (!open) return null;
+
+  const Icon = danger ? AlertTriangle : HelpCircle;
 
   return (
     <div
@@ -51,14 +61,20 @@ export default function ConfirmDialog({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-3 flex items-center gap-2.5">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-red-400/30 bg-red-500/10 text-red-300">
-            <AlertTriangle className="h-4 w-4" />
+          <span
+            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border ${
+              danger
+                ? "border-red-400/30 bg-red-500/10 text-red-300"
+                : "border-sky-400/30 bg-sky-500/10 text-sky-300"
+            }`}
+          >
+            <Icon className="h-4 w-4" />
           </span>
           <p className="text-base font-bold text-white">{title}</p>
         </div>
         <p className="mb-5 text-sm text-gray-400">
           {body ? `${body} ` : ""}
-          Queda registrado y se puede restaurar desde Monitoreo → Eliminaciones.
+          {danger && "Queda registrado y se puede restaurar desde Monitoreo → Eliminaciones."}
         </p>
         <div className="flex justify-end gap-2">
           <button
@@ -81,9 +97,13 @@ export default function ConfirmDialog({
                 setPending(false);
               }
             }}
-            className="cursor-pointer rounded-full border border-red-400/40 bg-red-500/15 px-4 py-2 text-sm font-semibold text-red-200 transition-colors hover:bg-red-500/25 disabled:opacity-50"
+            className={`cursor-pointer rounded-full border px-4 py-2 text-sm font-semibold transition-colors disabled:opacity-50 ${
+              danger
+                ? "border-red-400/40 bg-red-500/15 text-red-200 hover:bg-red-500/25"
+                : "border-sky-400/40 bg-sky-500/15 text-sky-200 hover:bg-sky-500/25"
+            }`}
           >
-            {pending ? "Eliminando…" : confirmLabel}
+            {pending ? (danger ? "Eliminando…" : "Guardando…") : label}
           </button>
         </div>
       </div>

@@ -9,24 +9,30 @@
 import { useMemo, useState } from "react";
 import {
   AlertTriangle,
+  Briefcase,
   CalendarClock,
   CheckCircle2,
   ChevronRight,
+  FileText,
+  Kanban,
+  LifeBuoy,
   Mail,
   Phone,
   Plus,
+  ScrollText,
   Search,
   TrendingUp,
   Users,
 } from "lucide-react";
 import type { ClientStatus, CrmClient } from "@/lib/crm/clients";
-import type { ClientHealth } from "@/lib/crm/collections";
+import type { ClientHealth, PlanRow } from "@/lib/crm/collections";
+import { daysUntil } from "@/lib/crm/plan-status";
 import type { CrmProject } from "@/lib/crm/projects";
 import type { CrmQuote } from "@/lib/crm/quotes";
 import type { CrmInvoice } from "@/lib/crm/invoices";
 import type { CrmTask } from "@/lib/crm/tasks";
 import type { CrmContract } from "@/lib/crm/contracts";
-import type { CrmExpense } from "@/lib/crm/expenses";
+import type { CrmService } from "@/lib/crm/contract-types";
 import type { ItTicket } from "@/lib/it/ticket-types";
 import type { ItAsset } from "@/lib/it/asset-types";
 import { formatCurrencyMXN, initialsOf } from "@/lib/crm/format";
@@ -62,6 +68,16 @@ const STATUS_STYLES: Record<ClientStatus, { avatar: string; accent: string; dot:
   },
 };
 
+const CLOSED_TICKETS = new Set(["resuelto", "cerrado"]);
+const STALE_QUOTE_DAYS = 14;
+
+/** A quote that's still open (borrador / enviada) and has gone cold — needs follow-up. */
+function isStaleQuote(q: CrmQuote): boolean {
+  if (q.status === "aceptada" || q.status === "rechazada") return false;
+  if (q.validUntil) return daysUntil(q.validUntil) < 0; // vigencia vencida sin cerrar
+  return daysUntil(q.createdAt.slice(0, 10)) <= -STALE_QUOTE_DAYS; // sin vigencia y lleva sentada
+}
+
 /** Renders the client list with KPI strip, status filters, search, and the "new client" form. */
 export default function ClientsSection({
   clients,
@@ -73,8 +89,9 @@ export default function ClientsSection({
   contracts = [],
   tickets = [],
   assets = [],
-  expenses = [],
+  plans = [],
   serviceOptions = [],
+  catalogServices = [],
   canWriteBilling = false,
   canReadBilling = false,
   canUseSupport = false,
@@ -90,9 +107,12 @@ export default function ClientsSection({
   contracts?: CrmContract[];
   tickets?: ItTicket[];
   assets?: ItAsset[];
-  expenses?: CrmExpense[];
+  /** Active recurring plans, for the per-card summary (see `getPlans`). */
+  plans?: PlanRow[];
   /** Service names suggested in the client form's "Servicio" field. */
   serviceOptions?: string[];
+  /** Active catalog services, for the "Añadir servicio" picker in the workspace. */
+  catalogServices?: CrmService[];
   /** Gates the "+ Factura" contextual action in the workspace. */
   canWriteBilling?: boolean;
   /** Gates the Servicios (contratos) panel in the workspace. */
@@ -138,6 +158,7 @@ export default function ClientsSection({
         onBack={() => setOpenId(null)}
         clients={clients}
         serviceOptions={serviceOptions}
+        catalogServices={catalogServices}
         canWriteBilling={canWriteBilling}
         canReadBilling={canReadBilling}
         canUseSupport={canUseSupport}
@@ -149,7 +170,6 @@ export default function ClientsSection({
           contracts: contracts.filter((c) => c.clientId === openId),
           tickets: tickets.filter((t) => t.clientId === openId),
           assets: assets.filter((a) => a.clientId === openId),
-          expenses: expenses.filter((e) => e.clientId === openId),
         }}
       />
     );
@@ -235,6 +255,37 @@ export default function ClientsSection({
         {filtered.map((client) => {
           const s = STATUS_STYLES[client.status];
           const h = health[client.id];
+
+          const activePlans = plans.filter((p) => p.clientId === client.id && p.status === "activo");
+          const activeContracts = contracts.filter((c) => c.clientId === client.id && c.status === "activo");
+          const activeProjects = projects.filter(
+            (p) => p.clientId === client.id && p.status !== "completado"
+          ).length;
+          const openTasks = tasks.filter(
+            (t) => t.clientId === client.id && t.status !== "terminado"
+          ).length;
+          const openTickets = tickets.filter(
+            (t) => t.clientId === client.id && !CLOSED_TICKETS.has(t.status)
+          ).length;
+          const staleQuotes = quotes.filter((q) => q.clientId === client.id && isStaleQuote(q)).length;
+
+          const planLabel =
+            activePlans.length > 0
+              ? `Plan: ${activePlans[0].name}${activePlans.length > 1 ? ` +${activePlans.length - 1}` : ""}`
+              : activeContracts.length > 0
+                ? `Servicio: ${activeContracts[0].title}${
+                    activeContracts.length > 1 ? ` +${activeContracts.length - 1}` : ""
+                  }`
+                : h?.hasActivePlan
+                  ? `Plan activo${
+                      h.nextChargeAmount != null ? ` · ${formatCurrencyMXN(h.nextChargeAmount)}` : ""
+                    }`
+                  : null;
+
+          const hasMeta = Boolean(
+            planLabel || activeProjects || openTasks || openTickets || staleQuotes
+          );
+
           return (
             <button
               key={client.id}
@@ -277,7 +328,11 @@ export default function ClientsSection({
                       }`}
                     >
                       <CalendarClock className="h-3 w-3" />
-                      {h.hasActivePlan && h.nextDueDate ? `Próximo cobro ${h.nextDueDate}` : "Sin plan activo"}
+                      {h.hasActivePlan && h.nextDueDate
+                        ? `Próximo cobro ${h.nextDueDate}${
+                            h.nextChargeAmount != null ? ` · ${formatCurrencyMXN(h.nextChargeAmount)}` : ""
+                          }`
+                        : "Sin plan activo"}
                     </span>
                   )}
                   {h && h.overdueAmount > 0 && (
@@ -286,6 +341,37 @@ export default function ClientsSection({
                     </span>
                   )}
                 </div>
+
+                {hasMeta && (
+                  <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11px]">
+                    {planLabel && (
+                      <span className="flex items-center gap-1 rounded-full bg-cyan-500/10 px-2 py-0.5 text-cyan-300">
+                        <ScrollText className="h-3 w-3 shrink-0" /> {planLabel}
+                      </span>
+                    )}
+                    {activeProjects > 0 && (
+                      <span className="flex items-center gap-1 rounded-full bg-blue-500/10 px-2 py-0.5 text-blue-300">
+                        <Briefcase className="h-3 w-3" /> {activeProjects} proyecto{activeProjects > 1 ? "s" : ""}
+                      </span>
+                    )}
+                    {openTasks > 0 && (
+                      <span className="flex items-center gap-1 rounded-full bg-indigo-500/10 px-2 py-0.5 text-indigo-300">
+                        <Kanban className="h-3 w-3" /> {openTasks} tarea{openTasks > 1 ? "s" : ""}
+                      </span>
+                    )}
+                    {openTickets > 0 && (
+                      <span className="flex items-center gap-1 rounded-full bg-rose-500/10 px-2 py-0.5 text-rose-300">
+                        <LifeBuoy className="h-3 w-3" /> {openTickets} ticket{openTickets > 1 ? "s" : ""}
+                      </span>
+                    )}
+                    {staleQuotes > 0 && (
+                      <span className="flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 font-semibold text-amber-300">
+                        <FileText className="h-3 w-3" /> {staleQuotes} cotización{staleQuotes > 1 ? "es" : ""} sin
+                        seguimiento
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
 
               <ChevronRight className="h-5 w-5 shrink-0 text-gray-600" />

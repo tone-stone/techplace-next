@@ -16,6 +16,11 @@ import { softDelete } from "./soft-delete";
 import { addHistory } from "./history";
 import { insertWithSequentialNumber } from "./numbering";
 import { formatCurrencyMXN } from "./format";
+import { sendEmail } from "@/lib/email/client";
+import { sendWhatsApp } from "@/lib/whatsapp/client";
+import { quoteAcceptedEmail, quoteSentEmail } from "@/lib/email/templates";
+import { quoteAcceptedWhatsApp, quoteSentWhatsApp } from "@/lib/notify/messages";
+import { readNotifySettings } from "@/lib/notify/config";
 import type { CrmActionState } from "./clients";
 
 export type QuoteStatus = "borrador" | "enviada" | "aceptada" | "rechazada";
@@ -34,6 +39,12 @@ export type CrmQuote = {
   total: number;
   notes: string | null;
   validUntil: string | null;
+  /** Editable "fecha de creación" (issue date); falls back to `createdAt` when migration 0034 is pending. */
+  issuedDate: string;
+  /** Per-quote override of the executive legends; `null` → use `DEFAULT_QUOTE_TERMS`. */
+  terms: string | null;
+  /** Recurring plan created from this quote, if any (see `createPlanFromQuoteAction`). */
+  planId: string | null;
   createdAt: string;
 };
 
@@ -65,6 +76,9 @@ function mapQuote(row: {
   total: number;
   notes: string | null;
   valid_until: string | null;
+  issued_date?: string | null;
+  terms?: string | null;
+  plan_id: string | null;
   created_at: string;
 }): CrmQuote {
   return {
@@ -81,6 +95,9 @@ function mapQuote(row: {
     total: Number(row.total),
     notes: row.notes,
     validUntil: row.valid_until,
+    issuedDate: row.issued_date ?? (row.created_at ? row.created_at.slice(0, 10) : ""),
+    terms: row.terms ?? null,
+    planId: row.plan_id ?? null,
     createdAt: row.created_at,
   };
 }
@@ -127,29 +144,36 @@ export async function getQuoteDetail(quoteId: string): Promise<QuoteDetail | nul
   return { quote: mapQuote(quote), items: (items ?? []).map(mapQuoteItem) };
 }
 
+/** True when a Postgres error is "column ... does not exist" for migration 0034's columns. */
+function isMissingQuoteExtraColumn(msg: string | undefined) {
+  return !!msg && /column .*(issued_date|terms).* does not exist/i.test(msg);
+}
+
+type ParsedQuoteForm = {
+  clientId: string;
+  clientName: string;
+  clientCompany: string;
+  clientEmail: string;
+  taxRate: number;
+  notes: string;
+  validUntil: string;
+  issuedDate: string;
+  terms: string;
+  items: RawLineItem[];
+  subtotal: number;
+  taxAmount: number;
+  total: number;
+};
+
 /**
- * `useActionState` action backing the "Nueva cotización" form. Parses the
- * `items` field (a JSON-encoded array built client-side by `QuoteFormModal`)
- * and validates each line before computing subtotal/tax/total server-side.
+ * Shared parse + validation for the create and update quote forms. Reads the
+ * client fields, the JSON `items` array built by `QuoteFormModal`, the tax
+ * rate, and the new `issuedDate` / `terms` fields, then recomputes the money
+ * server-side (never trusting the client's totals).
  */
-export async function createQuoteAction(
-  _prevState: CrmActionState,
-  formData: FormData
-): Promise<CrmActionState> {
-  const check = await requireCrmCore();
-  if (!check.ok) return { error: check.error };
-
-  const clientId = String(formData.get("clientId") ?? "").trim();
+function parseQuoteForm(formData: FormData): { ok: true; data: ParsedQuoteForm } | { ok: false; error: string } {
   const clientName = String(formData.get("clientName") ?? "").trim();
-  const clientCompany = String(formData.get("clientCompany") ?? "").trim();
-  const clientEmail = String(formData.get("clientEmail") ?? "").trim();
-  const taxRate = Number(formData.get("taxRate") ?? 0);
-  const notes = String(formData.get("notes") ?? "").trim();
-  const validUntil = String(formData.get("validUntil") ?? "").trim();
-
-  if (!clientName) {
-    return { error: "Escribe el nombre del cliente o prospecto" };
-  }
+  if (!clientName) return { ok: false, error: "Escribe el nombre del cliente o prospecto" };
 
   let items: RawLineItem[];
   try {
@@ -164,32 +188,73 @@ export async function createQuoteAction(
       return { concept, quantity, unitPrice };
     });
   } catch {
-    return { error: "Agrega al menos una línea válida (concepto, cantidad y precio)" };
+    return { ok: false, error: "Agrega al menos una línea válida (concepto, cantidad y precio)" };
   }
 
+  const taxRate = Number(formData.get("taxRate") ?? 0);
   const subtotal = items.reduce((sum, i) => sum + i.quantity * i.unitPrice, 0);
   const taxAmount = subtotal * (taxRate / 100);
-  const total = subtotal + taxAmount;
+
+  return {
+    ok: true,
+    data: {
+      clientId: String(formData.get("clientId") ?? "").trim(),
+      clientName,
+      clientCompany: String(formData.get("clientCompany") ?? "").trim(),
+      clientEmail: String(formData.get("clientEmail") ?? "").trim(),
+      taxRate,
+      notes: String(formData.get("notes") ?? "").trim(),
+      validUntil: String(formData.get("validUntil") ?? "").trim(),
+      issuedDate: String(formData.get("issuedDate") ?? "").trim(),
+      terms: String(formData.get("terms") ?? "").trim(),
+      items,
+      subtotal,
+      taxAmount,
+      total: subtotal + taxAmount,
+    },
+  };
+}
+
+/**
+ * `useActionState` action backing the "Nueva cotización" form. Parses the
+ * `items` field (a JSON-encoded array built client-side by `QuoteFormModal`)
+ * and validates each line before computing subtotal/tax/total server-side.
+ */
+export async function createQuoteAction(
+  _prevState: CrmActionState,
+  formData: FormData
+): Promise<CrmActionState> {
+  const check = await requireCrmCore();
+  if (!check.ok) return { error: check.error };
+
+  const parsed = parseQuoteForm(formData);
+  if (!parsed.ok) return { error: parsed.error };
+  const f = parsed.data;
 
   const supabase = await createClient();
-  const result = await insertWithSequentialNumber(supabase, "crm_quotes", "COT", {
-    client_id: clientId || null,
-    client_name: clientName,
-    client_company: clientCompany || null,
-    client_email: clientEmail || null,
-    subtotal,
-    tax_rate: taxRate,
-    tax_amount: taxAmount,
-    total,
-    notes: notes || null,
-    valid_until: validUntil || null,
+  const base = {
+    client_id: f.clientId || null,
+    client_name: f.clientName,
+    client_company: f.clientCompany || null,
+    client_email: f.clientEmail || null,
+    subtotal: f.subtotal,
+    tax_rate: f.taxRate,
+    tax_amount: f.taxAmount,
+    total: f.total,
+    notes: f.notes || null,
+    valid_until: f.validUntil || null,
     created_by: check.userId,
-  });
+  };
+  const extras = { issued_date: f.issuedDate || undefined, terms: f.terms || null };
 
+  let result = await insertWithSequentialNumber(supabase, "crm_quotes", "COT", { ...base, ...extras });
+  if ("error" in result && isMissingQuoteExtraColumn(result.error)) {
+    result = await insertWithSequentialNumber(supabase, "crm_quotes", "COT", base); // migration 0034 pending
+  }
   if ("error" in result) return { error: result.error };
 
   const { error: itemsError } = await supabase.from("crm_quote_items").insert(
-    items.map((item, position) => ({
+    f.items.map((item, position) => ({
       quote_id: result.data.id,
       concept: item.concept,
       quantity: item.quantity,
@@ -199,12 +264,90 @@ export async function createQuoteAction(
   );
   if (itemsError) return { error: itemsError.message };
 
-  if (clientId) {
+  if (f.clientId) {
     await addHistory(
       supabase,
-      clientId,
+      f.clientId,
       "cotizacion",
-      `Cotización ${result.number} creada por ${formatCurrencyMXN(total)}`,
+      `Cotización ${result.number} creada por ${formatCurrencyMXN(f.total)}`,
+      check.userId
+    );
+  }
+  revalidatePath("/admin");
+  return { success: true };
+}
+
+/**
+ * `useActionState` action backing the "Editar cotización" form — full CRUD so
+ * capture errors (client, líneas, fechas, IVA, notas, condiciones) can be
+ * fixed. Replaces the quote's line items wholesale. The folio and creator are
+ * never touched.
+ */
+export async function updateQuoteAction(
+  _prevState: CrmActionState,
+  formData: FormData
+): Promise<CrmActionState> {
+  const check = await requireCrmCore();
+  if (!check.ok) return { error: check.error };
+
+  const quoteId = String(formData.get("quoteId") ?? "").trim();
+  if (!quoteId) return { error: "Cotización no encontrada" };
+
+  const parsed = parseQuoteForm(formData);
+  if (!parsed.ok) return { error: parsed.error };
+  const f = parsed.data;
+
+  const supabase = await createClient();
+  const base = {
+    client_id: f.clientId || null,
+    client_name: f.clientName,
+    client_company: f.clientCompany || null,
+    client_email: f.clientEmail || null,
+    subtotal: f.subtotal,
+    tax_rate: f.taxRate,
+    tax_amount: f.taxAmount,
+    total: f.total,
+    notes: f.notes || null,
+    valid_until: f.validUntil || null,
+  };
+  const extras = { issued_date: f.issuedDate || undefined, terms: f.terms || null };
+
+  let { data: updated, error } = await supabase
+    .from("crm_quotes")
+    .update({ ...base, ...extras })
+    .eq("id", quoteId)
+    .is("deleted_at", null)
+    .select("number")
+    .single();
+  if (error && isMissingQuoteExtraColumn(error.message)) {
+    ({ data: updated, error } = await supabase
+      .from("crm_quotes")
+      .update(base)
+      .eq("id", quoteId)
+      .is("deleted_at", null)
+      .select("number")
+      .single()); // migration 0034 pending
+  }
+  if (error) return { error: error.message };
+
+  await supabase.from("crm_quote_items").delete().eq("quote_id", quoteId);
+  const { error: itemsError } = await supabase.from("crm_quote_items").insert(
+    f.items.map((item, position) => ({
+      quote_id: quoteId,
+      concept: item.concept,
+      quantity: item.quantity,
+      unit_price: item.unitPrice,
+      position,
+    }))
+  );
+  if (itemsError) return { error: itemsError.message };
+
+  if (f.clientId) {
+    await addHistory(
+      supabase,
+      f.clientId,
+      "cotizacion",
+      `Cotización ${updated?.number ?? ""} actualizada · ${formatCurrencyMXN(f.total)}`.trim(),
       check.userId
     );
   }
@@ -228,8 +371,115 @@ export async function updateQuoteStatusAction(
   if (clientId) {
     await addHistory(supabase, clientId, "cotizacion", `Cotización actualizada a "${status}"`, check.userId);
   }
+
+  // Real-time notifications for the two lifecycle steps that matter. Never let a
+  // delivery hiccup fail the status change the user just made.
+  if (status === "enviada" || status === "aceptada") {
+    try {
+      await notifyQuoteEvent(supabase, quoteId, clientId, status);
+    } catch (err) {
+      console.warn("[quotes] notificación omitida:", err instanceof Error ? err.message : err);
+    }
+  }
+
   revalidatePath("/admin");
   return { success: true };
+}
+
+/**
+ * Fires the "enviada" (to the client) or "aceptada" (to the team) notice over
+ * email + WhatsApp. Best-effort: individual channel failures are swallowed.
+ */
+async function notifyQuoteEvent(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  quoteId: string,
+  clientId: string | null,
+  status: "enviada" | "aceptada"
+): Promise<void> {
+  const { data: q } = await supabase
+    .from("crm_quotes")
+    .select("number, client_name, client_email, total, valid_until")
+    .eq("id", quoteId)
+    .maybeSingle();
+  if (!q) return;
+
+  const notify = await readNotifySettings(async (cols) => {
+    const { data } = await supabase.from("app_settings").select(cols).eq("id", true).maybeSingle();
+    return (data as Record<string, unknown> | null) ?? null;
+  });
+  const total = Number(q.total) || 0;
+
+  if (status === "enviada") {
+    let contactName: string | null = null;
+    let phone: string | null = null;
+    if (clientId) {
+      const { data: contact } = await supabase
+        .from("crm_contacts")
+        .select("name, phone")
+        .eq("client_id", clientId)
+        .eq("is_primary", true)
+        .is("deleted_at", null)
+        .maybeSingle();
+      contactName = contact?.name ?? null;
+      phone = contact?.phone ?? null;
+    }
+    if (q.client_email) {
+      const { subject, html } = quoteSentEmail({
+        orgName: notify.orgName,
+        number: q.number,
+        contactName,
+        total,
+        validUntil: q.valid_until,
+      });
+      await sendEmail({ to: q.client_email, subject, html, from: notify.fromEmail });
+    }
+    if (notify.whatsappReady && phone) {
+      await sendWhatsApp({
+        to: phone,
+        body: quoteSentWhatsApp({
+          orgName: notify.orgName,
+          number: q.number,
+          contactName,
+          total,
+          validUntil: q.valid_until,
+        }),
+      });
+    }
+    return;
+  }
+
+  // status === "aceptada" → internal alert
+  const { data: staff } = await supabase
+    .from("profiles")
+    .select("email")
+    .in("role", ["dios", "admin"])
+    .is("deleted_at", null);
+  const recipients = [
+    ...new Set([
+      ...(staff ?? []).map((s) => s.email).filter((e): e is string => !!e),
+      ...notify.internalEmail,
+    ]),
+  ];
+  if (recipients.length > 0) {
+    const { subject, html } = quoteAcceptedEmail({
+      orgName: notify.orgName,
+      number: q.number,
+      clientName: q.client_name,
+      total,
+    });
+    await sendEmail({ to: recipients, subject, html, from: notify.fromEmail });
+  }
+  if (notify.whatsappReady && notify.internalWhatsApp.length > 0) {
+    await sendWhatsApp({
+      to: notify.internalWhatsApp,
+      body: quoteAcceptedWhatsApp({
+        orgName: notify.orgName,
+        number: q.number,
+        clientName: q.client_name,
+        total,
+      }),
+    });
+  }
 }
 
 /** Soft-deletes a quote (recoverable; logged to `deletion_log`). */

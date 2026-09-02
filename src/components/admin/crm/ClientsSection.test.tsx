@@ -80,4 +80,41 @@ describe("ClientsSection", () => {
 
     expect(screen.getByText(/no hay clientes/i)).toBeInTheDocument();
   });
+
+  it("summarizes each client's plan, open work and stale quotes on the card", () => {
+    const old = "2026-01-01T00:00:00Z"; // well over 14 days before any plausible test run
+    render(
+      <ClientsSection
+        clients={clients}
+        plans={[
+          {
+            id: "p1",
+            clientId: "1",
+            company: "Acme Corp",
+            name: "Soporte mensual",
+            amount: 2500,
+            billingCycle: "mensual",
+            cutoffDay: 1,
+            nextDueDate: "2030-01-01",
+            status: "activo",
+            contractId: null,
+          },
+        ]}
+        projects={[
+          { id: "pr1", clientId: "1", name: "Rediseño", status: "en_progreso" },
+        ] as never}
+        tasks={[{ id: "t1", clientId: "1", title: "Llamar", status: "por_hacer" }] as never}
+        quotes={
+          [
+            { id: "q1", clientId: "1", number: "C-1", status: "enviada", validUntil: null, createdAt: old },
+          ] as never
+        }
+      />
+    );
+
+    expect(screen.getByText(/Plan: Soporte mensual/)).toBeInTheDocument();
+    expect(screen.getByText(/1 proyecto/)).toBeInTheDocument();
+    expect(screen.getByText(/1 tarea/)).toBeInTheDocument();
+    expect(screen.getByText(/1 cotización sin seguimiento/)).toBeInTheDocument();
+  });
 });

@@ -6,14 +6,21 @@ import {
   Clock,
   HandCoins,
   LineChart,
+  TrendingDown,
   TrendingUp,
   Users,
+  Wallet,
 } from "lucide-react";
 import type { ComponentType } from "react";
 import type { ClientPayment, CrmClient } from "@/lib/crm/clients";
+import type { ScheduledCharge } from "@/lib/crm/collections";
+import type { CrmExpense } from "@/lib/crm/expense-types";
 import { formatCurrencyMXN } from "@/lib/crm/format";
 import type { CrmProject } from "@/lib/crm/projects";
+import type { CrmTask } from "@/lib/crm/tasks";
+import type { ItTicket } from "@/lib/it/ticket-types";
 import StatusBadge from "./StatusBadge";
+import UpcomingCalendar, { type CalEvent } from "./UpcomingCalendar";
 
 /**
  * "Resumen" tab: the CRM's dashboard-at-a-glance. Derives KPI tiles, a
@@ -26,11 +33,13 @@ import StatusBadge from "./StatusBadge";
 // Dark surface the charts are drawn on — used for the end-dot's surface ring.
 const SURFACE = "#0e1420";
 
-/** Compact peso formatting for chart labels (e.g. `$1.2M`, `$40k`), unlike the full `formatCurrencyMXN`. */
+/** Compact peso formatting for chart labels (e.g. `$1.2M`, `$40k`, `−$3k`), unlike the full `formatCurrencyMXN`. */
 function compactMXN(value: number): string {
-  if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
-  if (value >= 1_000) return `$${Math.round(value / 1_000)}k`;
-  return `$${value}`;
+  const sign = value < 0 ? "−" : "";
+  const abs = Math.abs(value);
+  if (abs >= 1_000_000) return `${sign}$${(abs / 1_000_000).toFixed(1)}M`;
+  if (abs >= 1_000) return `${sign}$${Math.round(abs / 1_000)}k`;
+  return `${sign}$${abs}`;
 }
 
 /* ------------------------------------------------------------------ */
@@ -46,10 +55,10 @@ type Stat = {
   glow: string;
 };
 
-/** Grid of the top KPI cards (active clients, active projects, revenue this month, pending). */
+/** Grid of the top KPI cards (clients, projects, and the money-in/out/net/pending strip). */
 function StatTiles({ stats }: { stats: Stat[] }) {
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {stats.map((stat) => (
         <div
           key={stat.label}
@@ -78,31 +87,34 @@ function StatTiles({ stats }: { stats: Stat[] }) {
 /*  Revenue area chart (6 months, single series)                      */
 /* ------------------------------------------------------------------ */
 
-/** Hand-drawn SVG area/line chart of monthly collected revenue, with a labeled endpoint. */
+/** Hand-drawn SVG area/line chart of monthly net flow, with a zero baseline and a labeled endpoint. */
 function RevenueChart({ data }: { data: { label: string; value: number }[] }) {
   const W = 560;
   const H = 170;
   const PT = 16;
   const PB = 26;
   const PX = 10;
-  const max = Math.max(1, ...data.map((d) => d.value));
+  const rawMax = Math.max(0, ...data.map((d) => d.value));
+  const rawMin = Math.min(0, ...data.map((d) => d.value));
+  const span = Math.max(1, rawMax - rawMin);
   const stepX = (W - PX * 2) / Math.max(1, data.length - 1);
   const x = (i: number) => PX + i * stepX;
-  const y = (v: number) => PT + (1 - v / max) * (H - PT - PB);
+  const y = (v: number) => PT + (1 - (v - rawMin) / span) * (H - PT - PB);
+  const baseY = y(0);
 
   const line = data
     .map((d, i) => `${i === 0 ? "M" : "L"}${x(i).toFixed(1)},${y(d.value).toFixed(1)}`)
     .join(" ");
-  const area = `${line} L${x(data.length - 1).toFixed(1)},${H - PB} L${x(0).toFixed(1)},${H - PB} Z`;
+  const area = `${line} L${x(data.length - 1).toFixed(1)},${baseY.toFixed(1)} L${x(0).toFixed(1)},${baseY.toFixed(1)} Z`;
   const last = data[data.length - 1];
-  const hasData = data.some((d) => d.value > 0);
+  const hasData = data.some((d) => d.value !== 0);
 
   return (
     <svg
       viewBox={`0 0 ${W} ${H}`}
       className="w-full"
       role="img"
-      aria-label="Ingresos cobrados en los últimos 6 meses"
+      aria-label="Flujo neto (cobrado menos egresos) en los últimos 6 meses"
     >
       <defs>
         <linearGradient id="crm-rev-fill" x1="0" x2="0" y1="0" y2="1">
@@ -133,8 +145,8 @@ function RevenueChart({ data }: { data: { label: string; value: number }[] }) {
       <line
         x1={PX}
         x2={W - PX}
-        y1={H - PB}
-        y2={H - PB}
+        y1={baseY}
+        y2={baseY}
         stroke="rgba(255,255,255,0.15)"
         strokeWidth="1"
       />
@@ -193,7 +205,7 @@ function RevenueChart({ data }: { data: { label: string; value: number }[] }) {
           className="fill-gray-500"
           style={{ fontSize: 12 }}
         >
-          Sin pagos registrados todavía
+          Sin movimientos registrados todavía
         </text>
       )}
     </svg>
@@ -236,26 +248,49 @@ export default function OverviewSection({
   clients,
   projects,
   payments,
+  expenses = [],
+  scheduledCharges = [],
+  tasks = [],
+  tickets = [],
 }: {
   clients: CrmClient[];
   projects: CrmProject[];
   payments: ClientPayment[];
+  expenses?: CrmExpense[];
+  /** Active plans' next charge — folded into "Por cobrar" as money still coming. */
+  scheduledCharges?: ScheduledCharge[];
+  tasks?: CrmTask[];
+  tickets?: ItTicket[];
 }) {
   const now = new Date();
   const activeClients = clients.filter((c) => c.status === "activo").length;
   const activeProjects = projects.filter((p) => p.status !== "completado").length;
 
+  /** True when `isoDate` (YYYY-MM-DD) falls in the current calendar month. */
+  const inThisMonth = (isoDate: string | null) => {
+    if (!isoDate) return false;
+    const d = new Date(`${isoDate}T00:00:00`);
+    return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+  };
+
   const monthlyRevenue = payments
-    .filter((p) => {
-      if (p.status !== "pagado" || !p.paidDate) return false;
-      const paid = new Date(`${p.paidDate}T00:00:00`);
-      return paid.getFullYear() === now.getFullYear() && paid.getMonth() === now.getMonth();
-    })
+    .filter((p) => p.status === "pagado" && inThisMonth(p.paidDate))
     .reduce((sum, p) => sum + p.amount, 0);
 
-  const pendingRevenue = payments
+  // Sólo egresos pagados afectan las cuentas; los programados no cuentan aún.
+  const monthlyExpenses = expenses
+    .filter((e) => e.status === "pagado" && inThisMonth(e.expenseDate))
+    .reduce((sum, e) => sum + e.amount, 0);
+
+  const monthlyNet = monthlyRevenue - monthlyExpenses;
+
+  const scheduledTotal = scheduledCharges.reduce((sum, c) => sum + c.amount, 0);
+
+  const pendingPaymentsTotal = payments
     .filter((p) => p.status === "pendiente" || p.status === "vencido")
     .reduce((sum, p) => sum + p.amount, 0);
+
+  const pendingRevenue = pendingPaymentsTotal + scheduledTotal;
 
   const stats: Stat[] = [
     {
@@ -283,6 +318,22 @@ export default function OverviewSection({
       glow: "bg-emerald-500/20",
     },
     {
+      label: "Egresos este mes",
+      value: formatCurrencyMXN(monthlyExpenses),
+      icon: TrendingDown,
+      ring: "border-rose-400/30 bg-rose-500/10",
+      text: "text-rose-300",
+      glow: "bg-rose-500/20",
+    },
+    {
+      label: "Neto este mes",
+      value: formatCurrencyMXN(monthlyNet),
+      icon: Wallet,
+      ring: monthlyNet < 0 ? "border-rose-400/30 bg-rose-500/10" : "border-emerald-400/30 bg-emerald-500/10",
+      text: monthlyNet < 0 ? "text-rose-300" : "text-emerald-300",
+      glow: monthlyNet < 0 ? "bg-rose-500/20" : "bg-emerald-500/20",
+    },
+    {
       label: "Por cobrar",
       value: formatCurrencyMXN(pendingRevenue),
       icon: HandCoins,
@@ -292,18 +343,76 @@ export default function OverviewSection({
     },
   ];
 
-  // Revenue: last 6 months of paid payments, bucketed by month.
-  const revenueByMonth = Array.from({ length: 6 }, (_, k) => {
+  // Net flow: last 6 months of (cobrado − egresos), bucketed by month. A month
+  // where a charge was collected and then spent nets back to ~0.
+  const netByMonth = Array.from({ length: 6 }, (_, k) => {
     const d = new Date(now.getFullYear(), now.getMonth() - (5 - k), 1);
-    const value = payments
-      .filter((p) => {
-        if (p.status !== "pagado" || !p.paidDate) return false;
-        const paid = new Date(`${p.paidDate}T00:00:00`);
-        return paid.getFullYear() === d.getFullYear() && paid.getMonth() === d.getMonth();
-      })
+    const sameMonth = (iso: string | null) => {
+      if (!iso) return false;
+      const x = new Date(`${iso}T00:00:00`);
+      return x.getFullYear() === d.getFullYear() && x.getMonth() === d.getMonth();
+    };
+    const cobrado = payments
+      .filter((p) => p.status === "pagado" && sameMonth(p.paidDate))
       .reduce((sum, p) => sum + p.amount, 0);
-    return { label: d.toLocaleDateString("es-MX", { month: "short" }).replace(".", ""), value };
+    const gastado = expenses
+      .filter((e) => e.status === "pagado" && sameMonth(e.expenseDate))
+      .reduce((sum, e) => sum + e.amount, 0);
+    return {
+      label: d.toLocaleDateString("es-MX", { month: "short" }).replace(".", ""),
+      value: cobrado - gastado,
+    };
   });
+
+  // Agenda: every dated thing coming up — cobros, tareas, entregas de proyecto,
+  // y SLAs de soporte — para el calendario.
+  const companyOf = (id: string | null) => (id ? (clients.find((c) => c.id === id)?.company ?? "") : "");
+  const CLOSED_TICKETS = new Set(["resuelto", "cerrado"]);
+  const calendarEvents: CalEvent[] = [
+    ...payments
+      .filter((p) => p.status === "pendiente" || p.status === "vencido")
+      .map((p) => ({
+        id: `pay-${p.id}`,
+        date: p.dueDate,
+        kind: "cobro" as const,
+        label: formatCurrencyMXN(p.amount),
+        sub: companyOf(p.clientId),
+      })),
+    ...scheduledCharges.map((s) => ({
+      id: `sc-${s.planId}`,
+      date: s.nextDueDate,
+      kind: "cobro" as const,
+      label: formatCurrencyMXN(s.amount),
+      sub: `${s.company} · plan`,
+    })),
+    ...tasks
+      .filter((t) => t.status !== "terminado" && t.dueDate)
+      .map((t) => ({
+        id: `task-${t.id}`,
+        date: t.dueDate as string,
+        kind: "tarea" as const,
+        label: t.title,
+        sub: companyOf(t.clientId) || undefined,
+      })),
+    ...projects
+      .filter((p) => p.status !== "completado" && p.dueDate)
+      .map((p) => ({
+        id: `proj-${p.id}`,
+        date: p.dueDate as string,
+        kind: "proyecto" as const,
+        label: p.name,
+        sub: companyOf(p.clientId) || undefined,
+      })),
+    ...tickets
+      .filter((t) => !CLOSED_TICKETS.has(t.status) && t.slaDueAt)
+      .map((t) => ({
+        id: `tk-${t.id}`,
+        date: (t.slaDueAt as string).slice(0, 10),
+        kind: "soporte" as const,
+        label: `${t.number} · ${t.subject}`,
+        sub: "SLA",
+      })),
+  ];
 
   // Client funnel (ordinal — order is the meaning). Blue ramp: sky 300 → 600.
   const clientFunnel = [
@@ -359,8 +468,9 @@ export default function OverviewSection({
     { label: "Pagado", value: paidAmount, bar: "bg-emerald-500", icon: CheckCircle2, text: "text-emerald-400" },
     { label: "Pendiente", value: pendingAmount, bar: "bg-amber-500", icon: Clock, text: "text-amber-400" },
     { label: "Vencido", value: overdueAmount, bar: "bg-red-500", icon: AlertTriangle, text: "text-red-400" },
+    { label: "Programado", value: scheduledTotal, bar: "bg-sky-500", icon: CalendarClock, text: "text-sky-400" },
   ];
-  const collectionTotal = paidAmount + pendingAmount + overdueAmount || 1;
+  const collectionTotal = paidAmount + pendingAmount + overdueAmount + scheduledTotal || 1;
 
   const recentProjects = [...projects]
     .sort((a, b) => (a.dueDate ?? "9999-99-99").localeCompare(b.dueDate ?? "9999-99-99"))
@@ -370,12 +480,23 @@ export default function OverviewSection({
     <div className="space-y-6">
       <StatTiles stats={stats} />
 
+      <p className="-mt-2 text-xs text-gray-500">
+        Desglose del pendiente por cobrar: {formatCurrencyMXN(pendingPaymentsTotal)} en cobros
+        pendientes/vencidos + {formatCurrencyMXN(scheduledTotal)} de {scheduledCharges.length} plan(es)
+        activo(s) sin cobro pendiente.
+        {pendingRevenue === 0 &&
+          " Registra un plan recurrente o un cobro pendiente en el cliente para que aparezca aquí."}
+      </p>
+
+      <UpcomingCalendar events={calendarEvents} />
+
       <div className="tp-dark-card-crm rounded-2xl p-5 sm:p-6">
         <div className="mb-4 flex items-center gap-2">
           <LineChart className="h-4 w-4 text-indigo-300" />
-          <h2 className="text-lg font-bold text-white">Ingresos de los últimos 6 meses</h2>
+          <h2 className="text-lg font-bold text-white">Flujo neto de los últimos 6 meses</h2>
+          <span className="ml-1 text-xs text-gray-500">cobrado − egresos</span>
         </div>
-        <RevenueChart data={revenueByMonth} />
+        <RevenueChart data={netByMonth} />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">

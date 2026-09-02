@@ -17,7 +17,7 @@ import type { CrmActionState } from "./clients";
 
 export type { CrmService } from "./contract-types";
 
-/** Every non-deleted catalog service, active first then alphabetical. */
+/** Every non-deleted catalog service, active first then oldest→newest (new ones land at the bottom). */
 export async function getServices() {
   return withTiming("crm.getServices", async () => {
     const supabase = await createClient();
@@ -26,7 +26,7 @@ export async function getServices() {
       .select("*")
       .is("deleted_at", null)
       .order("active", { ascending: false })
-      .order("name", { ascending: true });
+      .order("created_at", { ascending: true });
     return (data ?? []).map(mapService);
   });
 }

@@ -19,24 +19,42 @@ import { formatCurrencyMXN } from "./format";
 import { EXPENSE_CATEGORIES, mapExpense } from "./expense-types";
 import type { CrmActionState } from "./clients";
 
-export type { CrmExpense, ExpenseCategory } from "./expense-types";
+export type { CrmExpense, ExpenseCategory, ExpenseStatus } from "./expense-types";
 
-/** Every expense, most recent first. */
+/** True when a Postgres error is "column ... does not exist" (migration 0033 not applied yet). */
+function isMissingStatusColumn(msg: string | undefined) {
+  return !!msg && /column .*(status|paid_date).* does not exist/i.test(msg);
+}
+
+/**
+ * Every expense, most recent first — excluding those tied to a soft-deleted
+ * client (general expenses with no client are always kept).
+ */
 export async function getExpenses() {
   return withTiming("crm.getExpenses", async () => {
     const supabase = await createClient();
     const { data } = await supabase
       .from("crm_expenses")
-      .select("*")
+      .select("*, crm_clients(deleted_at)")
       .is("deleted_at", null)
       .order("expense_date", { ascending: false });
-    return (data ?? []).map(mapExpense);
+    const rows = (data ?? []) as (Parameters<typeof mapExpense>[0] & {
+      crm_clients: { deleted_at: string | null } | { deleted_at: string | null }[] | null;
+    })[];
+    return rows
+      .filter((r) => {
+        if (!r.client_id) return true;
+        const c = Array.isArray(r.crm_clients) ? r.crm_clients[0] : r.crm_clients;
+        return !c || c.deleted_at == null;
+      })
+      .map(mapExpense);
   });
 }
 
 function readExpenseFields(formData: FormData) {
   const str = (k: string) => String(formData.get(k) ?? "").trim();
   const categoryRaw = str("category");
+  const paid = formData.get("markPaidNow") === "on";
   return {
     clientId: str("clientId") || null,
     planId: str("planId") || null,
@@ -48,6 +66,7 @@ function readExpenseFields(formData: FormData) {
     vendor: str("vendor") || null,
     method: str("method") || null,
     notes: str("notes") || null,
+    status: (paid ? "pagado" : "pendiente") as "pagado" | "pendiente",
   };
 }
 
@@ -65,7 +84,7 @@ export async function createExpenseAction(
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.from("crm_expenses").insert({
+  const base = {
     client_id: f.clientId,
     plan_id: f.planId,
     payment_id: f.paymentId,
@@ -77,7 +96,15 @@ export async function createExpenseAction(
     method: f.method,
     notes: f.notes,
     created_by: check.userId,
+  };
+  let { error } = await supabase.from("crm_expenses").insert({
+    ...base,
+    status: f.status,
+    paid_date: f.status === "pagado" ? f.expenseDate || new Date().toISOString().slice(0, 10) : null,
   });
+  if (error && isMissingStatusColumn(error.message)) {
+    ({ error } = await supabase.from("crm_expenses").insert(base)); // migration 0033 pending
+  }
   if (error) return { error: error.message };
 
   if (f.clientId) {
@@ -85,10 +112,79 @@ export async function createExpenseAction(
       supabase,
       f.clientId,
       "egreso",
-      `Egreso de ${formatCurrencyMXN(f.amount)} — ${f.concept}`,
+      `Egreso ${f.status === "pagado" ? "" : "programado "}de ${formatCurrencyMXN(f.amount)} — ${f.concept}`,
       check.userId
     );
   }
+  revalidatePath("/admin");
+  return { success: true };
+}
+
+/** Marks a programmed expense as paid today. */
+export async function markExpensePaidAction(
+  expenseId: string,
+  clientId?: string | null
+): Promise<CrmActionState> {
+  const check = await requireBillingWrite();
+  if (!check.ok) return { error: check.error };
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("crm_expenses")
+    .update({ status: "pagado", paid_date: new Date().toISOString().slice(0, 10) })
+    .eq("id", expenseId)
+    .is("deleted_at", null);
+  if (error) {
+    return {
+      error: isMissingStatusColumn(error.message)
+        ? "Falta aplicar la migración 0033 para los egresos pendientes."
+        : error.message,
+    };
+  }
+
+  if (clientId) await addHistory(supabase, clientId, "egreso", "Egreso marcado como pagado", check.userId);
+  revalidatePath("/admin");
+  return { success: true };
+}
+
+/** `useActionState` action backing the inline "Editar egreso" form. */
+export async function updateExpenseAction(
+  _prevState: CrmActionState,
+  formData: FormData
+): Promise<CrmActionState> {
+  const check = await requireBillingWrite();
+  if (!check.ok) return { error: check.error };
+
+  const expenseId = String(formData.get("expenseId") ?? "").trim();
+  if (!expenseId) return { error: "Egreso no encontrado" };
+  const f = readExpenseFields(formData);
+  if (!f.concept || !(f.amount > 0)) {
+    return { error: "Escribe el concepto y un monto mayor a 0" };
+  }
+
+  const supabase = await createClient();
+  const base = {
+    category: f.category,
+    concept: f.concept,
+    amount: f.amount,
+    expense_date: f.expenseDate || undefined,
+    vendor: f.vendor,
+    method: f.method,
+  };
+  let { error } = await supabase
+    .from("crm_expenses")
+    .update({
+      ...base,
+      status: f.status,
+      paid_date: f.status === "pagado" ? f.expenseDate || new Date().toISOString().slice(0, 10) : null,
+    })
+    .eq("id", expenseId)
+    .is("deleted_at", null);
+  if (error && isMissingStatusColumn(error.message)) {
+    ({ error } = await supabase.from("crm_expenses").update(base).eq("id", expenseId).is("deleted_at", null));
+  }
+  if (error) return { error: error.message };
+
   revalidatePath("/admin");
   return { success: true };
 }

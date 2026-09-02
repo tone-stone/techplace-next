@@ -14,6 +14,8 @@ export const EXPENSE_CATEGORIES = [
 ] as const;
 export type ExpenseCategory = (typeof EXPENSE_CATEGORIES)[number];
 
+export type ExpenseStatus = "pendiente" | "pagado";
+
 export const EXPENSE_CATEGORY_LABELS: Record<string, string> = {
   hosting: "Hosting",
   dominio: "Dominio",
@@ -36,6 +38,9 @@ export type CrmExpense = {
   vendor: string | null;
   method: string | null;
   notes: string | null;
+  /** "pendiente" = programado, aún no pagado; no cuenta en las cuentas generales. */
+  status: ExpenseStatus;
+  paidDate: string | null;
   createdAt: string;
 };
 
@@ -52,6 +57,8 @@ export function mapExpense(row: {
   vendor: string | null;
   method: string | null;
   notes: string | null;
+  status?: string | null;
+  paid_date?: string | null;
   created_at: string;
 }): CrmExpense {
   return {
@@ -66,6 +73,8 @@ export function mapExpense(row: {
     vendor: row.vendor,
     method: row.method,
     notes: row.notes,
+    status: row.status === "pendiente" ? "pendiente" : "pagado",
+    paidDate: row.paid_date ?? null,
     createdAt: row.created_at,
   };
 }
