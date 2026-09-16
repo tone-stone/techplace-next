@@ -18,8 +18,9 @@ const db: {
   tasks: Rows;
   projects: Rows;
   tickets: Rows;
+  quotes: Rows;
   staff: Rows;
-} = { settings: null, tasks: [], projects: [], tickets: [], staff: [] };
+} = { settings: null, tasks: [], projects: [], tickets: [], quotes: [], staff: [] };
 
 function makeClient() {
   const builder = (table: string) => {
@@ -27,6 +28,7 @@ function makeClient() {
       if (table === "crm_tasks") return { data: db.tasks, error: null };
       if (table === "crm_projects") return { data: db.projects, error: null };
       if (table === "it_tickets") return { data: db.tickets, error: null };
+      if (table === "crm_quotes") return { data: db.quotes, error: null };
       if (table === "profiles") return { data: db.staff, error: null };
       return { data: [], error: null };
     };
@@ -48,6 +50,7 @@ beforeEach(() => {
   db.tasks = [];
   db.projects = [];
   db.tickets = [];
+  db.quotes = [];
   db.staff = [];
   sendEmail.mockClear();
   sendWhatsApp.mockClear();
@@ -76,6 +79,17 @@ describe("runAgendaCycle", () => {
     const [arg] = sendEmail.mock.calls[0] as unknown as [{ to: string[]; subject: string }];
     expect(arg.to).toEqual(["admin@techplace.mx"]);
     expect(arg.subject).toMatch(/3 pendiente/);
+  });
+
+  it("collects quotes sent but not yet answered as they approach valid_until", async () => {
+    db.staff = [{ email: "admin@techplace.mx" }];
+    db.quotes = [
+      { number: "COT-1", client_name: "Ana", client_company: "Acme", valid_until: "2026-09-03" },
+    ];
+
+    const res = await runAgendaCycle(new Date("2026-09-02T15:00:00Z"));
+
+    expect(res).toMatchObject({ items: 1, quotes: 1, emailSent: true });
   });
 
   it("also sends the WhatsApp digest when enabled with an internal list", async () => {

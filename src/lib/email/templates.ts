@@ -153,7 +153,12 @@ export function agendaDigestEmail(opts: {
   orgName: string;
   items: AgendaItem[];
 }): { subject: string; html: string } {
-  const kindLabel = { tarea: "Tarea", proyecto: "Proyecto", soporte: "Soporte (SLA)" } as const;
+  const kindLabel = {
+    tarea: "Tarea",
+    proyecto: "Proyecto",
+    soporte: "Soporte (SLA)",
+    cotizacion: "Cotización",
+  } as const;
   const rows = opts.items
     .map(
       (i) =>

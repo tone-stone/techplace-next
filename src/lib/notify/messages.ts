@@ -7,7 +7,7 @@
 import { formatCurrencyMXN } from "@/lib/crm/format";
 
 export type AgendaItem = {
-  kind: "tarea" | "proyecto" | "soporte";
+  kind: "tarea" | "proyecto" | "soporte" | "cotizacion";
   title: string;
   company: string | null;
   date: string;
@@ -18,6 +18,7 @@ const KIND_LABEL: Record<AgendaItem["kind"], string> = {
   tarea: "Tarea",
   proyecto: "Proyecto",
   soporte: "Soporte (SLA)",
+  cotizacion: "Cotización",
 };
 
 function whenLabel(daysLeft: number, date: string): string {
