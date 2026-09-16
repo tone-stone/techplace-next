@@ -95,6 +95,14 @@ export const PROJECTS: Project[] = [
     services: ["desarrollo-web", "hosting"],
   },
   {
+    image: "https://res.cloudinary.com/lpc9euwf/image/upload/v1789547019/techplace-portfolio/credipro.webp",
+    title: "Credipro",
+    description: "Landing page para créditos de nómina, con simulador interactivo y captación de leads por WhatsApp.",
+    tags: ["Desarrollo web", "Landing page", "Fintech"],
+    url: "https://credipro.com.mx/",
+    services: ["desarrollo-web", "hosting"],
+  },
+  {
     image: "/img/logos/techplace-brand.webp",
     title: "TechPlace",
     description: "Nuestro propio sitio: hardening, monitoreo y pruebas de seguridad continuas.",

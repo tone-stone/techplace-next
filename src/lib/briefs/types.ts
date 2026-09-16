@@ -16,13 +16,15 @@ export type ManagedBrief = {
   hasWebsite: boolean;
   currentWebsiteUrl: string | null;
   projectType: string;
+  /** Solo aplica cuando projectType es "Sistema o plataforma a medida (CMS, CRM, ERP, etc.)". */
+  systemType: string | null;
   projectGoal: string;
   targetAudience: string | null;
   problemToSolve: string | null;
   pagesEstimate: string | null;
   features: string[];
   paymentGateway: string | null;
-  integrations: string | null;
+  integrations: string[];
   hasBranding: string | null;
   referenceSites: string | null;
   contentReady: string | null;

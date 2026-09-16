@@ -15,6 +15,15 @@ function str(formData: FormData, key: string): string {
   return String(formData.get(key) ?? "").trim();
 }
 
+const OTHER = "Otro";
+
+/** Reads a select field that offers an "Otro" option backed by a sibling `${key}_other` text input. */
+function strOrOther(formData: FormData, key: string): string {
+  const value = str(formData, key);
+  if (value !== OTHER) return value;
+  return str(formData, `${key}_other`) || OTHER;
+}
+
 export async function submitProjectBrief(_prevState: BriefState, formData: FormData): Promise<BriefState> {
   const fullName = str(formData, "full_name");
   const email = str(formData, "email");
@@ -34,25 +43,27 @@ export async function submitProjectBrief(_prevState: BriefState, formData: FormD
 
   const hasWebsite = str(formData, "has_website") === "Sí";
   const features = formData.getAll("features").map(String);
+  const integrations = formData.getAll("integrations").map(String);
 
   const brief = {
     full_name: fullName,
     business_name: str(formData, "business_name") || null,
     email,
     phone,
-    industry: str(formData, "industry") || null,
+    industry: strOrOther(formData, "industry") || null,
     has_website: hasWebsite,
     current_website_url: hasWebsite ? str(formData, "current_website_url") || null : null,
 
     project_type: projectType,
+    system_type: str(formData, "system_type") || null,
     project_goal: projectGoal,
     target_audience: str(formData, "target_audience") || null,
     problem_to_solve: str(formData, "problem_to_solve") || null,
 
     pages_estimate: str(formData, "pages_estimate") || null,
     features,
-    payment_gateway: str(formData, "payment_gateway") || null,
-    integrations: str(formData, "integrations") || null,
+    payment_gateway: strOrOther(formData, "payment_gateway") || null,
+    integrations,
 
     has_branding: str(formData, "has_branding") || null,
     reference_sites: str(formData, "reference_sites") || null,
@@ -60,7 +71,7 @@ export async function submitProjectBrief(_prevState: BriefState, formData: FormD
     visual_style: str(formData, "visual_style") || null,
 
     has_domain_hosting: str(formData, "has_domain_hosting") || null,
-    tech_preference: str(formData, "tech_preference") || null,
+    tech_preference: strOrOther(formData, "tech_preference") || null,
     needs_maintenance: str(formData, "needs_maintenance") || null,
 
     budget_range: budgetRange,
@@ -87,6 +98,7 @@ export async function submitProjectBrief(_prevState: BriefState, formData: FormD
         _subject: `Nuevo brief de proyecto: ${fullName} (${projectType})`,
         ...brief,
         features: features.join(", "),
+        integrations: integrations.join(", "),
       }),
     });
   } catch (err) {
@@ -134,13 +146,14 @@ function mapBriefRow(row: {
   has_website: boolean;
   current_website_url: string | null;
   project_type: string;
+  system_type: string | null;
   project_goal: string;
   target_audience: string | null;
   problem_to_solve: string | null;
   pages_estimate: string | null;
   features: string[] | null;
   payment_gateway: string | null;
-  integrations: string | null;
+  integrations: string[] | null;
   has_branding: string | null;
   reference_sites: string | null;
   content_ready: string | null;
@@ -164,13 +177,14 @@ function mapBriefRow(row: {
     hasWebsite: row.has_website,
     currentWebsiteUrl: row.current_website_url,
     projectType: row.project_type,
+    systemType: row.system_type,
     projectGoal: row.project_goal,
     targetAudience: row.target_audience,
     problemToSolve: row.problem_to_solve,
     pagesEstimate: row.pages_estimate,
     features: row.features ?? [],
     paymentGateway: row.payment_gateway,
-    integrations: row.integrations,
+    integrations: row.integrations ?? [],
     hasBranding: row.has_branding,
     referenceSites: row.reference_sites,
     contentReady: row.content_ready,
@@ -204,9 +218,6 @@ export async function updateBriefStatusAction(
 ): Promise<{ error: string } | { success: true }> {
   const check = await requireCrmStaff();
   if (!check.ok) return { error: check.error };
-  if (check.role !== "dios" && check.role !== "admin") {
-    return { error: "Solo un administrador puede cambiar el estado" };
-  }
 
   const supabase = await createClient();
   const { error } = await supabase.from("project_briefs").update({ status }).eq("id", id);

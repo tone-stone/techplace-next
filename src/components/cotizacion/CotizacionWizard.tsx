@@ -38,13 +38,72 @@ const FEATURES = [
   "Newsletter / email marketing",
 ];
 
+const CUSTOM_SYSTEM_TYPE = "Sistema o plataforma a medida (CMS, CRM, ERP, etc.)";
+
+const PROJECT_TYPES = [
+  "Landing page (una sola página enfocada en conversión)",
+  "Sitio web corporativo / informativo (varias páginas)",
+  "Tienda en línea / E-commerce",
+  "Blog o sitio de contenido",
+  CUSTOM_SYSTEM_TYPE,
+  "Aplicación móvil",
+  "Rediseño de un sitio existente",
+  "No estoy seguro, necesito asesoría",
+];
+
+const SYSTEM_TYPES = [
+  "CMS (gestor de contenido propio)",
+  "CRM (gestión de clientes y ventas)",
+  "ERP (gestión de procesos y operaciones internas)",
+  "Portal o intranet para empleados",
+  "Marketplace o plataforma multiusuario",
+  "Otro tipo de sistema",
+];
+
+const INDUSTRIES = [
+  "Restaurantes y alimentos",
+  "Retail y comercio",
+  "Salud y bienestar",
+  "Servicios profesionales (legal, contable, consultoría)",
+  "Bienes raíces",
+  "Educación",
+  "Tecnología / software",
+  "Manufactura o industria",
+  "Turismo y hospedaje",
+  "Otro",
+];
+
+const PAYMENT_GATEWAYS = [
+  "Stripe",
+  "PayPal",
+  "Conekta",
+  "Mercado Pago",
+  "No necesito cobrar en línea",
+  "No estoy seguro",
+  "Otro",
+];
+
+const INTEGRATIONS = [
+  "Facturación electrónica (CFDI)",
+  "Sistema de inventario",
+  "CRM o ERP externo",
+  "Sistema de reservaciones o citas",
+  "Redes sociales / Meta Ads",
+  "Google Analytics / Tag Manager",
+  "Ninguna por el momento",
+];
+
+const TECH_PREFERENCES = [
+  "Sin preferencia, que ustedes decidan",
+  "Debe integrarse con un sistema que ya tenemos",
+  "Prefiero una plataforma de código abierto (ej. WordPress)",
+  "Prefiero desarrollo 100% a la medida",
+  "Otro",
+];
+
 const inputCls =
   "tp-glass-input w-full px-4 py-3 rounded-2xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-blue focus:border-brand-blue transition duration-200";
 const labelCls = "block text-sm font-semibold text-gray-200 mb-2";
-// El popup nativo de <select> ignora el glassmorphism y usa fondo blanco por defecto en
-// la mayoría de navegadores; sin esto las opciones quedan en texto blanco sobre blanco.
-const optionCls = "bg-[#150c1e] text-white";
-const selectStyle: React.CSSProperties = { colorScheme: "dark" };
 
 function Field({
   label,
@@ -90,11 +149,66 @@ function RadioRow({
   );
 }
 
+function CheckboxGrid({ name, options }: { name: string; options: string[] }) {
+  return (
+    <div className="grid sm:grid-cols-2 gap-2.5">
+      {options.map((opt) => (
+        <label
+          key={opt}
+          className="tp-glass-input flex items-center gap-2.5 px-4 py-2.5 rounded-2xl cursor-pointer text-sm text-gray-200 has-checked:ring-2 has-checked:ring-brand-blue has-checked:text-white"
+        >
+          <input type="checkbox" name={name} value={opt} className="accent-brand-blue" />
+          {opt}
+        </label>
+      ))}
+    </div>
+  );
+}
+
+const OTHER = "Otro";
+
+/** A <select> whose last option ("Otro") reveals a free-text input for the one case a fixed menu can't cover. */
+function SelectWithOther({
+  name,
+  options,
+  required,
+  placeholder = "Selecciona una opción",
+}: {
+  name: string;
+  options: string[];
+  required?: boolean;
+  placeholder?: string;
+}) {
+  const [isOther, setIsOther] = useState(false);
+  return (
+    <div className="space-y-2">
+      <select
+        name={name}
+        required={required}
+        defaultValue=""
+        onChange={(e) => setIsOther(e.target.value === OTHER)}
+        className={inputCls}
+      >
+        <option value="" disabled>
+          {placeholder}
+        </option>
+        {options.map((opt) => (
+          <option key={opt}>{opt}</option>
+        ))}
+      </select>
+      {isOther && (
+        <input name={`${name}_other`} required placeholder="Especifica…" className={inputCls} />
+      )}
+    </div>
+  );
+}
+
 const initialState: BriefState = null;
 
 export default function CotizacionWizard() {
   const [step, setStep] = useState(0);
   const [hasWebsite, setHasWebsite] = useState<string | null>(null);
+  const [projectType, setProjectType] = useState<string | null>(null);
   const [state, formAction, pending] = useActionState(submitProjectBrief, initialState);
   const formRef = useRef<HTMLFormElement>(null);
   const lastStep = STEPS.length - 1;
@@ -177,7 +291,7 @@ export default function CotizacionWizard() {
             </Field>
           </div>
           <Field label="¿A qué giro o industria se dedica tu negocio?">
-            <input name="industry" placeholder="Ej. Restaurantes, salud, retail, servicios profesionales…" className={inputCls} />
+            <SelectWithOther name="industry" options={INDUSTRIES} />
           </Field>
           <div onChange={(e) => setHasWebsite((e.target as HTMLInputElement).value)}>
             <Field label="¿Ya tienes una página web actualmente?" required>
@@ -194,29 +308,44 @@ export default function CotizacionWizard() {
         {/* Paso 2: Tipo de proyecto y objetivos */}
         <div data-step={1} className={step === 1 ? "space-y-5" : "hidden"}>
           <Field label="¿Qué tipo de proyecto necesitas?" required>
-            <select name="project_type" required defaultValue="" className={inputCls} style={selectStyle}>
-              <option value="" disabled className={optionCls}>
+            <select
+              name="project_type"
+              required
+              defaultValue=""
+              onChange={(e) => setProjectType(e.target.value)}
+              className={inputCls}
+            >
+              <option value="" disabled>
                 Selecciona una opción
               </option>
-              <option className={optionCls}>Sitio web informativo</option>
-              <option className={optionCls}>Tienda en línea / E-commerce</option>
-              <option className={optionCls}>Landing page</option>
-              <option className={optionCls}>Sistema web a medida o app</option>
-              <option className={optionCls}>Rediseño de un sitio existente</option>
-              <option className={optionCls}>No estoy seguro, necesito asesoría</option>
+              {PROJECT_TYPES.map((opt) => (
+                <option key={opt}>{opt}</option>
+              ))}
             </select>
           </Field>
+          {projectType === CUSTOM_SYSTEM_TYPE && (
+            <Field label="¿Qué tipo de sistema necesitas específicamente?" required>
+              <select name="system_type" required defaultValue="" className={inputCls}>
+                <option value="" disabled>
+                  Selecciona una opción
+                </option>
+                {SYSTEM_TYPES.map((opt) => (
+                  <option key={opt}>{opt}</option>
+                ))}
+              </select>
+            </Field>
+          )}
           <Field label="¿Cuál es el objetivo principal del proyecto?" required>
-            <select name="project_goal" required defaultValue="" className={inputCls} style={selectStyle}>
-              <option value="" disabled className={optionCls}>
+            <select name="project_goal" required defaultValue="" className={inputCls}>
+              <option value="" disabled>
                 Selecciona una opción
               </option>
-              <option className={optionCls}>Vender productos o servicios en línea</option>
-              <option className={optionCls}>Generar clientes potenciales (leads)</option>
-              <option className={optionCls}>Dar información de la empresa / presencia digital</option>
-              <option className={optionCls}>Recibir reservas o citas</option>
-              <option className={optionCls}>Ofrecer un portal para usuarios registrados</option>
-              <option className={optionCls}>Otro</option>
+              <option>Vender productos o servicios en línea</option>
+              <option>Generar clientes potenciales (leads)</option>
+              <option>Dar información de la empresa / presencia digital</option>
+              <option>Recibir reservas o citas</option>
+              <option>Ofrecer un portal para usuarios registrados</option>
+              <option>Otro</option>
             </select>
           </Field>
           <Field label="¿Quién es tu público objetivo o cliente ideal?">
@@ -230,35 +359,25 @@ export default function CotizacionWizard() {
         {/* Paso 3: Alcance y funcionalidades */}
         <div data-step={2} className={step === 2 ? "space-y-5" : "hidden"}>
           <Field label="¿Cuántas páginas o secciones necesitas aproximadamente?">
-            <select name="pages_estimate" defaultValue="" className={inputCls} style={selectStyle}>
-              <option value="" disabled className={optionCls}>
+            <select name="pages_estimate" defaultValue="" className={inputCls}>
+              <option value="" disabled>
                 Selecciona una opción
               </option>
-              <option className={optionCls}>1 sola página (landing)</option>
-              <option className={optionCls}>2 a 5 páginas</option>
-              <option className={optionCls}>6 a 10 páginas</option>
-              <option className={optionCls}>Más de 10 páginas</option>
-              <option className={optionCls}>No estoy seguro</option>
+              <option>1 sola página (landing)</option>
+              <option>2 a 5 páginas</option>
+              <option>6 a 10 páginas</option>
+              <option>Más de 10 páginas</option>
+              <option>No estoy seguro</option>
             </select>
           </Field>
           <Field label="¿Qué funcionalidades necesitas? (selecciona todas las que apliquen)">
-            <div className="grid sm:grid-cols-2 gap-2.5">
-              {FEATURES.map((f) => (
-                <label
-                  key={f}
-                  className="tp-glass-input flex items-center gap-2.5 px-4 py-2.5 rounded-2xl cursor-pointer text-sm text-gray-200 has-checked:ring-2 has-checked:ring-brand-blue has-checked:text-white"
-                >
-                  <input type="checkbox" name="features" value={f} className="accent-brand-blue" />
-                  {f}
-                </label>
-              ))}
-            </div>
+            <CheckboxGrid name="features" options={FEATURES} />
           </Field>
-          <Field label="¿Necesitas cobrar en línea? ¿Con qué pasarela de pago, si ya lo sabes?">
-            <input name="payment_gateway" placeholder="Ej. Stripe, PayPal, Conekta, o no estoy seguro" className={inputCls} />
+          <Field label="¿Necesitas cobrar en línea? ¿Con qué pasarela de pago?">
+            <SelectWithOther name="payment_gateway" options={PAYMENT_GATEWAYS} />
           </Field>
-          <Field label="¿Necesitas integrar el sitio con otros sistemas que ya usas?">
-            <textarea name="integrations" rows={2} placeholder="Ej. Facturación, CRM, inventario, sistema de reservaciones…" className={inputCls} />
+          <Field label="¿Necesitas integrar el sitio con otros sistemas que ya usas? (selecciona todas las que apliquen)">
+            <CheckboxGrid name="integrations" options={INTEGRATIONS} />
           </Field>
         </div>
 
@@ -286,35 +405,35 @@ export default function CotizacionWizard() {
           <Field label="¿Ya tienes dominio y hosting?">
             <RadioRow name="has_domain_hosting" options={["Sí, ambos", "Solo el dominio", "Ninguno todavía"]} />
           </Field>
-          <Field label="¿Tienes alguna preferencia o requerimiento técnico específico? (opcional)">
-            <input name="tech_preference" placeholder="Ej. debe integrarse con un sistema que ya tenemos" className={inputCls} />
+          <Field label="¿Tienes alguna preferencia o requerimiento técnico específico?">
+            <SelectWithOther name="tech_preference" options={TECH_PREFERENCES} />
           </Field>
           <Field label="¿Necesitas mantenimiento continuo después de la entrega?">
             <RadioRow name="needs_maintenance" options={["Sí, mensual", "Solo la entrega inicial", "No estoy seguro"]} />
           </Field>
           <div className="grid sm:grid-cols-2 gap-5">
             <Field label="Presupuesto aproximado" required>
-              <select name="budget_range" required defaultValue="" className={inputCls} style={selectStyle}>
-                <option value="" disabled className={optionCls}>
+              <select name="budget_range" required defaultValue="" className={inputCls}>
+                <option value="" disabled>
                   Selecciona un rango
                 </option>
-                <option className={optionCls}>Menos de $10,000 MXN</option>
-                <option className={optionCls}>$10,000 – $25,000 MXN</option>
-                <option className={optionCls}>$25,000 – $50,000 MXN</option>
-                <option className={optionCls}>$50,000 – $100,000 MXN</option>
-                <option className={optionCls}>Más de $100,000 MXN</option>
-                <option className={optionCls}>Prefiero que me asesoren</option>
+                <option>Menos de $10,000 MXN</option>
+                <option>$10,000 – $25,000 MXN</option>
+                <option>$25,000 – $50,000 MXN</option>
+                <option>$50,000 – $100,000 MXN</option>
+                <option>Más de $100,000 MXN</option>
+                <option>Prefiero que me asesoren</option>
               </select>
             </Field>
             <Field label="¿Para cuándo lo necesitas?" required>
-              <select name="timeline" required defaultValue="" className={inputCls} style={selectStyle}>
-                <option value="" disabled className={optionCls}>
+              <select name="timeline" required defaultValue="" className={inputCls}>
+                <option value="" disabled>
                   Selecciona una opción
                 </option>
-                <option className={optionCls}>Lo antes posible</option>
-                <option className={optionCls}>En el próximo mes</option>
-                <option className={optionCls}>En 1 a 3 meses</option>
-                <option className={optionCls}>Flexible, sin fecha límite</option>
+                <option>Lo antes posible</option>
+                <option>En el próximo mes</option>
+                <option>En 1 a 3 meses</option>
+                <option>Flexible, sin fecha límite</option>
               </select>
             </Field>
           </div>

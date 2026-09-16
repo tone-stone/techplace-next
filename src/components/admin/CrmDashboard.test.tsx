@@ -76,9 +76,10 @@ describe("CrmDashboard", () => {
     expect(screen.queryAllByRole("button", { name: "Usuarios" })).toHaveLength(0);
   });
 
-  it("switches to Usuarios when that nav item is clicked (admin)", async () => {
+  it("switches to Usuarios (inside Configuración) when clicked (admin)", async () => {
     const user = userEvent.setup();
     renderDash("admin");
+    await user.click(screen.getAllByRole("button", { name: "Configuración" })[0]);
     await user.click(screen.getAllByRole("button", { name: "Usuarios" })[0]);
     expect(screen.getByText("Usuarios totales")).toBeInTheDocument();
   });

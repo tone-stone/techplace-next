@@ -775,6 +775,41 @@ html {
   backdrop-filter: blur(8px);
 }
 
+/* Every screen in the app is dark-themed, but a native <select>'s dropdown
+   popup is rendered by the OS/browser, not by our CSS — left alone it
+   defaults to a white popup with inherited light text, making options
+   unreadable. This is site-wide so new selects (CRM, forms, wizards) don't
+   need to re-solve it per component. */
+select {
+  color-scheme: dark;
+}
+
+select option {
+  background-color: #0a0e14;
+  color: #fff;
+}
+
+/* Chrome/Edge/Safari force a white (or yellow) background with black text on
+   an autofilled field, ignoring our own background/color entirely — the
+   only way to override it is this inset box-shadow trick, painting over the
+   forced background with the site's dark tone before the field's own
+   border-radius clips it. The absurdly long transition delay stops the
+   forced color from flashing in for a moment before our override applies. */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+textarea:-webkit-autofill,
+textarea:-webkit-autofill:hover,
+textarea:-webkit-autofill:focus {
+  -webkit-text-fill-color: #fff;
+  -webkit-box-shadow: 0 0 0 1000px #0a0e14 inset;
+  box-shadow: 0 0 0 1000px #0a0e14 inset;
+  caret-color: #fff;
+  transition:
+    background-color 600000s ease-in-out 0s,
+    color 600000s ease-in-out 0s;
+}
+
 .tp-gradient-text {
   background: linear-gradient(90deg, #c4b5fd, #a78bfa, #818cf8);
   -webkit-background-clip: text;

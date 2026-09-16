@@ -17,6 +17,8 @@ create table if not exists public.project_briefs (
 
   -- Tipo de proyecto y objetivos
   project_type text not null,
+  -- Solo aplica cuando project_type = 'Sistema o plataforma a medida (CMS, CRM, ERP, etc.)'.
+  system_type text,
   project_goal text not null,
   target_audience text,
   problem_to_solve text,
@@ -25,7 +27,7 @@ create table if not exists public.project_briefs (
   pages_estimate text,
   features text[] not null default '{}',
   payment_gateway text,
-  integrations text,
+  integrations text[] not null default '{}',
 
   -- Diseño y contenido
   has_branding text,
@@ -67,14 +69,17 @@ create policy "project_briefs_select_staff"
     )
   );
 
--- Solo dios/admin puede actualizar el estado de seguimiento (nuevo/en revisión/cotizado/descartado).
+-- Mismo set que puede leer (canUseCrmCore) puede actualizar el estado de
+-- seguimiento — igual que "Cotizaciones" formales, donde cualquier ejecutivo
+-- gestiona el ciclo completo, no solo dios/admin.
 drop policy if exists "project_briefs_update_admin" on public.project_briefs;
-create policy "project_briefs_update_admin"
+drop policy if exists "project_briefs_update_staff" on public.project_briefs;
+create policy "project_briefs_update_staff"
   on public.project_briefs for update
   using (
     exists (
       select 1 from public.profiles p
-      where p.id = auth.uid() and p.deleted_at is null and p.role in ('dios', 'admin')
+      where p.id = auth.uid() and p.deleted_at is null and p.role in ('dios', 'admin', 'ejecutivo')
     )
   );
 
@@ -86,3 +91,26 @@ create index if not exists project_briefs_status_idx on public.project_briefs (s
 -- antes de que la política de RLS siquiera se evalúe.
 grant insert on public.project_briefs to anon, authenticated;
 grant select, update on public.project_briefs to authenticated;
+
+-- Refinamiento del cuestionario: distinguir landing/corporativo de un sistema a
+-- medida (CMS/CRM/ERP) y pasar "integraciones" de texto libre a checkboxes.
+-- Idempotente para poder correr este archivo completo más de una vez.
+alter table public.project_briefs add column if not exists system_type text;
+
+do $$
+begin
+  if not exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'project_briefs'
+      and column_name = 'integrations' and data_type = 'ARRAY'
+  ) then
+    alter table public.project_briefs
+      alter column integrations type text[]
+      using case
+        when integrations is null or integrations = '' then '{}'::text[]
+        else string_to_array(integrations, ',')
+      end;
+    alter table public.project_briefs alter column integrations set default '{}';
+    alter table public.project_briefs alter column integrations set not null;
+  end if;
+end $$;

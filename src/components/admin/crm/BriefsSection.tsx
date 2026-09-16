@@ -1,11 +1,19 @@
 "use client";
 
+/**
+ * "Solicitudes" tab: incoming project briefs from the public /cotizacion
+ * intake form. Read-only discovery info the team reviews before turning one
+ * into a formal CrmQuote — a different concept from the priced "Cotizaciones"
+ * tab, which is why it's a separate section instead of merged into it.
+ */
+
 import { useMemo, useState, useTransition } from "react";
 import {
   Briefcase,
   Building2,
   ChevronDown,
   Clock,
+  FilePlus2,
   FileQuestion,
   Globe,
   Mail,
@@ -14,9 +22,13 @@ import {
 } from "lucide-react";
 import { updateBriefStatusAction } from "@/lib/briefs/actions";
 import { BRIEF_STATUSES, type BriefStatus, type ManagedBrief } from "@/lib/briefs/types";
+import { suggestQuoteFromBrief } from "@/lib/briefs/suggest-quote";
+import type { CrmClient } from "@/lib/crm/clients";
+import type { CrmService } from "@/lib/crm/services";
+import QuoteFormModal from "./QuoteFormModal";
 
 const STATUS_STYLE: Record<BriefStatus, string> = {
-  nuevo: "border-brand-blue/30 bg-brand-blue/10 text-brand-blue",
+  nuevo: "border-sky-400/30 bg-sky-500/10 text-sky-300",
   "en revisión": "border-amber-400/30 bg-amber-500/15 text-amber-300",
   cotizado: "border-emerald-400/30 bg-emerald-500/15 text-emerald-300",
   descartado: "border-red-400/30 bg-red-500/15 text-red-300",
@@ -51,6 +63,22 @@ function DetailRow({ label, value }: { label: string; value: string | null }) {
   );
 }
 
+function ChipList({ label, items }: { label: string; items: string[] }) {
+  if (items.length === 0) return null;
+  return (
+    <div>
+      <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">{label}</p>
+      <div className="mt-1.5 flex flex-wrap gap-2">
+        {items.map((item) => (
+          <span key={item} className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-gray-300">
+            {item}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function StatusSelect({
   brief,
   onChanged,
@@ -79,11 +107,10 @@ function StatusSelect({
         value={brief.status}
         disabled={pending}
         onChange={(e) => handleChange(e.target.value as BriefStatus)}
-        style={{ colorScheme: "dark" }}
         className={`rounded-full border px-3 py-1.5 text-xs font-semibold outline-none disabled:opacity-60 ${STATUS_STYLE[brief.status]}`}
       >
         {BRIEF_STATUSES.map((s) => (
-          <option key={s} value={s} className="bg-[#150c1e] text-white">
+          <option key={s} value={s}>
             {STATUS_LABEL[s]}
           </option>
         ))}
@@ -93,16 +120,21 @@ function StatusSelect({
   );
 }
 
-export default function BriefsPanel({
+export default function BriefsSection({
   initialBriefs,
   canManage,
+  clients = [],
+  catalogServices = [],
 }: {
   initialBriefs: ManagedBrief[];
   canManage: boolean;
+  clients?: CrmClient[];
+  catalogServices?: CrmService[];
 }) {
   const [briefs, setBriefs] = useState(initialBriefs);
   const [filter, setFilter] = useState<BriefStatus | "todos">("todos");
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [quoteBrief, setQuoteBrief] = useState<ManagedBrief | null>(null);
 
   const counts = useMemo(() => {
     const base: Record<BriefStatus, number> = { nuevo: 0, "en revisión": 0, cotizado: 0, descartado: 0 };
@@ -120,7 +152,7 @@ export default function BriefsPanel({
     <div className="space-y-6">
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         {(["nuevo", "en revisión", "cotizado", "descartado"] as BriefStatus[]).map((s) => (
-          <div key={s} className="tp-dark-card-admin rounded-2xl p-5">
+          <div key={s} className="tp-dark-card-crm rounded-2xl p-5">
             <p className="text-2xl font-bold">{counts[s]}</p>
             <p className="text-xs text-gray-400">{STATUS_LABEL[s]}</p>
           </div>
@@ -135,7 +167,7 @@ export default function BriefsPanel({
             onClick={() => setFilter(s)}
             className={`rounded-full border px-4 py-1.5 text-sm font-medium transition-colors ${
               filter === s
-                ? "border-purple-400/50 bg-purple-500/20 text-white"
+                ? "border-sky-400/40 bg-sky-500/15 text-white"
                 : "border-white/10 bg-white/5 text-gray-400 hover:text-gray-200"
             }`}
           >
@@ -150,7 +182,7 @@ export default function BriefsPanel({
           return (
             <div
               key={brief.id}
-              className="tp-dark-card-admin rounded-2xl border border-white/10 overflow-hidden"
+              className="tp-dark-card-crm rounded-2xl border border-white/10 overflow-hidden"
             >
               <div
                 onClick={() => setExpandedId(isOpen ? null : brief.id)}
@@ -164,7 +196,7 @@ export default function BriefsPanel({
                     )}
                   </div>
                   <p className="mt-1 truncate text-xs text-gray-400">
-                    {brief.projectType} · {brief.budgetRange} · {timeAgo(brief.createdAt)}
+                    {brief.systemType ?? brief.projectType} · {brief.budgetRange} · {timeAgo(brief.createdAt)}
                   </p>
                 </div>
 
@@ -196,11 +228,12 @@ export default function BriefsPanel({
                   </div>
 
                   <div className="border-t border-white/5 pt-4">
-                    <p className="mb-3 flex items-center gap-1.5 text-sm font-bold text-purple-300">
+                    <p className="mb-3 flex items-center gap-1.5 text-sm font-bold text-sky-300">
                       <Briefcase className="h-4 w-4" /> Proyecto y objetivos
                     </p>
                     <div className="grid gap-4 sm:grid-cols-2">
                       <DetailRow label="Tipo de proyecto" value={brief.projectType} />
+                      <DetailRow label="Tipo de sistema" value={brief.systemType} />
                       <DetailRow label="Objetivo" value={brief.projectGoal} />
                       <DetailRow label="Público objetivo" value={brief.targetAudience} />
                       <DetailRow label="Problema a resolver" value={brief.problemToSolve} />
@@ -208,30 +241,21 @@ export default function BriefsPanel({
                   </div>
 
                   <div className="border-t border-white/5 pt-4">
-                    <p className="mb-3 flex items-center gap-1.5 text-sm font-bold text-purple-300">
+                    <p className="mb-3 flex items-center gap-1.5 text-sm font-bold text-sky-300">
                       <FileQuestion className="h-4 w-4" /> Alcance
                     </p>
                     <div className="grid gap-4 sm:grid-cols-2">
                       <DetailRow label="Páginas estimadas" value={brief.pagesEstimate} />
                       <DetailRow label="Pasarela de pago" value={brief.paymentGateway} />
-                      <DetailRow label="Integraciones" value={brief.integrations} />
                     </div>
-                    {brief.features.length > 0 && (
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {brief.features.map((f) => (
-                          <span
-                            key={f}
-                            className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-gray-300"
-                          >
-                            {f}
-                          </span>
-                        ))}
-                      </div>
-                    )}
+                    <div className="mt-3 space-y-3">
+                      <ChipList label="Funcionalidades" items={brief.features} />
+                      <ChipList label="Integraciones" items={brief.integrations} />
+                    </div>
                   </div>
 
                   <div className="border-t border-white/5 pt-4">
-                    <p className="mb-3 flex items-center gap-1.5 text-sm font-bold text-purple-300">
+                    <p className="mb-3 flex items-center gap-1.5 text-sm font-bold text-sky-300">
                       <Globe className="h-4 w-4" /> Diseño y contenido
                     </p>
                     <div className="grid gap-4 sm:grid-cols-2">
@@ -243,7 +267,7 @@ export default function BriefsPanel({
                   </div>
 
                   <div className="border-t border-white/5 pt-4">
-                    <p className="mb-3 flex items-center gap-1.5 text-sm font-bold text-purple-300">
+                    <p className="mb-3 flex items-center gap-1.5 text-sm font-bold text-sky-300">
                       <Wallet className="h-4 w-4" /> Técnico, presupuesto y tiempos
                     </p>
                     <div className="grid gap-4 sm:grid-cols-2">
@@ -258,25 +282,40 @@ export default function BriefsPanel({
                     </div>
                   </div>
 
-                  <div className="flex flex-wrap gap-3 border-t border-white/5 pt-4 text-xs text-gray-400">
-                    <a href={`mailto:${brief.email}`} className="inline-flex items-center gap-1.5 hover:text-purple-300">
-                      <Mail className="h-3.5 w-3.5" /> {brief.email}
-                    </a>
-                    <a
-                      href={`https://wa.me/${brief.phone.replace(/\D/g, "")}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 hover:text-purple-300"
-                    >
-                      <Phone className="h-3.5 w-3.5" /> {brief.phone}
-                    </a>
-                    <span className="inline-flex items-center gap-1.5">
-                      <Clock className="h-3.5 w-3.5" /> Recibido {timeAgo(brief.createdAt)}
-                    </span>
-                    {brief.businessName && (
+                  <div className="flex flex-wrap items-center justify-between gap-3 border-t border-white/5 pt-4">
+                    <div className="flex flex-wrap gap-3 text-xs text-gray-400">
+                      <a href={`mailto:${brief.email}`} className="inline-flex items-center gap-1.5 hover:text-sky-300">
+                        <Mail className="h-3.5 w-3.5" /> {brief.email}
+                      </a>
+                      <a
+                        href={`https://wa.me/${brief.phone.replace(/\D/g, "")}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 hover:text-sky-300"
+                      >
+                        <Phone className="h-3.5 w-3.5" /> {brief.phone}
+                      </a>
                       <span className="inline-flex items-center gap-1.5">
-                        <Building2 className="h-3.5 w-3.5" /> {brief.businessName}
+                        <Clock className="h-3.5 w-3.5" /> Recibido {timeAgo(brief.createdAt)}
                       </span>
+                      {brief.businessName && (
+                        <span className="inline-flex items-center gap-1.5">
+                          <Building2 className="h-3.5 w-3.5" /> {brief.businessName}
+                        </span>
+                      )}
+                    </div>
+
+                    {canManage && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setQuoteBrief(brief);
+                        }}
+                        className="inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-full bg-sky-500/20 px-4 py-2 text-xs font-semibold text-sky-200 hover:bg-sky-500/30"
+                      >
+                        <FilePlus2 className="h-3.5 w-3.5" /> Generar cotización
+                      </button>
                     )}
                   </div>
                 </div>
@@ -286,9 +325,18 @@ export default function BriefsPanel({
         })}
 
         {filtered.length === 0 && (
-          <p className="py-10 text-center text-sm text-gray-500">No hay cotizaciones en este filtro todavía.</p>
+          <p className="py-10 text-center text-sm text-gray-500">No hay solicitudes en este filtro todavía.</p>
         )}
       </div>
+
+      {quoteBrief && (
+        <QuoteFormModal
+          clients={clients}
+          catalogServices={catalogServices}
+          initial={suggestQuoteFromBrief(quoteBrief)}
+          onClose={() => setQuoteBrief(null)}
+        />
+      )}
     </div>
   );
 }

@@ -16,6 +16,7 @@ import {
   ChevronRight,
   FileText,
   HandCoins,
+  Inbox,
   Kanban,
   LayoutDashboard,
   LifeBuoy,
@@ -63,6 +64,7 @@ import type { CrmProject } from "@/lib/crm/projects";
 import type { CrmInvoice } from "@/lib/crm/invoices";
 import type { CrmQuote } from "@/lib/crm/quotes";
 import type { CrmTask } from "@/lib/crm/tasks";
+import type { ManagedBrief } from "@/lib/briefs/types";
 import type { ItAsset } from "@/lib/it/asset-types";
 import type { ItTicket } from "@/lib/it/ticket-types";
 import type { ClientMonthUsage } from "@/lib/it/time-entries";
@@ -81,6 +83,7 @@ import InvoicesSection from "./crm/InvoicesSection";
 import CobranzaSection from "./crm/CobranzaSection";
 import ExpensesSection from "./crm/ExpensesSection";
 import QuotesSection from "./crm/QuotesSection";
+import BriefsSection from "./crm/BriefsSection";
 import ContractsSection from "./crm/ContractsSection";
 import AssetsSection from "./it/AssetsSection";
 import TicketsSection from "./it/TicketsSection";
@@ -98,17 +101,18 @@ type Section =
   | "cobranza"
   | "egresos"
   | "cotizaciones"
+  | "solicitudes"
   | "contratos"
   | "soporte"
   | "activos"
   | "tareas"
   | "blog"
-  | "usuarios"
   | "monitoreo"
   | "configuracion";
 
 const NAV_ITEMS: { id: Section; label: string; icon: typeof Users }[] = [
   { id: "resumen", label: "Resumen", icon: LayoutDashboard },
+  { id: "solicitudes", label: "Solicitudes", icon: Inbox },
   { id: "clientes", label: "Clientes", icon: Users },
   { id: "proyectos", label: "Proyectos", icon: Briefcase },
   { id: "facturacion", label: "Facturación", icon: Receipt },
@@ -120,21 +124,19 @@ const NAV_ITEMS: { id: Section; label: string; icon: typeof Users }[] = [
   { id: "activos", label: "Activos", icon: Server },
   { id: "tareas", label: "Tareas", icon: Kanban },
   { id: "blog", label: "Blog", icon: Newspaper },
-  { id: "usuarios", label: "Usuarios", icon: UserCog },
   { id: "monitoreo", label: "Monitoreo", icon: Activity },
 ];
 
 /** Which nav sections a role sees, in nav order. */
 function visibleSections(role: Role): Section[] {
   const out: Section[] = [];
-  if (canUseCrmCore(role)) out.push("resumen", "clientes", "proyectos");
+  if (canUseCrmCore(role)) out.push("resumen", "solicitudes", "clientes", "proyectos");
   if (canReadBilling(role)) out.push("facturacion", "cobranza", "egresos");
   if (canUseCrmCore(role)) out.push("cotizaciones");
   if (canReadBilling(role)) out.push("contratos");
   if (canUseSupport(role)) out.push("soporte", "activos");
   out.push("tareas");
   if (canUseBlogModule(role)) out.push("blog");
-  if (canManageAllUsers(role)) out.push("usuarios");
   if (canSeeMonitoring(role)) out.push("monitoreo");
   return out;
 }
@@ -159,6 +161,7 @@ export default function CrmDashboard({
   projects = [],
   invoices = [],
   quotes = [],
+  briefs = [],
   collections = [],
   scheduledCharges = [],
   plans = [],
@@ -196,6 +199,7 @@ export default function CrmDashboard({
   projects?: CrmProject[];
   invoices?: CrmInvoice[];
   quotes?: CrmQuote[];
+  briefs?: ManagedBrief[];
   collections?: CollectionItem[];
   scheduledCharges?: ScheduledCharge[];
   plans?: PlanRow[];
@@ -226,6 +230,7 @@ export default function CrmDashboard({
   const [section, setSection] = useState<Section>(navItems[0]?.id ?? "tareas");
   const [history, setHistory] = useState<Section[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [settingsTab, setSettingsTab] = useState<"organizacion" | "usuarios">("organizacion");
 
   /** True when `id` is a section this role may open. */
   const isReachable = (id: string): id is Section =>
@@ -521,6 +526,14 @@ export default function CrmDashboard({
           {section === "cotizaciones" && allowed.includes("cotizaciones") && (
             <QuotesSection quotes={quotes} clients={clients} catalogServices={services} />
           )}
+          {section === "solicitudes" && allowed.includes("solicitudes") && (
+            <BriefsSection
+              initialBriefs={briefs}
+              canManage={canUseCrmCore(role)}
+              clients={clients}
+              catalogServices={services}
+            />
+          )}
           {section === "contratos" && allowed.includes("contratos") && (
             <ContractsSection
               contracts={contracts}
@@ -567,13 +580,6 @@ export default function CrmDashboard({
               currentUserId={userId}
             />
           )}
-          {section === "usuarios" && allowed.includes("usuarios") && (
-            <UserManagement
-              currentUserId={userId}
-              initialUsers={users}
-              assignableRoles={assignableRoles(role)}
-            />
-          )}
           {section === "monitoreo" && allowed.includes("monitoreo") && (
             <MonitoringSection
               recentErrors={recentErrors}
@@ -584,8 +590,44 @@ export default function CrmDashboard({
               failedLogins={failedLogins}
             />
           )}
-          {section === "configuracion" && canManageSettings(role) && appSettings && (
-            <SettingsSection settings={appSettings} env={envStatus} />
+          {section === "configuracion" && canManageSettings(role) && (
+            <div className="space-y-6">
+              <div className="flex flex-wrap gap-2">
+                {(
+                  [
+                    { id: "organizacion", label: "Organización", icon: Settings, show: true },
+                    { id: "usuarios", label: "Usuarios", icon: UserCog, show: canManageAllUsers(role) },
+                  ] as const
+                )
+                  .filter((tab) => tab.show)
+                  .map((tab) => (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => setSettingsTab(tab.id)}
+                      className={`inline-flex items-center gap-1.5 rounded-full border px-4 py-1.5 text-sm font-medium transition-colors ${
+                        settingsTab === tab.id
+                          ? "border-sky-400/40 bg-sky-500/15 text-white"
+                          : "border-white/10 bg-white/5 text-gray-400 hover:text-gray-200"
+                      }`}
+                    >
+                      <tab.icon className="h-4 w-4" />
+                      {tab.label}
+                    </button>
+                  ))}
+              </div>
+
+              {settingsTab === "organizacion" && appSettings && (
+                <SettingsSection settings={appSettings} env={envStatus} />
+              )}
+              {settingsTab === "usuarios" && canManageAllUsers(role) && (
+                <UserManagement
+                  currentUserId={userId}
+                  initialUsers={users}
+                  assignableRoles={assignableRoles(role)}
+                />
+              )}
+            </div>
           )}
         </main>
       </div>

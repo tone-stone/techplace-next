@@ -21,6 +21,15 @@ import QuotePreview from "./QuotePreview";
 
 type DraftItem = { concept: string; quantity: string; unitPrice: string };
 
+/** Prefill for a brand-new quote (e.g. from a `project_briefs` lead) — ignored in edit mode or when `lockedClientId` is set. */
+export type QuoteFormInitial = {
+  clientName?: string;
+  clientCompany?: string;
+  clientEmail?: string;
+  items?: { concept: string; quantity: number; unitPrice: number }[];
+  notes?: string;
+};
+
 const EMPTY_ITEM: DraftItem = { concept: "", quantity: "1", unitPrice: "" };
 const FIELD =
   "rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder-gray-500 outline-none focus:border-sky-400/40";
@@ -37,6 +46,7 @@ export default function QuoteFormModal({
   catalogServices = [],
   lockedClientId,
   quote,
+  initial,
   onClose,
 }: {
   clients: CrmClient[];
@@ -46,28 +56,42 @@ export default function QuoteFormModal({
   lockedClientId?: string;
   /** When set, the form edits this quote instead of creating a new one. */
   quote?: QuoteDetail;
+  /** Prefill for a new quote (e.g. suggested from a lead). Ignored once `quote` or `lockedClientId` is set. */
+  initial?: QuoteFormInitial;
   onClose: () => void;
 }) {
   const editing = Boolean(quote);
   const locked = lockedClientId ? clients.find((c) => c.id === lockedClientId) : undefined;
 
   const [clientId, setClientId] = useState(quote?.quote.clientId ?? locked?.id ?? "");
-  const [clientName, setClientName] = useState(quote?.quote.clientName ?? locked?.name ?? "");
-  const [clientCompany, setClientCompany] = useState(quote?.quote.clientCompany ?? locked?.company ?? "");
-  const [clientEmail, setClientEmail] = useState(quote?.quote.clientEmail ?? locked?.email ?? "");
-  const [includeTax, setIncludeTax] = useState(quote ? quote.quote.taxRate > 0 : true);
-  const [items, setItems] = useState<DraftItem[]>(
-    quote && quote.items.length > 0
-      ? quote.items.map((it) => ({
-          concept: it.concept,
-          quantity: String(it.quantity),
-          unitPrice: String(it.unitPrice),
-        }))
-      : [{ ...EMPTY_ITEM }]
+  const [clientName, setClientName] = useState(quote?.quote.clientName ?? locked?.name ?? initial?.clientName ?? "");
+  const [clientCompany, setClientCompany] = useState(
+    quote?.quote.clientCompany ?? locked?.company ?? initial?.clientCompany ?? ""
   );
+  const [clientEmail, setClientEmail] = useState(
+    quote?.quote.clientEmail ?? locked?.email ?? initial?.clientEmail ?? ""
+  );
+  const [includeTax, setIncludeTax] = useState(quote ? quote.quote.taxRate > 0 : true);
+  const [items, setItems] = useState<DraftItem[]>(() => {
+    if (quote && quote.items.length > 0) {
+      return quote.items.map((it) => ({
+        concept: it.concept,
+        quantity: String(it.quantity),
+        unitPrice: String(it.unitPrice),
+      }));
+    }
+    if (!quote && initial?.items && initial.items.length > 0) {
+      return initial.items.map((it) => ({
+        concept: it.concept,
+        quantity: String(it.quantity),
+        unitPrice: String(it.unitPrice),
+      }));
+    }
+    return [{ ...EMPTY_ITEM }];
+  });
   const [issuedDate, setIssuedDate] = useState(quote?.quote.issuedDate || todayIso());
   const [validUntil, setValidUntil] = useState(quote?.quote.validUntil ?? "");
-  const [notes, setNotes] = useState(quote?.quote.notes ?? "");
+  const [notes, setNotes] = useState(quote?.quote.notes ?? initial?.notes ?? "");
   const [terms, setTerms] = useState(quote?.quote.terms ?? DEFAULT_QUOTE_TERMS);
   const [catalogPick, setCatalogPick] = useState("");
   const [showPreview, setShowPreview] = useState(false);
