@@ -22,6 +22,7 @@ const NAV_LINKS = [
     ],
   },
   { href: "/#contacto", label: "Contacto" },
+  { href: "/cotizacion", label: "Cotización" },
 ];
 
 export default function Navbar() {
