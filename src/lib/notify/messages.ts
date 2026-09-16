@@ -110,6 +110,25 @@ export function quoteAcceptedWhatsApp(opts: {
   ].join("\n");
 }
 
+/** Internal alert when a new lead comes in through the public /cotizacion form. */
+export function newBriefWhatsApp(opts: {
+  orgName: string;
+  fullName: string;
+  businessName: string | null;
+  projectType: string;
+  budgetRange: string;
+  phone: string;
+}): string {
+  return [
+    `*Nueva solicitud de cotización* — ${opts.orgName}`,
+    `${opts.fullName}${opts.businessName ? ` · ${opts.businessName}` : ""}`,
+    `Proyecto: ${opts.projectType}`,
+    `Presupuesto: ${opts.budgetRange}`,
+    `Tel: ${opts.phone}`,
+    "Revisa el panel — pestaña Solicitudes.",
+  ].join("\n");
+}
+
 /** Internal daily agenda of what's due soon. */
 export function agendaDigestWhatsApp(opts: { orgName: string; items: AgendaItem[] }): string {
   const lines = opts.items.map(

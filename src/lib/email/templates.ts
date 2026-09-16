@@ -124,6 +124,30 @@ export function quoteAcceptedEmail(opts: {
   return { subject: `Cotización aceptada: ${opts.number} (${opts.clientName})`, html };
 }
 
+/** Internal alert when a new lead comes in through the public /cotizacion form. */
+export function newBriefEmail(opts: {
+  orgName: string;
+  fullName: string;
+  businessName: string | null;
+  email: string;
+  phone: string;
+  projectType: string;
+  budgetRange: string;
+  timeline: string;
+}): { subject: string; html: string } {
+  const html = shell("Nueva solicitud de cotización", `
+    <p style="font-size:14px"><strong>${opts.fullName}</strong>${opts.businessName ? ` · ${opts.businessName}` : ""}</p>
+    <ul style="font-size:14px;padding-left:18px">
+      <li>Proyecto: ${opts.projectType}</li>
+      <li>Presupuesto indicado: ${opts.budgetRange}</li>
+      <li>Tiempo esperado: ${opts.timeline}</li>
+      <li>Email: ${opts.email}</li>
+      <li>Teléfono: ${opts.phone}</li>
+    </ul>
+    <p style="font-size:13px;color:#64748b">Revísala y genera una cotización desde el panel — pestaña "Solicitudes".</p>`);
+  return { subject: `Nueva solicitud: ${opts.fullName} (${opts.projectType})`, html };
+}
+
 /** Daily internal agenda: tasks / projects / support SLAs coming due. */
 export function agendaDigestEmail(opts: {
   orgName: string;

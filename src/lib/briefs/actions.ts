@@ -2,14 +2,16 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { canUseCrmCore, type Role } from "@/lib/auth/roles";
+import { readNotifySettings } from "@/lib/notify/config";
+import { sendEmail } from "@/lib/email/client";
+import { sendWhatsApp } from "@/lib/whatsapp/client";
+import { newBriefEmail } from "@/lib/email/templates";
+import { newBriefWhatsApp } from "@/lib/notify/messages";
 import type { BriefState, BriefStatus, ManagedBrief } from "@/lib/briefs/types";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-// Mismo formulario de Formspree que usa la sección de Contacto: reenvía una copia
-// por correo además de guardar la respuesta completa en Supabase para dar seguimiento.
-const FORMSPREE_ENDPOINT = "https://formspree.io/f/xwpbgpkr";
 
 function str(formData: FormData, key: string): string {
   return String(formData.get(key) ?? "").trim();
@@ -91,25 +93,79 @@ export async function submitProjectBrief(_prevState: BriefState, formData: FormD
   }
 
   try {
-    await fetch(FORMSPREE_ENDPOINT, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify({
-        _subject: `Nuevo brief de proyecto: ${fullName} (${projectType})`,
-        ...brief,
-        features: features.join(", "),
-        integrations: integrations.join(", "),
-      }),
-    });
+    await notifyNewBrief(brief);
   } catch (err) {
-    // La respuesta ya quedó guardada en Supabase; la notificación por correo es best-effort.
-    console.error("submitProjectBrief: fallo al notificar por correo", err);
+    // La respuesta ya quedó guardada en Supabase; la notificación al equipo es best-effort.
+    console.error("submitProjectBrief: fallo al notificar al equipo", err);
   }
 
   return {
     success: true,
     message: "¡Gracias! Recibimos tu brief. Te contactaremos pronto con una cotización a la medida.",
   };
+}
+
+/**
+ * Internal alert (email + WhatsApp) to dios/admin the moment a lead comes in
+ * through the public form — before this, the team only found out by opening
+ * the panel. Runs with the service-role client since the submitter has no
+ * session/permissions to read `app_settings` or `profiles`. Best-effort: the
+ * caller swallows failures so a notification hiccup never fails the submission.
+ */
+async function notifyNewBrief(brief: {
+  full_name: string;
+  business_name: string | null;
+  email: string;
+  phone: string;
+  project_type: string;
+  budget_range: string;
+  timeline: string;
+}): Promise<void> {
+  const admin = createAdminClient();
+  const notify = await readNotifySettings(async (cols) => {
+    const { data } = await admin.from("app_settings").select(cols).eq("id", true).maybeSingle();
+    return (data as Record<string, unknown> | null) ?? null;
+  });
+
+  const { data: staff } = await admin
+    .from("profiles")
+    .select("email")
+    .in("role", ["dios", "admin"])
+    .is("deleted_at", null);
+  const recipients = [
+    ...new Set([
+      ...(staff ?? []).map((s) => s.email).filter((e): e is string => !!e),
+      ...notify.internalEmail,
+    ]),
+  ];
+
+  if (recipients.length > 0) {
+    const { subject, html } = newBriefEmail({
+      orgName: notify.orgName,
+      fullName: brief.full_name,
+      businessName: brief.business_name,
+      email: brief.email,
+      phone: brief.phone,
+      projectType: brief.project_type,
+      budgetRange: brief.budget_range,
+      timeline: brief.timeline,
+    });
+    await sendEmail({ to: recipients, subject, html, from: notify.fromEmail });
+  }
+
+  if (notify.whatsappReady && notify.internalWhatsApp.length > 0) {
+    await sendWhatsApp({
+      to: notify.internalWhatsApp,
+      body: newBriefWhatsApp({
+        orgName: notify.orgName,
+        fullName: brief.full_name,
+        businessName: brief.business_name,
+        projectType: brief.project_type,
+        budgetRange: brief.budget_range,
+        phone: brief.phone,
+      }),
+    });
+  }
 }
 
 async function requireCrmStaff() {
