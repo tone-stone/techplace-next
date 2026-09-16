@@ -52,6 +52,7 @@ export async function submitProjectBrief(_prevState: BriefState, formData: FormD
     business_name: str(formData, "business_name") || null,
     email,
     phone,
+    lead_source: strOrOther(formData, "lead_source") || null,
     industry: strOrOther(formData, "industry") || null,
     has_website: hasWebsite,
     current_website_url: hasWebsite ? str(formData, "current_website_url") || null : null,
@@ -117,6 +118,7 @@ async function notifyNewBrief(brief: {
   business_name: string | null;
   email: string;
   phone: string;
+  lead_source: string | null;
   project_type: string;
   budget_range: string;
   timeline: string;
@@ -146,6 +148,7 @@ async function notifyNewBrief(brief: {
       businessName: brief.business_name,
       email: brief.email,
       phone: brief.phone,
+      leadSource: brief.lead_source,
       projectType: brief.project_type,
       budgetRange: brief.budget_range,
       timeline: brief.timeline,
@@ -160,6 +163,7 @@ async function notifyNewBrief(brief: {
         orgName: notify.orgName,
         fullName: brief.full_name,
         businessName: brief.business_name,
+        leadSource: brief.lead_source,
         projectType: brief.project_type,
         budgetRange: brief.budget_range,
         phone: brief.phone,
@@ -198,6 +202,7 @@ function mapBriefRow(row: {
   business_name: string | null;
   email: string;
   phone: string;
+  lead_source: string | null;
   industry: string | null;
   has_website: boolean;
   current_website_url: string | null;
@@ -229,6 +234,7 @@ function mapBriefRow(row: {
     businessName: row.business_name,
     email: row.email,
     phone: row.phone,
+    leadSource: row.lead_source,
     industry: row.industry,
     hasWebsite: row.has_website,
     currentWebsiteUrl: row.current_website_url,

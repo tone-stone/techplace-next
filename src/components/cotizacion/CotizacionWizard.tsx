@@ -101,6 +101,14 @@ const TECH_PREFERENCES = [
   "Otro",
 ];
 
+const LEAD_SOURCES = [
+  "Recomendación de alguien",
+  "Redes sociales (Facebook / Instagram)",
+  "Google / búsqueda",
+  "Ya soy cliente de TechPlace",
+  "Otro",
+];
+
 const inputCls =
   "tp-glass-input w-full px-4 py-3 rounded-2xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-blue focus:border-brand-blue transition duration-200";
 const labelCls = "block text-sm font-semibold text-gray-200 mb-2";
@@ -290,6 +298,9 @@ export default function CotizacionWizard() {
               </div>
             </Field>
           </div>
+          <Field label="¿Cómo te enteraste de nosotros?">
+            <SelectWithOther name="lead_source" options={LEAD_SOURCES} />
+          </Field>
           <Field label="¿A qué giro o industria se dedica tu negocio?">
             <SelectWithOther name="industry" options={INDUSTRIES} />
           </Field>

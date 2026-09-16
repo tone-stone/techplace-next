@@ -12,6 +12,7 @@ export type ManagedBrief = {
   businessName: string | null;
   email: string;
   phone: string;
+  leadSource: string | null;
   industry: string | null;
   hasWebsite: boolean;
   currentWebsiteUrl: string | null;

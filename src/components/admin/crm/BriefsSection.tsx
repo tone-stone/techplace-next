@@ -220,6 +220,7 @@ export default function BriefsSection({
                   <div className="grid gap-4 sm:grid-cols-2">
                     <DetailRow label="Email" value={brief.email} />
                     <DetailRow label="Teléfono" value={brief.phone} />
+                    <DetailRow label="Fuente del lead" value={brief.leadSource} />
                     <DetailRow label="Giro / industria" value={brief.industry} />
                     <DetailRow
                       label="Sitio actual"

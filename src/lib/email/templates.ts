@@ -131,6 +131,7 @@ export function newBriefEmail(opts: {
   businessName: string | null;
   email: string;
   phone: string;
+  leadSource: string | null;
   projectType: string;
   budgetRange: string;
   timeline: string;
@@ -141,6 +142,7 @@ export function newBriefEmail(opts: {
       <li>Proyecto: ${opts.projectType}</li>
       <li>Presupuesto indicado: ${opts.budgetRange}</li>
       <li>Tiempo esperado: ${opts.timeline}</li>
+      ${opts.leadSource ? `<li>Fuente: ${opts.leadSource}</li>` : ""}
       <li>Email: ${opts.email}</li>
       <li>Teléfono: ${opts.phone}</li>
     </ul>

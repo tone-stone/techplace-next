@@ -116,6 +116,7 @@ export function newBriefWhatsApp(opts: {
   orgName: string;
   fullName: string;
   businessName: string | null;
+  leadSource: string | null;
   projectType: string;
   budgetRange: string;
   phone: string;
@@ -125,9 +126,12 @@ export function newBriefWhatsApp(opts: {
     `${opts.fullName}${opts.businessName ? ` · ${opts.businessName}` : ""}`,
     `Proyecto: ${opts.projectType}`,
     `Presupuesto: ${opts.budgetRange}`,
+    opts.leadSource ? `Fuente: ${opts.leadSource}` : null,
     `Tel: ${opts.phone}`,
     "Revisa el panel — pestaña Solicitudes.",
-  ].join("\n");
+  ]
+    .filter((l): l is string => l !== null)
+    .join("\n");
 }
 
 /** Internal daily agenda of what's due soon. */
