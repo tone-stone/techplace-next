@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { canUseCrmCore, type Role } from "@/lib/auth/roles";
 import type { BriefState, BriefStatus, ManagedBrief } from "@/lib/briefs/types";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -99,7 +100,7 @@ export async function submitProjectBrief(_prevState: BriefState, formData: FormD
   };
 }
 
-async function requireStaff() {
+async function requireCrmStaff() {
   const supabase = await createClient();
   const {
     data: { user },
@@ -107,10 +108,18 @@ async function requireStaff() {
 
   if (!user) return { ok: false as const, error: "No autenticado" };
 
-  const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .is("deleted_at", null)
+    .single();
   if (!profile) return { ok: false as const, error: "No tienes un perfil de equipo asociado" };
 
-  return { ok: true as const, role: profile.role as "admin" | "redactor" };
+  const role = profile.role as Role;
+  if (!canUseCrmCore(role)) return { ok: false as const, error: "No tienes permiso para ver cotizaciones" };
+
+  return { ok: true as const, role };
 }
 
 function mapBriefRow(row: {
@@ -176,7 +185,7 @@ function mapBriefRow(row: {
 }
 
 export async function listProjectBriefs(): Promise<{ briefs: ManagedBrief[] } | { error: string }> {
-  const check = await requireStaff();
+  const check = await requireCrmStaff();
   if (!check.ok) return { error: check.error };
 
   const supabase = await createClient();
@@ -193,9 +202,11 @@ export async function updateBriefStatusAction(
   id: string,
   status: BriefStatus
 ): Promise<{ error: string } | { success: true }> {
-  const check = await requireStaff();
+  const check = await requireCrmStaff();
   if (!check.ok) return { error: check.error };
-  if (check.role !== "admin") return { error: "Solo un administrador puede cambiar el estado" };
+  if (check.role !== "dios" && check.role !== "admin") {
+    return { error: "Solo un administrador puede cambiar el estado" };
+  }
 
   const supabase = await createClient();
   const { error } = await supabase.from("project_briefs").update({ status }).eq("id", id);

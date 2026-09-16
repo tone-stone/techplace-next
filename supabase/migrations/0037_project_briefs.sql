@@ -53,17 +53,30 @@ create policy "project_briefs_insert_public"
   to anon, authenticated
   with check (true);
 
--- Solo el staff (perfiles registrados) puede leer las respuestas para cotizar.
+-- Solo quien usa el núcleo del CRM (dios/admin/ejecutivo, ver canUseCrmCore en
+-- src/lib/auth/roles.ts) puede leer las respuestas para cotizar — blog/redactor
+-- no tienen por qué ver datos de contacto de clientes potenciales. Se excluye
+-- también al staff dado de baja (soft delete de la migración 0018).
 drop policy if exists "project_briefs_select_staff" on public.project_briefs;
 create policy "project_briefs_select_staff"
   on public.project_briefs for select
-  using (exists (select 1 from public.profiles p where p.id = auth.uid()));
+  using (
+    exists (
+      select 1 from public.profiles p
+      where p.id = auth.uid() and p.deleted_at is null and p.role in ('dios', 'admin', 'ejecutivo')
+    )
+  );
 
--- Solo un admin puede actualizar el estado de seguimiento (nuevo/en revisión/cotizado/descartado).
+-- Solo dios/admin puede actualizar el estado de seguimiento (nuevo/en revisión/cotizado/descartado).
 drop policy if exists "project_briefs_update_admin" on public.project_briefs;
 create policy "project_briefs_update_admin"
   on public.project_briefs for update
-  using (exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'admin'));
+  using (
+    exists (
+      select 1 from public.profiles p
+      where p.id = auth.uid() and p.deleted_at is null and p.role in ('dios', 'admin')
+    )
+  );
 
 create index if not exists project_briefs_created_at_idx on public.project_briefs (created_at desc);
 create index if not exists project_briefs_status_idx on public.project_briefs (status);
