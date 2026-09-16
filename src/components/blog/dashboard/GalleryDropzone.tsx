@@ -1,8 +1,17 @@
 "use client";
 
+/**
+ * Drag-and-drop / click-to-browse picker for an article's extra photo
+ * gallery, used inside `ArticleForm`. Enforces the gallery size limits from
+ * `media-limits.ts`, previews newly picked files via object URLs, and lets
+ * the user remove either a newly added file or a previously saved gallery
+ * image.
+ */
+
 import { useEffect, useRef, useState } from "react";
 import { ImagePlus, X } from "lucide-react";
 import { formatBytes, MAX_GALLERY_IMAGES, MAX_IMAGE_BYTES } from "@/lib/blog/media-limits";
+import FitImage from "../FitImage";
 
 type GalleryDropzoneProps = {
   files: File[];
@@ -11,6 +20,14 @@ type GalleryDropzoneProps = {
   onRemoveExisting: (url: string) => void;
 };
 
+/**
+ * Renders the dropzone plus a thumbnail grid combining already-saved
+ * gallery images (`existingUrls`) and newly picked files (`files`), each
+ * removable independently.
+ *
+ * @param onRemoveExisting - Called when a previously saved gallery image is
+ * removed; new files are removed locally via `onFilesChange` instead.
+ */
 export default function GalleryDropzone({
   files,
   existingUrls,
@@ -23,7 +40,12 @@ export default function GalleryDropzone({
   const [previews, setPreviews] = useState<string[]>([]);
 
   useEffect(() => {
+    // Object URLs need paired create/revoke lifecycle management, which only
+    // an effect's cleanup function provides — this isn't a redundant
+    // prop-to-state sync (useMemo can't revoke the *previous* URLs when it
+    // recomputes), so setState here is the correct pattern despite the rule.
     const urls = files.map((file) => URL.createObjectURL(file));
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setPreviews(urls);
     return () => {
       urls.forEach((url) => URL.revokeObjectURL(url));
@@ -70,7 +92,6 @@ export default function GalleryDropzone({
         Galería de fotos ({totalCount}/{MAX_GALLERY_IMAGES})
       </label>
 
-      {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events */}
       <div
         onClick={() => inputRef.current?.click()}
         onDragOver={(e) => {
@@ -107,8 +128,7 @@ export default function GalleryDropzone({
         <div className="mt-3 grid grid-cols-4 gap-2 sm:grid-cols-6">
           {existingUrls.map((url) => (
             <div key={url} className="group relative aspect-square overflow-hidden rounded-lg border border-white/10">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={url} alt="" className="h-full w-full object-cover" />
+              <FitImage src={url} sizes="120px" />
               <button
                 type="button"
                 onClick={() => onRemoveExisting(url)}
@@ -121,8 +141,7 @@ export default function GalleryDropzone({
           ))}
           {previews.map((url, i) => (
             <div key={url} className="group relative aspect-square overflow-hidden rounded-lg border border-indigo-400/30">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={url} alt="" className="h-full w-full object-cover" />
+              <FitImage src={url} sizes="120px" />
               <button
                 type="button"
                 onClick={() => removeNewFile(i)}

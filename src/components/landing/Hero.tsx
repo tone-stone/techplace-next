@@ -1,81 +1,84 @@
-"use client";
-
 import { ShieldCheck } from "lucide-react";
-import { motion } from "motion/react";
-import { Swiper, SwiperSlide } from "swiper/react";
-import { Autoplay, EffectFade } from "swiper/modules";
-
-import "swiper/css";
-import "swiper/css/effect-fade";
+import HeroBackground from "./HeroBackground";
 
 const SLIDES = [
-  "Tu futuro digital empieza aquí",
-  "Seguridad & Web a otro nivel",
-  "Innovación para negocios modernos",
+  "Ingeniería digital para empresas en crecimiento",
+  "Desarrollo potenciado por inteligencia artificial",
+  "Tecnología de vanguardia, resultados medibles",
 ];
 
+/**
+ * The landing page's opening section (`#home`): a looping background video
+ * with a crossfading decorative tagline, the SEO-facing `<h1>`, an intro
+ * paragraph, and the two primary calls to action (quote request / view
+ * projects).
+ */
 export default function Hero() {
   return (
     <section
       id="home"
       className="relative flex items-center justify-center min-h-screen pt-24 pb-10 overflow-hidden"
     >
-      <video
-        autoPlay
-        muted
-        loop
-        playsInline
-        className="tp-video-bg"
-        poster="/img/backup-dark-bg.webp"
-      >
-        <source src="/video/bg.mp4" type="video/mp4" />
-        Tu navegador no soporta videos en HTML5.
-      </video>
+      <HeroBackground />
       <div className="tp-hero-overlay" />
       <div
         aria-hidden
-        className="pointer-events-none absolute -top-24 -left-24 h-96 w-96 rounded-full bg-violet-700/20 blur-3xl z-[1] animate-[tp-float_9s_ease-in-out_infinite]"
+        className="tp-hero-blob pointer-events-none absolute -top-24 -left-24 h-96 w-96 rounded-full bg-violet-700/20 blur-3xl z-[1] animate-[tp-float_9s_ease-in-out_infinite]"
       />
       <div
         aria-hidden
-        className="pointer-events-none absolute -bottom-24 -right-16 h-96 w-96 rounded-full bg-indigo-600/25 blur-3xl z-[1] animate-[tp-float_11s_ease-in-out_infinite_reverse]"
+        className="tp-hero-blob pointer-events-none absolute -bottom-24 -right-16 h-96 w-96 rounded-full bg-indigo-600/25 blur-3xl z-[1] animate-[tp-float_11s_ease-in-out_infinite_reverse]"
       />
 
-      <div className="tp-hero-content relative z-20 text-center w-full max-w-full md:max-w-2xl mx-auto">
-        <Swiper
-          modules={[Autoplay, EffectFade]}
-          effect="fade"
-          fadeEffect={{ crossFade: true }}
-          loop
-          autoplay={{ delay: 2800, disableOnInteraction: false }}
-          allowTouchMove={false}
-          className="tp-heroSwiper select-none mb-4 w-full max-w-full md:max-w-2xl mx-auto"
+      <div className="tp-hero-content relative z-20 text-center w-full max-w-full px-5 sm:px-6 md:max-w-2xl mx-auto">
+        {/* Decorative crossfading tagline — not a heading. The single real
+            <h1> for SEO is the line below it. */}
+        <div
+          aria-hidden
+          className="tp-hero-slides select-none mb-5 sm:mb-6 w-full max-w-full md:max-w-2xl mx-auto"
         >
-          {SLIDES.map((text) => (
-            <SwiperSlide key={text}>
-              <h1 className="tp-heading font-heading text-3xl sm:text-4xl md:text-6xl font-extrabold drop-shadow-xl tracking-tight tp-animate-fadein">
-                {text}
-              </h1>
-            </SwiperSlide>
+          {SLIDES.map((text, i) => (
+            <span
+              key={text}
+              style={{ animationDelay: `${i * 2.8}s` }}
+              className="tp-hero-slide font-heading text-2xl sm:text-4xl md:text-6xl font-extrabold drop-shadow-xl tracking-tight leading-tight"
+            >
+              {text}
+            </span>
           ))}
-        </Swiper>
-        <p className="text-base sm:text-lg md:text-2xl text-gray-200 mb-8 drop-shadow-lg font-light tp-animate-fadein">
-          Desarrollamos sitios web y blindamos tus datos.
-          <br />
-          Innovación y seguridad para negocios modernos.
+        </div>
+        <h1 className="font-heading text-base sm:text-xl md:text-2xl font-bold text-white/95 mb-3 tracking-tight drop-shadow-lg leading-snug">
+          Desarrollo web, apps y ciberseguridad en Tijuana
+        </h1>
+        <p className="text-base sm:text-lg md:text-xl text-gray-200 mb-8 drop-shadow-lg font-light tp-animate-fadein text-justify">
+          Diseñamos, desarrollamos y aseguramos productos digitales a la medida,
+          con inteligencia artificial integrada en cada etapa del proceso.
+          Operamos desde Tijuana y Baja California, con cobertura remota en todo
+          México.
         </p>
-        <motion.a
-          href="#contacto"
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 1, delay: 1.2, ease: [0.4, 0, 0.2, 1] }}
-          whileHover={{ scale: 1.05, transition: { type: "spring", stiffness: 400, damping: 15 } }}
-          whileTap={{ scale: 0.97 }}
-          className="tp-btn-animated inline-flex items-center text-white px-6 sm:px-8 md:px-10 py-3 md:py-4 rounded-full text-base sm:text-lg font-bold shadow-lg shadow-blue-900/40"
-        >
-          <ShieldCheck className="mr-2 h-5 w-5" />
-          Solicita tu consultoría
-        </motion.a>
+        {/* Wrapped so the entrance animation (from `.tp-hero-content > *`)
+            lands on this div instead of the <a>. The <a> already runs its
+            own `animation` (tp-gradient-shift, via .tp-btn-animated) — same
+            collision as the headline slides above, avoided the same way:
+            keep the two animated elements separate instead of letting two
+            classes fight over one `animation` property. */}
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+          <a
+            href="#contacto"
+            data-track="hero_cta_cotizacion"
+            className="tp-btn-animated inline-flex items-center text-white px-6 sm:px-8 md:px-10 py-3 md:py-4 rounded-full text-base sm:text-lg font-bold shadow-lg shadow-blue-900/40 transition-transform duration-300 hover:scale-105 active:scale-[0.97]"
+          >
+            <ShieldCheck className="mr-2 h-5 w-5" />
+            Solicita tu cotización
+          </a>
+          <a
+            href="#portafolio"
+            data-track="hero_ver_proyectos"
+            className="inline-flex items-center rounded-full border border-white/25 px-6 sm:px-8 py-3 md:py-4 text-base sm:text-lg font-bold text-white/90 transition-colors duration-300 hover:bg-white/10 hover:text-white"
+          >
+            Ver proyectos
+          </a>
+        </div>
       </div>
     </section>
   );

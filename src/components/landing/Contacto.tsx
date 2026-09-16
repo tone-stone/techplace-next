@@ -3,21 +3,42 @@
 import Image from "next/image";
 import { Globe, Mail, MapPin, MessageSquare, Send, User } from "lucide-react";
 import { FaFacebookF, FaWhatsapp } from "react-icons/fa6";
-import { motion } from "motion/react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Reveal from "./Reveal";
+import { trackInteraction } from "@/lib/monitoring/engagement";
 
+/** Status/feedback message shown under the contact form after a submit attempt, or `null` before one happens. */
 type EstadoForm = { message: string; error: boolean } | null;
 
+/**
+ * The "Contáctanos" section (`#contacto`): a contact form that posts to our
+ * `/api/contact` proxy (rate limit + honeypot + time trap, then forwarded to
+ * Formspree), plus direct WhatsApp/website/Facebook links and business hours.
+ * Handles form submission asynchronously so the page never navigates away.
+ */
 export default function Contacto() {
   const [estado, setEstado] = useState<EstadoForm>(null);
   const [enviando, setEnviando] = useState(false);
+  // Funnel tracking: fire `start` once, on the first field the visitor touches.
+  const startedRef = useRef(false);
+  // Time trap: when the form was rendered. The server rejects submits that
+  // arrive implausibly fast (bots) or after the page sat open for hours.
+  const [renderedAt] = useState(() => Date.now());
 
+  const handleFirstFocus = () => {
+    if (startedRef.current) return;
+    startedRef.current = true;
+    trackInteraction("form", { form: "contacto", step: "start" });
+  };
+
+  // Submits the form via fetch (instead of a normal POST navigation) so we can
+  // show inline success/error feedback without leaving the page.
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const form = e.currentTarget;
     setEnviando(true);
     setEstado({ message: "Enviando…", error: false });
+    trackInteraction("form", { form: "contacto", step: "submit" });
 
     try {
       const res = await fetch(form.action, {
@@ -29,17 +50,25 @@ export default function Contacto() {
       if (res.ok) {
         setEstado({ message: "¡Mensaje enviado! Te responderemos pronto 😊", error: false });
         form.reset();
+        trackInteraction("form", { form: "contacto", step: "success" });
       } else {
-        setEstado({
-          message: "Error al enviar. Intenta de nuevo o contáctanos por WhatsApp.",
-          error: true,
-        });
+        const fallback =
+          res.status === 429
+            ? "Demasiados intentos. Espera unos minutos e inténtalo de nuevo."
+            : "Error al enviar. Intenta de nuevo o contáctanos por WhatsApp.";
+        const message = await res
+          .json()
+          .then((d) => (typeof d?.error === "string" ? d.error : fallback))
+          .catch(() => fallback);
+        setEstado({ message, error: true });
+        trackInteraction("form", { form: "contacto", step: "error" });
       }
     } catch {
       setEstado({
         message: "Error al enviar. Intenta de nuevo o contáctanos por WhatsApp.",
         error: true,
       });
+      trackInteraction("form", { form: "contacto", step: "error" });
     } finally {
       setEnviando(false);
     }
@@ -55,7 +84,13 @@ export default function Contacto() {
         </Reveal>
         <div className="flex flex-col md:flex-row gap-10 items-center justify-between">
           <Reveal className="tp-glass w-full md:w-1/2 rounded-3xl p-6 sm:p-8">
-            <form onSubmit={handleSubmit} className="space-y-6" action="https://formspree.io/f/xwpbgpkr" method="POST">
+            <form
+              onSubmit={handleSubmit}
+              onFocus={handleFirstFocus}
+              className="space-y-6"
+              action="/api/contact"
+              method="POST"
+            >
               <div className="relative group">
                 <input
                   type="text"
@@ -86,70 +121,64 @@ export default function Contacto() {
                 />
                 <MessageSquare className="absolute left-4 top-3.5 h-4 w-4 text-purple-400" />
               </div>
-              <input type="text" name="_gotcha" className="hidden" tabIndex={-1} autoComplete="off" />
+              {/* Honeypot + time trap — both checked server-side in /api/contact. */}
+              <input
+                type="text"
+                name="_gotcha"
+                className="hidden"
+                tabIndex={-1}
+                autoComplete="off"
+                aria-hidden="true"
+              />
+              <input type="hidden" name="_ts" value={renderedAt} readOnly />
 
               {estado && (
-                <motion.p
+                <p
                   key={estado.message}
-                  initial={estado.error ? { x: -6 } : { opacity: 0 }}
-                  animate={
-                    estado.error
-                      ? { x: [-6, 6, -4, 4, 0] }
-                      : { opacity: 1 }
-                  }
-                  transition={{ duration: 0.4 }}
-                  className={`text-sm ${estado.error ? "text-red-400" : "text-purple-300"}`}
+                  className={`text-sm ${estado.error ? "tp-shake text-red-400" : "tp-fade-in text-purple-300"}`}
                 >
                   {estado.message}
-                </motion.p>
+                </p>
               )}
 
-              <motion.button
+              <button
                 type="submit"
                 disabled={enviando}
-                whileHover={{ scale: enviando ? 1 : 1.03 }}
-                whileTap={{ scale: enviando ? 1 : 0.97 }}
-                className="tp-btn-animated relative px-10 py-3 rounded-full font-bold shadow-lg transition-opacity duration-300 text-lg text-white outline-none focus-visible:ring-2 focus-visible:ring-brand-blue disabled:opacity-60"
+                className="tp-btn-animated relative px-10 py-3 rounded-full font-bold shadow-lg transition-[opacity,transform] duration-300 text-lg text-white outline-none focus-visible:ring-2 focus-visible:ring-brand-blue disabled:opacity-60 not-disabled:hover:scale-[1.03] not-disabled:active:scale-[0.97]"
               >
                 <span className="inline-flex items-center gap-2">
                   <Send className="h-4 w-4" /> Enviar mensaje
                 </span>
-              </motion.button>
+              </button>
             </form>
             <div className="mt-10 text-gray-400 text-left space-y-3">
-              <p className="flex items-center gap-2">
-                <FaWhatsapp className="text-green-400 text-xl" />
-                <a
-                  href="https://wa.me/526643425615"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-green-400 hover:underline font-semibold"
-                >
-                  664 342 56 15
-                </a>
-              </p>
-              <p className="flex items-center gap-2">
-                <Globe className="text-brand-blue h-5 w-5" />
-                <a
-                  href="https://techplacetj.com"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-brand-blue hover:underline font-semibold"
-                >
-                  www.techplacetj.com
-                </a>
-              </p>
-              <p className="flex items-center gap-2">
-                <FaFacebookF className="text-blue-400 h-5 w-5" />
-                <a
-                  href="https://facebook.com/techplacetijuana"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-blue-400 hover:underline font-semibold"
-                >
-                  /techplacetj
-                </a>
-              </p>
+              <a
+                href="https://wa.me/526643425615"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="-my-2 flex items-center gap-2 py-2 text-green-400 hover:underline font-semibold"
+              >
+                <FaWhatsapp className="text-green-400 text-xl shrink-0" />
+                664 342 56 15
+              </a>
+              <a
+                href="https://techplacetj.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="-my-2 flex items-center gap-2 py-2 text-brand-blue hover:underline font-semibold"
+              >
+                <Globe className="text-brand-blue h-5 w-5 shrink-0" />
+                www.techplacetj.com
+              </a>
+              <a
+                href="https://facebook.com/techplacetijuana"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="-my-2 flex items-center gap-2 py-2 text-blue-400 hover:underline font-semibold"
+              >
+                <FaFacebookF className="text-blue-400 h-5 w-5 shrink-0" />
+                /techplacetj
+              </a>
               <p className="flex items-center gap-2 text-xs">
                 <MapPin className="h-4 w-4 text-purple-400" /> Tijuana, B.C. | Lun-Vie 10am-4pm
               </p>
@@ -158,10 +187,11 @@ export default function Contacto() {
           <Reveal className="tp-glass hidden md:flex md:w-1/2 rounded-3xl p-6 items-center justify-center" delay={0.15}>
             <Image
               src="/img/logos/techplace-brand.webp"
-              alt="Ilustración contacto"
+              alt="TechPlace — desarrollo web, apps y ciberseguridad en Tijuana"
               width={480}
               height={480}
-              loading="eager"
+              loading="lazy"
+              sizes="480px"
               className="w-3/4 md:w-full max-w-xl mx-auto rounded-2xl"
             />
           </Reveal>

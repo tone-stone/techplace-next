@@ -3,40 +3,61 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ChevronDown, LogIn, Menu, PenSquare, ShieldCheck, X } from "lucide-react";
-import { AnimatePresence, motion } from "motion/react";
+import { LogIn, Menu, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
+/**
+ * Fixed, floating pill navbar shown on every page. Tracks scroll position to
+ * swap its light/dark background and to auto-hide on mobile while scrolling,
+ * highlights the in-view landing section via IntersectionObserver, and hosts
+ * a desktop dropdown / full-screen mobile menu for the Blog submenu.
+ */
 const NAV_LINKS = [
   { href: "/#home", label: "Inicio" },
   { href: "/#servicios", label: "Servicios" },
   { href: "/#nosotros", label: "Nosotros" },
   { href: "/#portafolio", label: "Portafolio" },
-  {
-    href: "/blog",
-    label: "Blog",
-    children: [
-      { href: "/blog", label: "Ver blog" },
-      { href: "/blog/login", label: "Portal de redacción" },
-      { href: "/blog/admin-login", label: "Acceso Administrador" },
-    ],
-  },
+  { href: "/blog", label: "Blog" },
   { href: "/#contacto", label: "Contacto" },
   { href: "/cotizacion", label: "Cotización" },
 ];
 
+/** Site-wide navigation bar: logo, section links, Blog dropdown, and mobile menu. */
 export default function Navbar() {
   const pathname = usePathname();
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [active, setActive] = useState("home");
-  const [blogMenuOpen, setBlogMenuOpen] = useState(false);
-  const blogMenuRef = useRef<HTMLDivElement>(null);
+  // Mobile / tablet only (forced back to visible at lg: — see the nav's className):
+  // hidden while actively scrolling in either direction, shown again once
+  // scrolling settles. Keeps the bar out of the way while reading/scrolling
+  // through a long page on a small screen, without permanently losing it.
+  const [navHidden, setNavHidden] = useState(false);
+  const hideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Read inside the scroll handler without making `menuOpen` a dependency of
+  // the effect below — re-subscribing the scroll listener on every menu
+  // open/close is needless work on the tap that opens the menu.
+  const menuOpenRef = useRef(menuOpen);
+  useEffect(() => {
+    menuOpenRef.current = menuOpen;
+  }, [menuOpen]);
 
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 30);
-    window.addEventListener("scroll", onScroll);
-    return () => window.removeEventListener("scroll", onScroll);
+    const onScroll = () => {
+      const y = window.scrollY;
+      setScrolled(y > 30);
+
+      if (!menuOpenRef.current) {
+        setNavHidden(y > 30);
+        if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current);
+        hideTimeoutRef.current = setTimeout(() => setNavHidden(false), 350);
+      }
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current);
+    };
   }, []);
 
   useEffect(() => {
@@ -64,39 +85,29 @@ export default function Navbar() {
     return pathname.startsWith(href);
   };
 
-  useEffect(() => {
-    if (!blogMenuOpen) return;
-    const onClickOutside = (e: MouseEvent) => {
-      if (blogMenuRef.current && !blogMenuRef.current.contains(e.target as Node)) {
-        setBlogMenuOpen(false);
-      }
-    };
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setBlogMenuOpen(false);
-    };
-    document.addEventListener("mousedown", onClickOutside);
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.removeEventListener("mousedown", onClickOutside);
-      document.removeEventListener("keydown", onKeyDown);
-    };
-  }, [blogMenuOpen]);
-
-  useEffect(() => {
-    document.body.style.overflow = menuOpen ? "hidden" : "";
-    return () => {
-      document.body.style.overflow = "";
-    };
-  }, [menuOpen]);
+  // No JS body-scroll lock here on purpose: this menu is a `fixed inset-0`
+  // panel that fully covers the viewport, so it already intercepts every
+  // touch — the body underneath can't receive scroll gestures regardless.
+  // An earlier version pinned <body> to `position: fixed` (and before that,
+  // `overflow: hidden` on <html>/<body>) to belt-and-suspenders the lock, but
+  // both techniques raced with iOS Safari's touch/hit-testing pipeline and
+  // could leave the whole viewport unresponsive to taps until the next
+  // reflow — the toggle button (and every link) going dead on open.
 
   const toggleMenu = () => setMenuOpen((open) => !open);
+  const closeMenu = () => setMenuOpen(false);
 
   return (
-    <nav className="fixed z-50 top-0 inset-x-0 md:top-4 md:inset-x-6 lg:left-1/2 lg:right-auto lg:-translate-x-1/2 lg:w-full lg:max-w-6xl">
+    <nav className="fixed z-50 top-2 inset-x-2 sm:top-3 sm:inset-x-3 lg:top-4 lg:left-1/2 lg:right-auto lg:-translate-x-1/2 lg:w-full lg:max-w-6xl">
+      {/* The hide-on-scroll transform lives on this pill, not on <nav> itself:
+          any element with a `transform` becomes the containing block for its
+          `position: fixed` descendants — putting it on <nav> shrank the
+          full-screen mobile menu overlay down to the pill's own box instead
+          of the viewport, since the overlay is a fixed-position child of nav. */}
       <div
-        className={`shadow-lg backdrop-blur-md transition-all duration-300 md:rounded-full ${
-          scrolled ? "tp-navbar-bg-dark" : "tp-navbar-bg-light"
-        }`}
+        className={`relative z-50 shadow-lg rounded-2xl lg:rounded-full lg:backdrop-blur-md transition-all duration-300 ease-out lg:translate-y-0! ${
+          navHidden ? "-translate-y-24" : "translate-y-0"
+        } ${scrolled ? "tp-navbar-bg-dark" : "tp-navbar-bg-light"}`}
       >
       <div className="max-w-7xl mx-auto flex items-center justify-between px-6 py-3">
         <Link href="/#home" className="flex items-center gap-3">
@@ -118,67 +129,20 @@ export default function Navbar() {
           />
         </Link>
 
-        <div className="hidden md:flex items-center gap-8 text-lg font-semibold">
-          {NAV_LINKS.map((link) =>
-            link.children ? (
-              <div key={link.href} className="relative" ref={blogMenuRef}>
-                <button
-                  type="button"
-                  onClick={() => setBlogMenuOpen((open) => !open)}
-                  aria-haspopup="true"
-                  aria-expanded={blogMenuOpen}
-                  className={`tp-nav-link-underline${isActive(link.href) ? " active" : ""}`}
-                >
-                  <span className="inline-flex items-center gap-1">
-                    {link.label}
-                    <ChevronDown
-                      className={`h-4 w-4 transition-transform duration-200 ${blogMenuOpen ? "rotate-180" : ""}`}
-                    />
-                  </span>
-                </button>
-
-                <AnimatePresence>
-                  {blogMenuOpen && (
-                    <motion.div
-                      initial={{ opacity: 0, y: -8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -8 }}
-                      transition={{ duration: 0.18 }}
-                      className="tp-dropdown-glass absolute left-1/2 top-full mt-3 w-56 -translate-x-1/2 rounded-2xl p-2 text-base"
-                    >
-                      {link.children.map((child) => (
-                        <Link
-                          key={child.href}
-                          href={child.href}
-                          onClick={() => setBlogMenuOpen(false)}
-                          className="flex items-center gap-2 rounded-xl px-3 py-2.5 font-medium text-gray-200 hover:bg-white/10 hover:text-brand-blue transition-colors"
-                        >
-                          {child.href === "/blog/login" ? (
-                            <PenSquare className="h-4 w-4 text-purple-400" />
-                          ) : child.href === "/blog/admin-login" ? (
-                            <ShieldCheck className="h-4 w-4 text-purple-400" />
-                          ) : (
-                            <ChevronDown className="h-4 w-4 -rotate-90 text-purple-400" />
-                          )}
-                          {child.label}
-                        </Link>
-                      ))}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            ) : (
-              <Link
-                key={link.href}
-                href={link.href}
-                className={`tp-nav-link-underline${isActive(link.href) ? " active" : ""}`}
-              >
-                {link.label}
-              </Link>
-            )
-          )}
+        <div className="hidden lg:flex items-center gap-8 text-lg font-semibold">
+          {NAV_LINKS.map((link) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              data-track={`nav_${link.label.toLowerCase()}`}
+              className={`tp-nav-link-underline${isActive(link.href) ? " active" : ""}`}
+            >
+              {link.label}
+            </Link>
+          ))}
           <Link
             href="/login"
+            data-track="nav_entrar"
             className="tp-btn-animated inline-flex items-center gap-1.5 rounded-full px-5 py-2 text-base font-bold text-white shadow-lg shadow-blue-900/30 transition-transform hover:scale-105"
           >
             <LogIn className="h-4 w-4" />
@@ -187,93 +151,85 @@ export default function Navbar() {
         </div>
 
         <button
+          type="button"
           onClick={toggleMenu}
           aria-label={menuOpen ? "Cerrar menú" : "Abrir menú"}
           aria-expanded={menuOpen}
-          className="md:hidden relative z-50 flex items-center justify-center w-10 h-10 rounded-full text-purple-200 hover:text-brand-blue hover:bg-brand-blue/10 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue"
+          className="touch-manipulation lg:hidden relative z-50 flex items-center justify-center w-12 h-12 rounded-full text-purple-200 hover:text-brand-blue hover:bg-brand-blue/10 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue"
         >
-          <AnimatePresence mode="wait" initial={false}>
-            {menuOpen ? (
-              <motion.span
-                key="close"
-                initial={{ rotate: -90, opacity: 0 }}
-                animate={{ rotate: 0, opacity: 1 }}
-                exit={{ rotate: 90, opacity: 0 }}
-                transition={{ duration: 0.2 }}
-              >
-                <X className="h-6 w-6" />
-              </motion.span>
-            ) : (
-              <motion.span
-                key="open"
-                initial={{ rotate: 90, opacity: 0 }}
-                animate={{ rotate: 0, opacity: 1 }}
-                exit={{ rotate: -90, opacity: 0 }}
-                transition={{ duration: 0.2 }}
-              >
-                <Menu className="h-6 w-6" />
-              </motion.span>
-            )}
-          </AnimatePresence>
+          <span className="relative block h-6 w-6">
+            <Menu
+              className={`tp-menu-icon absolute inset-0 h-6 w-6 ${
+                menuOpen ? "rotate-90 opacity-0" : "rotate-0 opacity-100"
+              }`}
+            />
+            <X
+              className={`tp-menu-icon absolute inset-0 h-6 w-6 ${
+                menuOpen ? "rotate-0 opacity-100" : "-rotate-90 opacity-0"
+              }`}
+            />
+          </span>
         </button>
       </div>
       </div>
 
-      <AnimatePresence>
-        {menuOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.25 }}
-            className="fixed inset-0 z-40 md:hidden flex flex-col items-center justify-center gap-7 text-xl font-semibold bg-[#0a0a18]/90 backdrop-blur-md"
+      {menuOpen && (
+        <div
+          className="tp-menu-overlay-in fixed inset-0 z-40 lg:hidden overflow-y-auto overscroll-contain bg-[#0a0a18]/95"
+        >
+          {/* `min-h-full` (not the outer div's own `flex justify-center`) does
+              the centering: a flex container with `justify-content: center`
+              can't be scrolled to reach content that overflows past its
+              start edge — with enough links open (6 + the Blog submenu +
+              Entrar) that's exactly what happened, some links became
+              unreachable. This still centers short content but lets tall
+              content scroll normally from the top instead. */}
+          <div
+            onClick={(e) => {
+              if (e.target === e.currentTarget) closeMenu();
+            }}
+            className="flex min-h-full w-full flex-col items-center justify-center gap-7 py-10 text-xl font-semibold"
           >
+            {/* prefetch={false}: this overlay only mounts on the tap that opens
+                the menu, and every visible <Link> kicks off an App-Router
+                prefetch (RSC fetch + parse) at once — a main-thread burst
+                landing exactly on that tap, which janks the open on iOS
+                Safari/Chrome. Browsers that skip prefetch (e.g. Brave) don't
+                see it. The targets are cheap in-page anchors plus /blog and
+                /login, so on-demand navigation is fine. */}
             {NAV_LINKS.map((link, i) => (
-              <div key={link.href} className="flex flex-col items-center gap-4">
-                <motion.a
-                  href={link.href}
-                  onClick={toggleMenu}
-                  initial={{ opacity: 0, y: 16 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3, delay: 0.05 * i }}
-                  className={`tp-nav-link-underline${isActive(link.href) ? " active" : ""}`}
-                >
-                  {link.label}
-                </motion.a>
-                {link.children?.map((child) => (
-                  <motion.a
-                    key={child.href}
-                    href={child.href}
-                    onClick={toggleMenu}
-                    initial={{ opacity: 0, y: 16 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.3, delay: 0.05 * i }}
-                    className="flex items-center gap-1.5 text-base font-normal text-gray-400 hover:text-brand-blue transition-colors"
-                  >
-                    {child.href === "/blog/login" && <PenSquare className="h-3.5 w-3.5" />}
-                    {child.href === "/blog/admin-login" && <ShieldCheck className="h-3.5 w-3.5" />}
-                    {child.label}
-                  </motion.a>
-                ))}
-              </div>
+              <Link
+                key={link.href}
+                href={link.href}
+                prefetch={false}
+                onClick={closeMenu}
+                data-track={`navmobile_${link.label.toLowerCase()}`}
+                style={{ animationDelay: `${0.05 * i}s` }}
+                className={`touch-manipulation tp-menu-link-in tp-nav-link-underline tp-mobile-nav-link${
+                  isActive(link.href) ? " active" : ""
+                }`}
+              >
+                {link.label}
+              </Link>
             ))}
-            <motion.div
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3, delay: 0.05 * NAV_LINKS.length }}
+            <div
+              style={{ animationDelay: `${0.05 * NAV_LINKS.length}s` }}
+              className="tp-menu-link-in"
             >
               <Link
                 href="/login"
-                onClick={toggleMenu}
-                className="tp-btn-animated inline-flex items-center gap-1.5 rounded-full px-6 py-2.5 text-lg font-bold text-white shadow-lg transition-transform active:scale-95"
+                prefetch={false}
+                onClick={closeMenu}
+                data-track="navmobile_entrar"
+                className="tp-btn-animated inline-flex items-center gap-1.5 rounded-full px-6 py-3 text-lg font-bold text-white shadow-lg transition-transform active:scale-95"
               >
                 <LogIn className="h-5 w-5" />
                 Entrar
               </Link>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+            </div>
+          </div>
+        </div>
+      )}
     </nav>
   );
 }

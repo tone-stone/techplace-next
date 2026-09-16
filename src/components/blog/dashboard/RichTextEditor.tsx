@@ -1,5 +1,13 @@
 "use client";
 
+/**
+ * WYSIWYG editor for an article's body, used inside `ArticleForm`. Wraps a
+ * `contentEditable` div with a formatting toolbar (bold/italic/uppercase,
+ * headings, font size, alignment, spellcheck toggle, undo/redo) built on
+ * the browser's `document.execCommand`, and emits the resulting HTML string
+ * up to the parent on every change.
+ */
+
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   AlignCenter,
@@ -19,6 +27,8 @@ type RichTextEditorProps = {
   placeholder?: string;
 };
 
+// Single toolbar button; uses onMouseDown+preventDefault so clicking it
+// doesn't steal focus/selection away from the editor.
 function ToolbarButton({
   onClick,
   label,
@@ -49,6 +59,11 @@ function ToolbarButton({
   );
 }
 
+/**
+ * Renders the formatting toolbar and the editable content area, syncing
+ * `value` in from outside only when it didn't originate from this editor's
+ * own input (to avoid clobbering the browser's native undo history).
+ */
 export default function RichTextEditor({ value, onChange, placeholder }: RichTextEditorProps) {
   const editorRef = useRef<HTMLDivElement>(null);
   const lastEmitted = useRef(value);

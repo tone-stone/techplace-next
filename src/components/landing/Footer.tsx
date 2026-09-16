@@ -24,6 +24,11 @@ const SOCIAL_LINKS = [
 const WATER_BACK = "M0,80C240,130,480,130,720,80C960,30,1200,30,1440,80V150H0Z";
 const WATER_FRONT = "M0,100C240,60,480,60,720,100C960,140,1200,140,1440,100V150H0Z";
 
+/**
+ * The site-wide footer: brand recap, navigation links, contact details, an
+ * embedded map, and social links, all sitting above an animated SVG "water"
+ * effect at the very bottom of the page.
+ */
 export default function Footer() {
   return (
     <footer
@@ -62,19 +67,25 @@ export default function Footer() {
                 className="h-16 w-auto mb-3 drop-shadow-[0_0_16px_rgba(144,205,221,0.35)]"
               />
               <p className="text-sm leading-relaxed">
-                Desarrollo Web &nbsp;|&nbsp; Apps Móviles &nbsp;|&nbsp; Cyberseguridad <br />
+                Desarrollo web &nbsp;·&nbsp; Aplicaciones móviles &nbsp;·&nbsp; IA &nbsp;·&nbsp; Ciberseguridad <br />
                 Innovación que protege tu futuro digital.
               </p>
             </div>
 
             <div>
-              <h4 className="font-heading text-purple-400 font-bold mb-4 text-sm tracking-wide uppercase">
+              <h3 className="font-heading text-purple-400 font-bold mb-3 sm:mb-4 text-sm tracking-wide uppercase">
                 Navegación
-              </h4>
-              <ul className="space-y-2 text-sm">
+              </h3>
+              {/* Mobile: links wrap in a horizontal row to cut footer height.
+                  From sm up (footer becomes a multi-column grid) it's a
+                  normal vertical list again. */}
+              <ul className="flex flex-wrap gap-x-5 gap-y-1 text-sm sm:block sm:space-y-2">
                 {NAV_LINKS.map((link) => (
                   <li key={link.href}>
-                    <Link href={link.href} className="hover:text-brand-blue hover:pl-1 transition-all">
+                    <Link
+                      href={link.href}
+                      className="block py-1 hover:text-brand-blue transition-all sm:-my-1.5 sm:py-1.5 sm:hover:pl-1"
+                    >
                       {link.label}
                     </Link>
                   </li>
@@ -83,19 +94,25 @@ export default function Footer() {
             </div>
 
             <div>
-              <h4 className="font-heading text-purple-400 font-bold mb-4 text-sm tracking-wide uppercase">
+              <h3 className="font-heading text-purple-400 font-bold mb-4 text-sm tracking-wide uppercase">
                 Contacto
-              </h4>
+              </h3>
               <ul className="space-y-3 text-sm">
-                <li className="flex items-center gap-2">
-                  <Phone className="h-4 w-4 text-brand-blue" />
-                  <a href="tel:6643425615" className="hover:text-brand-blue transition">
+                <li>
+                  <a
+                    href="tel:6643425615"
+                    className="-my-1.5 flex items-center gap-2 py-1.5 hover:text-brand-blue transition"
+                  >
+                    <Phone className="h-4 w-4 shrink-0 text-brand-blue" />
                     664 342 56 15
                   </a>
                 </li>
-                <li className="flex items-center gap-2">
-                  <Mail className="h-4 w-4 text-brand-blue" />
-                  <a href="mailto:info@techplacetj.com" className="hover:text-brand-blue transition">
+                <li>
+                  <a
+                    href="mailto:info@techplacetj.com"
+                    className="-my-1.5 flex items-center gap-2 py-1.5 hover:text-brand-blue transition"
+                  >
+                    <Mail className="h-4 w-4 shrink-0 text-brand-blue" />
                     info@techplacetj.com
                   </a>
                 </li>
@@ -139,7 +156,10 @@ export default function Footer() {
           </div>
 
           <div className="mt-10 border-t border-white/10 pt-6 text-center text-xs text-gray-500">
-            © {new Date().getFullYear()} TechPlace – Todos los derechos reservados.
+            © {new Date().getFullYear()} TechPlace – Todos los derechos reservados. ·{" "}
+            <Link href="/legal" className="hover:text-brand-blue transition-colors">
+              Legal
+            </Link>
           </div>
         </Reveal>
       </div>

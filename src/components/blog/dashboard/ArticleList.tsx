@@ -1,11 +1,27 @@
 "use client";
 
+/**
+ * List of blog articles in the dashboard, shown next to `ArticleForm`.
+ * Clicking a row starts editing it; admins additionally get a delete
+ * button. Styled per `role` (indigo for redactor, purple for admin).
+ */
+
+import { useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { ExternalLink, Pencil, Trash2, Video as VideoIcon } from "lucide-react";
 import { CATEGORY_ICONS, formatPostDate } from "@/lib/blog-posts";
 import type { ManagedArticle } from "@/lib/blog/articles";
+import ConfirmDialog from "@/components/admin/ConfirmDialog";
 import type { DashboardRole } from "./types";
 
+/**
+ * Renders the article list with status badges (draft/published), a link to
+ * the live article once published, and edit/delete actions.
+ *
+ * @param canDelete - Whether the delete button is shown; false for
+ * redactors, who can create/edit but not delete.
+ */
 export default function ArticleList({
   articles,
   editingId,
@@ -21,6 +37,7 @@ export default function ArticleList({
   onEdit: (id: string) => void;
   onDelete: (id: string) => void;
 }) {
+  const [toDelete, setToDelete] = useState<ManagedArticle | null>(null);
   const isAdmin = role === "admin";
   const cardClass = isAdmin ? "tp-dark-card-admin" : "tp-dark-card";
   const accentText = isAdmin ? "text-purple-300" : "text-indigo-300";
@@ -45,7 +62,6 @@ export default function ArticleList({
           const Icon = CATEGORY_ICONS[article.category];
           const isEditing = article.id === editingId;
           return (
-            // eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events
             <div
               key={article.id}
               onClick={() => onEdit(article.id)}
@@ -58,8 +74,13 @@ export default function ArticleList({
                   className={`flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl border ${accentIconWrap}`}
                 >
                   {article.coverImageUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={article.coverImageUrl} alt="" className="h-full w-full object-cover" />
+                    <Image
+                      src={article.coverImageUrl}
+                      alt=""
+                      width={56}
+                      height={56}
+                      className="h-full w-full object-contain"
+                    />
                   ) : (
                     Icon && <Icon className={`h-6 w-6 ${accentText}`} strokeWidth={1.5} />
                   )}
@@ -115,7 +136,7 @@ export default function ArticleList({
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
-                      onDelete(article.id);
+                      setToDelete(article);
                     }}
                     className="ml-auto inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-gray-300 transition-colors hover:border-red-400/40 hover:bg-red-500/10 hover:text-red-400"
                   >
@@ -131,6 +152,16 @@ export default function ArticleList({
           <p className="py-8 text-center text-sm text-gray-500">No hay artículos todavía.</p>
         )}
       </div>
+
+      <ConfirmDialog
+        open={toDelete !== null}
+        title="Eliminar artículo"
+        body={toDelete ? `Se eliminará "${toDelete.title}".` : undefined}
+        onConfirm={() => {
+          if (toDelete) onDelete(toDelete.id);
+        }}
+        onClose={() => setToDelete(null)}
+      />
     </div>
   );
 }

@@ -1,5 +1,12 @@
 "use client";
 
+/**
+ * Admin-only dashboard panel listing recent create/edit/delete actions
+ * taken on blog articles during the current session. Activity is kept in
+ * client state by `DashboardClient` (not persisted), so this log resets on
+ * page reload.
+ */
+
 import { History } from "lucide-react";
 import type { ActivityAction, ActivityEntry } from "./types";
 
@@ -9,6 +16,7 @@ const DOT_COLOR: Record<ActivityAction, string> = {
   eliminó: "bg-red-400",
 };
 
+// Formats an ISO timestamp as a relative Spanish time string (e.g. "hace 5 min").
 function timeAgo(iso: string): string {
   const diffMs = Date.now() - new Date(iso).getTime();
   const seconds = Math.max(0, Math.floor(diffMs / 1000));
@@ -21,6 +29,10 @@ function timeAgo(iso: string): string {
   return `hace ${days} d`;
 }
 
+/**
+ * Renders the reverse-chronological list of activity entries, each showing
+ * who did what to which article and how long ago.
+ */
 export default function ActivityLog({ entries }: { entries: ActivityEntry[] }) {
   return (
     <div className="tp-dark-card-admin rounded-3xl p-6 sm:p-8">

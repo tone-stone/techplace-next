@@ -1,13 +1,66 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { LayoutDashboard } from "lucide-react";
+
+/**
+ * Server-rendered entry point for the dashboard at `/admin`. Resolves the
+ * signed-in account's role, fetches only the datasets that role's modules
+ * need (in parallel), and hands them to the client-side `CrmDashboard`
+ * shell. The proxy already enforced that the user is signed in with a valid
+ * role; the redirect here is defence in depth.
+ */
+
 import { createClient } from "@/lib/supabase/server";
-import { logout } from "@/lib/auth/actions";
-import { listProjectBriefs } from "@/lib/briefs/actions";
-import BriefsPanel from "@/components/admin/BriefsPanel";
+import { getAssignableUsers, listUsers } from "@/lib/auth/users";
+import { listArticles } from "@/lib/blog/articles";
+import { getAllPayments, getClients } from "@/lib/crm/clients";
+import { getAllContacts } from "@/lib/crm/contacts";
+import { getContracts } from "@/lib/crm/contracts";
+import { getServices } from "@/lib/crm/services";
+import { SERVICES } from "@/lib/services/catalog";
+import { getClientHealthMap, getPlans, getScheduledCharges, getUpcomingCollections } from "@/lib/crm/collections";
+import { getExpenses } from "@/lib/crm/expenses";
+import { getProjectNames, getProjects } from "@/lib/crm/projects";
+import { getInvoices } from "@/lib/crm/invoices";
+import { getQuotes } from "@/lib/crm/quotes";
+import { getAllTasks } from "@/lib/crm/tasks";
+import { getAssets } from "@/lib/it/assets";
+import { getTickets } from "@/lib/it/tickets";
+import { getMonthlyUsageByClient } from "@/lib/it/time-entries";
+import { getAppSettings } from "@/lib/settings";
+import {
+  canManageAllUsers,
+  canManageBlogUsers,
+  canManageSettings,
+  canReadBilling,
+  canSeeMonitoring,
+  canUseBlogModule,
+  canUseCrmCore,
+  canUseSupport,
+  canOpenDashboard,
+  type ProfileRole,
+  type Role,
+} from "@/lib/auth/roles";
+import {
+  getErrorStats,
+  getFailedLogins,
+  getRecentErrors,
+  getSlowOperations,
+  getSlowPagesByTtfb,
+  getWebVitalsSummary,
+} from "@/lib/monitoring/queries";
+import CrmDashboard from "@/components/admin/CrmDashboard";
 
 export const metadata: Metadata = {
   title: "Cotizaciones | Panel TechPlace",
+};
+
+const EMPTY_MONITORING = {
+  recentErrors: [],
+  errorStats: { daily: [], last24h: 0, last7d: 0 },
+  webVitals: [],
+  slowOperations: [],
+  slowPages: [],
+  failedLogins: { last24h: 0, last7d: 0, recent: [] },
 };
 
 export default async function AdminPage() {
@@ -15,44 +68,140 @@ export default async function AdminPage() {
   const {
     data: { user },
   } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
 
-  if (!user) {
-    redirect("/login");
-  }
+  const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).is("deleted_at", null).single();
+  const role = (profile as ProfileRole | null)?.role;
+  if (!role || !canOpenDashboard(role)) redirect("/login");
+  const r = role as Role;
 
-  const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
-  const role = profile?.role === "admin" ? "admin" : "redactor";
+  const crmCore = canUseCrmCore(r);
+  const billing = canReadBilling(r);
+  const support = canUseSupport(r);
+  const blog = canUseBlogModule(r);
+  const monitoring = canSeeMonitoring(r);
 
-  const briefsResult = await listProjectBriefs();
-  const briefs = "briefs" in briefsResult ? briefsResult.briefs : [];
+  const [
+    clients,
+    payments,
+    projects,
+    invoices,
+    quotes,
+    collections,
+    scheduledCharges,
+    plans,
+    expenses,
+    clientHealth,
+    contracts,
+    services,
+    contractUsage,
+    assets,
+    tickets,
+    contactsAll,
+    appSettings,
+    tasks,
+    assignees,
+    usersResult,
+    blogUsersResult,
+    articlesResult,
+    mon,
+  ] = await Promise.all([
+    crmCore ? getClients() : Promise.resolve([]),
+    crmCore ? getAllPayments() : Promise.resolve([]),
+    crmCore ? getProjects() : Promise.resolve([]),
+    billing ? getInvoices() : Promise.resolve([]),
+    crmCore ? getQuotes() : Promise.resolve([]),
+    billing ? getUpcomingCollections() : Promise.resolve([]),
+    billing ? getScheduledCharges() : Promise.resolve([]),
+    billing ? getPlans() : Promise.resolve([]),
+    billing ? getExpenses() : Promise.resolve([]),
+    billing ? getClientHealthMap() : Promise.resolve({}),
+    billing ? getContracts() : Promise.resolve([]),
+    billing ? getServices() : Promise.resolve([]),
+    billing ? getMonthlyUsageByClient() : Promise.resolve({}),
+    support ? getAssets() : Promise.resolve([]),
+    support ? getTickets() : Promise.resolve([]),
+    support ? getAllContacts() : Promise.resolve([]),
+    canManageSettings(r) ? getAppSettings() : Promise.resolve(null),
+    getAllTasks(),
+    getAssignableUsers(),
+    canManageAllUsers(r) ? listUsers() : Promise.resolve({ users: [] }),
+    canManageBlogUsers(r) ? listUsers({ blogOnly: true }) : Promise.resolve({ users: [] }),
+    blog ? listArticles() : Promise.resolve({ articles: [] }),
+    monitoring
+      ? Promise.all([
+          getRecentErrors(),
+          getErrorStats(),
+          getWebVitalsSummary(),
+          getSlowOperations(),
+          getSlowPagesByTtfb(),
+          getFailedLogins(),
+        ])
+      : Promise.resolve(null),
+  ]);
+
+  const projectOptions = crmCore
+    ? projects.map((p) => ({ id: p.id, name: p.name }))
+    : await getProjectNames();
+
+  const monitoringProps = mon
+    ? {
+        recentErrors: mon[0],
+        errorStats: mon[1],
+        webVitals: mon[2],
+        slowOperations: mon[3],
+        slowPages: mon[4],
+        failedLogins: mon[5],
+      }
+    : EMPTY_MONITORING;
+
+  const envStatus = {
+    resend: !!process.env.RESEND_API_KEY,
+    cron: !!process.env.CRON_SECRET,
+    fromEmail: !!process.env.BILLING_FROM_EMAIL,
+    twilio:
+      !!process.env.TWILIO_ACCOUNT_SID &&
+      !!process.env.TWILIO_AUTH_TOKEN &&
+      !!process.env.TWILIO_WHATSAPP_FROM,
+  };
 
   return (
-    <div className="min-h-screen bg-linear-to-br from-[#160a1f] via-[#150c1e] to-[#05040c] text-white">
-      <header className="sticky top-0 z-30 flex items-center justify-between gap-4 border-b border-white/10 bg-black/30 px-4 py-4 backdrop-blur-md sm:px-6">
-        <div className="flex items-center gap-2">
-          <LayoutDashboard className="h-5 w-5 text-purple-300" />
-          <h1 className="font-heading text-xl font-extrabold tracking-tight sm:text-2xl">Cotizaciones</h1>
-        </div>
-        <div className="flex items-center gap-3">
-          <span className="hidden truncate text-xs text-gray-400 sm:inline">{user.email}</span>
-          <form action={logout}>
-            <button
-              type="submit"
-              className="rounded-full border border-white/10 px-4 py-1.5 text-xs font-semibold text-gray-300 transition-colors hover:border-red-400/40 hover:text-red-300"
-            >
-              Cerrar sesión
-            </button>
-          </form>
-        </div>
-      </header>
-
-      <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
-        {"error" in briefsResult ? (
-          <p className="text-sm text-red-400">No pudimos cargar las cotizaciones: {briefsResult.error}</p>
-        ) : (
-          <BriefsPanel initialBriefs={briefs} canManage={role === "admin"} />
-        )}
-      </main>
-    </div>
+    <CrmDashboard
+      email={user.email ?? ""}
+      userName={(user.user_metadata?.full_name as string | undefined) ?? ""}
+      userId={user.id}
+      role={r}
+      users={"users" in usersResult ? usersResult.users : []}
+      blogUsers={"users" in blogUsersResult ? blogUsersResult.users : []}
+      assignees={assignees}
+      blogArticles={"articles" in articlesResult ? articlesResult.articles : []}
+      projectOptions={projectOptions}
+      clients={clients}
+      payments={payments}
+      projects={projects}
+      invoices={invoices}
+      quotes={quotes}
+      collections={collections}
+      scheduledCharges={scheduledCharges}
+      plans={plans}
+      expenses={expenses}
+      clientHealth={clientHealth}
+      assets={assets}
+      tickets={tickets}
+      contacts={contactsAll}
+      contracts={contracts}
+      services={services}
+      catalogServiceNames={SERVICES.map((s) => s.title)}
+      servicePricing={SERVICES.map((s) => ({
+        title: s.title,
+        slug: s.slug,
+        packages: s.packages ?? [],
+      }))}
+      contractUsage={contractUsage}
+      appSettings={appSettings}
+      envStatus={envStatus}
+      tasks={tasks}
+      {...monitoringProps}
+    />
   );
 }

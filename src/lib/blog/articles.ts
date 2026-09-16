@@ -1,9 +1,21 @@
 "use server";
 
+/**
+ * Server actions and data-access functions for blog articles: public reads
+ * (published articles only, via the public Supabase client) for the blog
+ * pages, and staff-gated reads/writes (via the authenticated Supabase
+ * client) for the dashboard, including cover/video/gallery uploads to
+ * Cloudinary. Staff access is gated by `requireStaff()`, which in turn
+ * checks `canUseBlogModule()` — dios, admin, blog, and redactor.
+ */
+
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createPublicClient } from "@/lib/supabase/public";
 import cloudinary from "@/lib/cloudinary";
 import { MAX_IMAGE_BYTES, MAX_VIDEO_BYTES, formatBytes } from "@/lib/blog/media-limits";
+import { canUseBlogModule, canDeleteArticles, type ProfileRole } from "@/lib/auth/roles";
+import { softDelete } from "@/lib/crm/soft-delete";
 
 export type ManagedArticle = {
   id: string;
@@ -22,6 +34,8 @@ export type ManagedArticle = {
 
 export type ArticleActionState = { error: string } | { success: true } | null;
 
+// Builds a URL-safe slug from an article title, with a random suffix to
+// avoid collisions between similarly titled articles.
 function slugify(title: string): string {
   const base = title
     .toLowerCase()
@@ -32,6 +46,14 @@ function slugify(title: string): string {
   return `${base || "articulo"}-${Math.random().toString(36).slice(2, 7)}`;
 }
 
+/**
+ * Auth/authorization gate for every dashboard-only action below: requires a
+ * signed-in user whose role passes `canUseBlogModule()` (dios, admin, blog,
+ * redactor).
+ *
+ * @returns The failure reason on rejection, or the user's id and profile on
+ * success.
+ */
 async function requireStaff() {
   const supabase = await createClient();
   const {
@@ -40,12 +62,16 @@ async function requireStaff() {
 
   if (!user) return { ok: false as const, error: "No autenticado" };
 
-  const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
-  if (!profile) return { ok: false as const, error: "No tienes un perfil de equipo asociado" };
+  const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).is("deleted_at", null).single();
+  if (!profile || !canUseBlogModule(profile as ProfileRole)) {
+    return { ok: false as const, error: "No tienes permisos para el módulo de blog" };
+  }
 
-  return { ok: true as const, userId: user.id, role: profile.role as "admin" | "redactor" };
+  return { ok: true as const, userId: user.id, email: user.email ?? null, profile: profile as ProfileRole };
 }
 
+// Converts a raw `articles` table row (snake_case) into the camelCase
+// `ManagedArticle` shape used throughout the app.
 function mapRow(row: {
   id: string;
   slug: string;
@@ -76,6 +102,10 @@ function mapRow(row: {
   };
 }
 
+/**
+ * Estimates reading time for an article's HTML content from its word count
+ * (~200 words/minute), rounded up to at least 1 minute.
+ */
 export async function estimateReadTime(html: string): Promise<string> {
   const words = html
     .replace(/<[^>]*>/g, " ")
@@ -84,45 +114,74 @@ export async function estimateReadTime(html: string): Promise<string> {
   return `${Math.max(1, Math.round(words / 200))} min`;
 }
 
+/**
+ * Fetches every published article via the public Supabase client, newest
+ * first — used by the public blog pages, which don't need staff access.
+ */
 export async function getPublishedArticles(): Promise<ManagedArticle[]> {
-  const supabase = await createClient();
+  const supabase = createPublicClient();
   const { data } = await supabase
     .from("articles")
     .select("*")
     .eq("status", "published")
+    .is("deleted_at", null)
     .order("created_at", { ascending: false });
 
   return (data ?? []).map(mapRow);
 }
 
-export async function getRelatedArticles(excludeSlug: string, count = 2): Promise<ManagedArticle[]> {
+/**
+ * Fetches every published article except the one at `excludeSlug`, for the
+ * "related articles" carousel on a post page.
+ */
+export async function getOtherArticles(excludeSlug: string): Promise<ManagedArticle[]> {
   const articles = await getPublishedArticles();
-  return articles.filter((a) => a.slug !== excludeSlug).slice(0, count);
+  return articles.filter((a) => a.slug !== excludeSlug);
 }
 
+/**
+ * Fetches a single published article by slug, or `null` if it doesn't
+ * exist or isn't published.
+ */
 export async function getPublishedArticleBySlug(slug: string): Promise<ManagedArticle | null> {
-  const supabase = await createClient();
+  const supabase = createPublicClient();
   const { data } = await supabase
     .from("articles")
     .select("*")
     .eq("status", "published")
     .eq("slug", slug)
+    .is("deleted_at", null)
     .single();
 
   return data ? mapRow(data) : null;
 }
 
+/**
+ * Fetches every article (draft and published) for the dashboard's article
+ * list. Staff-gated via `requireStaff()`.
+ */
 export async function listArticles(): Promise<{ articles: ManagedArticle[] } | { error: string }> {
   const check = await requireStaff();
   if (!check.ok) return { error: check.error };
 
   const supabase = await createClient();
-  const { data, error } = await supabase.from("articles").select("*").order("created_at", { ascending: false });
+  const { data, error } = await supabase
+    .from("articles")
+    .select("*")
+    .is("deleted_at", null)
+    .order("created_at", { ascending: false });
 
   if (error) return { error: error.message };
   return { articles: (data ?? []).map(mapRow) };
 }
 
+/**
+ * Uploads a file to Cloudinary under `techplace-blog/{folder}`, rejecting
+ * it up front if it exceeds `maxBytes`. Images are normalized to WebP;
+ * videos are uploaded as-is.
+ *
+ * @returns The uploaded asset's secure (HTTPS) URL.
+ */
 async function uploadMedia(file: File, folder: "covers" | "videos" | "gallery", maxBytes: number): Promise<string> {
   if (file.size > maxBytes) {
     throw new Error(`"${file.name}" pesa ${formatBytes(file.size)} — el máximo es ${formatBytes(maxBytes)}.`);
@@ -151,12 +210,18 @@ async function uploadMedia(file: File, folder: "covers" | "videos" | "gallery", 
   });
 }
 
+// Extracts the non-empty File entries submitted under the `galleryImages` field.
 function galleryFilesFrom(formData: FormData): File[] {
   return formData
     .getAll("galleryImages")
     .filter((entry): entry is File => entry instanceof File && entry.size > 0);
 }
 
+/**
+ * Server action backing "Publicar artículo": validates required fields,
+ * uploads any cover/video/gallery media, and inserts a new published
+ * article row. Staff-gated via `requireStaff()`.
+ */
 export async function createArticleAction(
   _prevState: ArticleActionState,
   formData: FormData
@@ -211,6 +276,12 @@ export async function createArticleAction(
   return { success: true };
 }
 
+/**
+ * Server action backing "Guardar cambios": validates required fields,
+ * uploads any newly picked media (keeping previously saved gallery URLs the
+ * user didn't remove), and updates the article row. Staff-gated via
+ * `requireStaff()`.
+ */
 export async function updateArticleAction(
   _prevState: ArticleActionState,
   formData: FormData
@@ -267,16 +338,25 @@ export async function updateArticleAction(
   return { success: true };
 }
 
+/**
+ * Server action backing article deletion. Gated via `requireStaff()`
+ * (`canUseBlogModule`); `canDeleteArticles` is the same set today, kept as an
+ * explicit hook for when article deletion needs a tighter rule.
+ */
 export async function deleteArticleAction(id: string): Promise<ArticleActionState> {
   const check = await requireStaff();
   if (!check.ok) return { error: check.error };
-  if (check.role !== "admin") return { error: "Solo un administrador puede eliminar artículos" };
+  if (!canDeleteArticles(check.profile)) return { error: "No tienes permiso para eliminar artículos" };
 
-  const supabase = await createClient();
-  const { error } = await supabase.from("articles").delete().eq("id", id);
-
-  if (error) return { error: error.message };
+  const result = await softDelete({
+    table: "articles",
+    id,
+    actorId: check.userId,
+    actorEmail: check.email ?? null,
+  });
+  if (!result.ok) return { error: result.error };
 
   revalidatePath("/blog");
+  revalidatePath("/admin");
   return { success: true };
 }

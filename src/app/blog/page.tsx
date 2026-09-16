@@ -1,3 +1,10 @@
+/**
+ * Public blog index at `/blog` — lists every published article as cards,
+ * with client-side category filtering handled by `BlogListClient`. Also
+ * defines this route's SEO metadata (OpenGraph/Twitter cards) and revalidates
+ * on a timer instead of rendering fully dynamically.
+ */
+import type { Metadata } from "next";
 import Aurora from "@/components/landing/Aurora";
 import Navbar from "@/components/landing/Navbar";
 import Footer from "@/components/landing/Footer";
@@ -7,6 +14,38 @@ import BlogPostCard from "@/components/blog/BlogPostCard";
 import BlogListClient from "@/components/blog/BlogListClient";
 import { getPublishedArticles } from "@/lib/blog/articles";
 
+// Articles rarely change more than a few times a day; revalidating on a
+// timer instead of on every request avoids a live Supabase round-trip per
+// visit (this route was fully dynamic — ƒ in the build output).
+export const revalidate = 60;
+
+const TITLE = "Blog | TechPlace";
+const DESCRIPTION =
+  "Noticias, tendencias y guías sobre desarrollo de software, ciberseguridad e inteligencia artificial, escritas por el equipo de TechPlace en Tijuana.";
+
+export const metadata: Metadata = {
+  title: TITLE,
+  description: DESCRIPTION,
+  alternates: { canonical: "/blog" },
+  openGraph: {
+    title: TITLE,
+    description: DESCRIPTION,
+    url: "/blog",
+    type: "website",
+    images: ["/img/logos/techplace-brand.webp"],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: TITLE,
+    description: DESCRIPTION,
+    images: ["/img/logos/techplace-brand.webp"],
+  },
+};
+
+/**
+ * Fetches all published articles and hands them, pre-rendered as
+ * `BlogPostCard` nodes, to `BlogListClient` for interactive filtering.
+ */
 export default async function BlogPage() {
   const articles = await getPublishedArticles();
   const categories = Array.from(new Set(articles.map((post) => post.category)));
@@ -34,9 +73,7 @@ export default async function BlogPage() {
             </p>
           </Reveal>
 
-          <Reveal delay={0.15}>
-            <BlogListClient items={items} categories={categories} />
-          </Reveal>
+          <BlogListClient items={items} categories={categories} />
         </div>
       </main>
 
