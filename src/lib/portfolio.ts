@@ -59,7 +59,7 @@ export const PROJECTS: Project[] = [
     title: "Escuela de Ingles Especializada",
     description: "Desarrollo web y SEO local.",
     tags: ["Desarrollo web", "SEO local"],
-    url: "https://industrialbajasupply.com/",
+    url: "https://escueladeinglesespecializada.com/",
     services: ["desarrollo-web", "hosting"],
   },
   {
