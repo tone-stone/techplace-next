@@ -67,7 +67,7 @@ export const PROJECTS: Project[] = [
     title: "Cervantes Quijano Abogados",
     description: "Admin web + correo empresarial seguro.",
     tags: ["Panel administrativo", "Correo empresarial", "Seguridad"],
-    url: "https://prosin.com.mx/",
+    url: "https://cervantes-quijano.com/",
     services: ["desarrollo-web", "hosting"],
   },
   {
