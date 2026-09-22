@@ -95,6 +95,14 @@ export const PROJECTS: Project[] = [
     services: ["desarrollo-web", "hosting"],
   },
   {
+    image: "/img/portfolio/vidal-publicidad.webp",
+    title: "Vidal Publicidad",
+    description: "Sitio web para imprenta y diseño gráfico en Tijuana.",
+    tags: ["Desarrollo web", "Diseño gráfico"],
+    url: "https://www.vidalpublicidad.com.mx/",
+    services: ["desarrollo-web", "hosting"],
+  },
+  {
     image: "/img/logos/techplace-brand.webp",
     title: "TechPlace",
     description: "Nuestro propio sitio: hardening, monitoreo y pruebas de seguridad continuas.",
