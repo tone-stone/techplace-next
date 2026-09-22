@@ -103,6 +103,14 @@ export const PROJECTS: Project[] = [
     services: ["desarrollo-web", "hosting"],
   },
   {
+    image: "/img/portfolio/la-glorieta.webp",
+    title: "Taquizas La Glorieta",
+    description: "Sitio web para servicio de taquizas y barras de comida para eventos.",
+    tags: ["Desarrollo web", "Eventos"],
+    url: "https://taquizaslaglorietatj.com/",
+    services: ["desarrollo-web", "hosting"],
+  },
+  {
     image: "/img/logos/techplace-brand.webp",
     title: "TechPlace",
     description: "Nuestro propio sitio: hardening, monitoreo y pruebas de seguridad continuas.",
