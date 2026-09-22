@@ -75,7 +75,7 @@ export const PROJECTS: Project[] = [
     title: "PROSIN",
     description: "Desarrollo web, seguridad, experiencia industrial.",
     tags: ["Desarrollo web", "Ciberseguridad", "Experiencia industrial"],
-    url: "https://www.oldsoulsrestaurante.com/",
+    url: "https://prosin.com.mx/",
     services: ["desarrollo-web", "hosting"],
   },
   {
