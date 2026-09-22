@@ -22,6 +22,7 @@ import { getExpenses } from "@/lib/crm/expenses";
 import { getProjectNames, getProjects } from "@/lib/crm/projects";
 import { getInvoices } from "@/lib/crm/invoices";
 import { getQuotes } from "@/lib/crm/quotes";
+import { listProjectBriefs } from "@/lib/briefs/actions";
 import { getAllTasks } from "@/lib/crm/tasks";
 import { getAssets } from "@/lib/it/assets";
 import { getTickets } from "@/lib/it/tickets";
@@ -51,7 +52,7 @@ import {
 import CrmDashboard from "@/components/admin/CrmDashboard";
 
 export const metadata: Metadata = {
-  title: "Panel | TechPlace",
+  title: "Cotizaciones | Panel TechPlace",
 };
 
 const EMPTY_MONITORING = {
@@ -87,6 +88,7 @@ export default async function AdminPage() {
     projects,
     invoices,
     quotes,
+    briefsResult,
     collections,
     scheduledCharges,
     plans,
@@ -111,6 +113,7 @@ export default async function AdminPage() {
     crmCore ? getProjects() : Promise.resolve([]),
     billing ? getInvoices() : Promise.resolve([]),
     crmCore ? getQuotes() : Promise.resolve([]),
+    crmCore ? listProjectBriefs() : Promise.resolve({ briefs: [] }),
     billing ? getUpcomingCollections() : Promise.resolve([]),
     billing ? getScheduledCharges() : Promise.resolve([]),
     billing ? getPlans() : Promise.resolve([]),
@@ -181,6 +184,7 @@ export default async function AdminPage() {
       projects={projects}
       invoices={invoices}
       quotes={quotes}
+      briefs={"briefs" in briefsResult ? briefsResult.briefs : []}
       collections={collections}
       scheduledCharges={scheduledCharges}
       plans={plans}

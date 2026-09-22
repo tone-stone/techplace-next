@@ -4,10 +4,12 @@
  * from that trusted route with `createAdminClient` (service-role).
  *
  * Collects everything coming due inside the configured lead window —
- * unfinished tasks and projects with a `due_date`, and open support tickets
- * with an `sla_due_at` — plus anything already overdue, and sends dios/admin
- * one internal digest (email always, WhatsApp when the internal list is set).
- * Payments are left to the cobranza cron so the two don't double up.
+ * unfinished tasks and projects with a `due_date`, open support tickets
+ * with an `sla_due_at`, and quotes sitting in "enviada" whose `valid_until`
+ * is approaching (the client never responded) — plus anything already
+ * overdue, and sends dios/admin one internal digest (email always, WhatsApp
+ * when the internal list is set). Payments are left to the cobranza cron so
+ * the two don't double up.
  */
 
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -24,6 +26,7 @@ export type AgendaRunResult = {
   tasks: number;
   projects: number;
   tickets: number;
+  quotes: number;
   emailSent: boolean;
   whatsappSent: boolean;
   errors: string[];
@@ -50,6 +53,7 @@ export async function runAgendaCycle(now: Date = new Date()): Promise<AgendaRunR
   let tasks = 0;
   let projects = 0;
   let tickets = 0;
+  let quotes = 0;
 
   // --- Tasks --------------------------------------------------------------
   const { data: taskRows, error: taskErr } = await supabase
@@ -115,6 +119,27 @@ export async function runAgendaCycle(now: Date = new Date()): Promise<AgendaRunR
     });
   }
 
+  // --- Quotes about to expire without a response -------------------------
+  const { data: quoteRows, error: quoteErr } = await supabase
+    .from("crm_quotes")
+    .select("number, client_name, client_company, valid_until")
+    .eq("status", "enviada")
+    .not("valid_until", "is", null)
+    .lte("valid_until", horizonDate)
+    .is("deleted_at", null);
+  if (quoteErr) errors.push(`quotes: ${quoteErr.message}`);
+  for (const r of quoteRows ?? []) {
+    if (!r.valid_until) continue;
+    quotes++;
+    items.push({
+      kind: "cotizacion",
+      title: `${r.number} · ${r.client_name}`,
+      company: r.client_company,
+      date: r.valid_until,
+      daysLeft: daysUntil(r.valid_until, now),
+    });
+  }
+
   items.sort((a, b) => a.date.localeCompare(b.date));
 
   // --- Deliver ---------------------------------------------------------
@@ -150,5 +175,5 @@ export async function runAgendaCycle(now: Date = new Date()): Promise<AgendaRunR
     }
   }
 
-  return { items: items.length, tasks, projects, tickets, emailSent, whatsappSent, errors };
+  return { items: items.length, tasks, projects, tickets, quotes, emailSent, whatsappSent, errors };
 }

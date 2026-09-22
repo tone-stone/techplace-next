@@ -19,6 +19,7 @@ const NAV_LINKS = [
   { href: "/#portafolio", label: "Portafolio" },
   { href: "/blog", label: "Blog" },
   { href: "/#contacto", label: "Contacto" },
+  { href: "/cotizacion", label: "Cotización" },
 ];
 
 /** Site-wide navigation bar: logo, section links, Blog dropdown, and mobile menu. */

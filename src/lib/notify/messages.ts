@@ -7,7 +7,7 @@
 import { formatCurrencyMXN } from "@/lib/crm/format";
 
 export type AgendaItem = {
-  kind: "tarea" | "proyecto" | "soporte";
+  kind: "tarea" | "proyecto" | "soporte" | "cotizacion";
   title: string;
   company: string | null;
   date: string;
@@ -18,6 +18,7 @@ const KIND_LABEL: Record<AgendaItem["kind"], string> = {
   tarea: "Tarea",
   proyecto: "Proyecto",
   soporte: "Soporte (SLA)",
+  cotizacion: "Cotización",
 };
 
 function whenLabel(daysLeft: number, date: string): string {
@@ -108,6 +109,29 @@ export function quoteAcceptedWhatsApp(opts: {
     `Total: *${formatCurrencyMXN(opts.total)}*`,
     "Conviértela en plan desde el detalle de la cotización.",
   ].join("\n");
+}
+
+/** Internal alert when a new lead comes in through the public /cotizacion form. */
+export function newBriefWhatsApp(opts: {
+  orgName: string;
+  fullName: string;
+  businessName: string | null;
+  leadSource: string | null;
+  projectType: string;
+  budgetRange: string;
+  phone: string;
+}): string {
+  return [
+    `*Nueva solicitud de cotización* — ${opts.orgName}`,
+    `${opts.fullName}${opts.businessName ? ` · ${opts.businessName}` : ""}`,
+    `Proyecto: ${opts.projectType}`,
+    `Presupuesto: ${opts.budgetRange}`,
+    opts.leadSource ? `Fuente: ${opts.leadSource}` : null,
+    `Tel: ${opts.phone}`,
+    "Revisa el panel — pestaña Solicitudes.",
+  ]
+    .filter((l): l is string => l !== null)
+    .join("\n");
 }
 
 /** Internal daily agenda of what's due soon. */
