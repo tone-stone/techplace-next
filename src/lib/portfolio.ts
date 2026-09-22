@@ -88,10 +88,10 @@ export const PROJECTS: Project[] = [
   },
   {
     image: "/img/portfolio/bel-industrial.webp",
-    title: "BelIndusrial",
+    title: "Bel Industrial",
     description: "Admin web + correo empresarial seguro.",
     tags: ["Panel administrativo", "Correo empresarial", "Seguridad"],
-    url: "https://prosin.com.mx/",
+    url: "https://belindustrial.com/",
     services: ["desarrollo-web", "hosting"],
   },
   {
