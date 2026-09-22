@@ -119,6 +119,14 @@ export const PROJECTS: Project[] = [
     services: ["desarrollo-web", "hosting"],
   },
   {
+    image: "/img/portfolio/conspro.webp",
+    title: "CONSPRO",
+    description: "Sitio web para fabricación, diseño e instalación de grúas viajeras.",
+    tags: ["Desarrollo web", "Catálogo de productos"],
+    url: "https://gruasconspro.com/",
+    services: ["desarrollo-web", "hosting"],
+  },
+  {
     image: "/img/logos/techplace-brand.webp",
     title: "TechPlace",
     description: "Nuestro propio sitio: hardening, monitoreo y pruebas de seguridad continuas.",
