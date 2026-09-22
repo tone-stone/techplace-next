@@ -2,7 +2,6 @@ import Image from "next/image";
 import Link from "next/link";
 import { Clock4, Mail, MapPin, Phone } from "lucide-react";
 import { FaFacebookF, FaGithub, FaLinkedinIn, FaWhatsapp } from "react-icons/fa6";
-import { LEGAL_DOCS } from "@/lib/legal-docs";
 import Reveal from "./Reveal";
 
 const NAV_LINKS = [
@@ -159,13 +158,21 @@ export default function Footer() {
           <div className="mt-10 border-t border-white/10 pt-6 text-center text-xs text-gray-500">
             <p>© {new Date().getFullYear()} TechPlace – Todos los derechos reservados.</p>
             <ul className="mt-3 flex flex-wrap justify-center gap-x-4 gap-y-1.5">
-              {LEGAL_DOCS.map((doc) => (
-                <li key={doc.slug}>
-                  <Link href={`/legal/${doc.slug}`} className="hover:text-brand-blue transition-colors">
-                    {doc.title}
-                  </Link>
-                </li>
-              ))}
+              <li>
+                <Link href="/legal/terminos" className="hover:text-brand-blue transition-colors">
+                  Términos y Condiciones
+                </Link>
+              </li>
+              <li>
+                <Link href="/legal/privacidad" className="hover:text-brand-blue transition-colors">
+                  Aviso de Privacidad
+                </Link>
+              </li>
+              <li>
+                <Link href="/legal" className="hover:text-brand-blue transition-colors">
+                  Legal
+                </Link>
+              </li>
             </ul>
           </div>
         </Reveal>
