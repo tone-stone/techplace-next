@@ -83,7 +83,7 @@ export const PROJECTS: Project[] = [
     title: "Rentas TJ",
     description: "Desarrollo web y SEO local.",
     tags: ["Desarrollo web", "SEO local"],
-    url: "https://industrialbajasupply.com/",
+    url: "https://rentastj.com.mx/",
     services: ["desarrollo-web", "hosting"],
   },
   {
