@@ -111,6 +111,14 @@ export const PROJECTS: Project[] = [
     services: ["desarrollo-web", "hosting"],
   },
   {
+    image: "/img/portfolio/dsl-industrial.webp",
+    title: "DSL Industrial",
+    description: "Sitio web para distribuidora de suministros de limpieza y seguridad industrial.",
+    tags: ["Desarrollo web", "Catálogo de productos"],
+    url: "https://dslindustrial.com.mx/",
+    services: ["desarrollo-web", "hosting"],
+  },
+  {
     image: "/img/logos/techplace-brand.webp",
     title: "TechPlace",
     description: "Nuestro propio sitio: hardening, monitoreo y pruebas de seguridad continuas.",
